@@ -1,0 +1,10 @@
+# Should be used to parse database
+count: 100
+backgrounds:
+  selection: random # random, sortby
+backgrounddir: ${data.synthdir}/backgrounds
+potdir: ${data.synthdir}/pots
+pot_jitter: [200, 500] # (min, max) extent of random placement of pots
+pots:
+  selection: random # random, sortby
+  sortby: date # batch, date, location, growth, camerasettings
