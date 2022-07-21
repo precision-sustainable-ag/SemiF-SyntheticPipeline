@@ -1,17 +1,10 @@
 
-batch_id: ${general.batch_id}
-workdir: ${hydra:runtime.cwd}  # where the code is executed
 count: 1500
 pot_jitter: [100, 100]
-blob_cutout: semifield-cutouts
-blob_model: semifield-models
-blob_synth: semifield-synth
 
-datadir: ${synth.workdir}/data
-synthdir: ${synth.datadir}/${synth.blob_synth}
-cutoutdir: ${synth.datadir}/${synth.blob_cutout}
-modeldir: ${synth.datadir}/${synth.blob_model}
-
-cutout_batchdir: ${synth.cutoutdir}/${synth.batch_id}
+datadir: ${general.workdir}/data
+synthdir: ${data.datadir}/${blob_names.synth}
 potdir: ${synth.synthdir}/pots
 backgrounddir: ${synth.synthdir}/backgrounds
+
+cutout_batchdir: ${data.cutoutdir}/${general.batch_id}

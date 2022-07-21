@@ -1,7 +1,5 @@
 defaults:
-  - autosfm: autosfm
   - maintenance: maintenance
-  - segment: segment
   - synth: synth
   - _self_
 
@@ -15,47 +13,15 @@ general:
   save_to_database: False
   from_database: False
   db: test  # test, trial, WIR
-  multitask: False
-  multitasks: [develop_images, copy_from_blob, auto_sfm, localize_plants, remap_labels, assign_species, segment_vegetation, copy_products_to_blobs, sythesize]
-  task: develop_images  # auto_sfm, localize_plants, remap_labels, segment_vegetation
+  task: synthesize  # auto_sfm, localize_plants, remap_labels, segment_vegetation
   workdir: ${hydra:runtime.cwd}  # where the code is executed
 
 blob_names:
-  upload: semifield-upload-images
-  developed: semifield-developed-images
-  utils: semifield-utils
+  synth: semifield-synth
   cutout: semifield-cutouts
-  model: semifield-models
-
-blob_storage:
-  blobhome: ${general.workdir}/blob_storage # /home/azureuser
-  uploaddir: ${blob_storage.blobhome}/${blob_names.upload}
-  developeddir: ${blob_storage.blobhome}/${blob_names.developed}
-  rawbatchdir: ${blob_storage.developeddir}/${general.batch_id}
-  utilsdir: ${blob_storage.blobhome}/${blob_names.utils}
-  cutoutdir: ${blob_storage.blobhome}/${blob_names.cutout}
-  modeldir: ${blob_storage.blobhome}/${blob_names.model}
 
 data:
   datadir: ${general.workdir}/data
-  uploaddir: ${data.datadir}/${blob_names.upload}
-  developeddir: ${data.datadir}/${blob_names.developed}
-  batchdir: ${data.developeddir}/${general.batch_id} # Is overiden by shell script
-  cutoutdir: ${data.datadir}/${blob_names.cutout}
-  modeldir: ${data.datadir}/${blob_names.model}
-  utilsdir: ${data.datadir}/${blob_names.utils}
-  logdir: ${general.workdir}/logs
-  species: ${data.utilsdir}/species_info.json # All species information
-  rename: True
-
-im_development:
-  color_profiles_dir: ${blob_storage.utilsdir}/image_development/color_profiles
-  dev_profiles_dir: ${blob_storage.utilsdir}/image_development/dev_profiles
-
-detect:
-  model_filename: best.pt
-  model_path: ${data.modeldir}/plant_detector/${detect.model_filename}
-  detections_csv: ${data.batchdir}/autosfm
-  save_detection: False
-  detectioncropdir: ${general.imagedir} # Location to save detection crops
-  device: "cuda:0"
+  cutoutdir: /home/admin_mkutugata/SemiF-AnnotationPipeline/data/semifield-cutouts
+  batchdir: ${data.cutoutdir}/${general.batch_id} # Is overiden by shell script
+  

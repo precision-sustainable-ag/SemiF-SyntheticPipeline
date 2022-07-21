@@ -19,7 +19,7 @@ def main(cfg: DictConfig) -> None:
 
     # Create synth data container
     data = SynthDataContainer(synthdir=cfg.synth.synthdir,
-                              batch_id=cfg.synth.batch_id,
+                              batch_id=cfg.general.batch_id,
                               background_dir=cfg.synth.backgrounddir,
                               pot_dir=cfg.synth.potdir,
                               cutout_dir=cfg.synth.cutout_batchdir)

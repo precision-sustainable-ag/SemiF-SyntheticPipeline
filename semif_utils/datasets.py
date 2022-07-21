@@ -663,7 +663,9 @@ class Cutout:
     @property
     def array(self):
         # Read the image from the file and return the numpy array
-        cut_array = cv2.imread(f"data/semifield-cutouts/{self.cutout_path}")
+        cut_array = cv2.imread(
+            f"/home/admin_mkutugata/SemiF-AnnotationPipeline/data/semifield-cutouts/{self.cutout_path}"
+        )
         cut_array = np.ascontiguousarray(
             cv2.cvtColor(cut_array, cv2.COLOR_BGR2RGB))
         return cut_array
