@@ -3,6 +3,10 @@
 
 #--------- Project Ignore ---------
 
+
+# Log files
+*.log
+
 # Hydra files
 .hydra
 
