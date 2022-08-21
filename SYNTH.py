@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 
 @hydra.main(config_path="conf", config_name="config")
-def run_SEMIF(cfg: DictConfig) -> None:
+def run_SYNTH(cfg: DictConfig) -> None:
     cfg = OmegaConf.create(cfg)
     print(cfg.general.task)
     log.info(f"Starting task {cfg.general.task}")
@@ -20,4 +20,4 @@ def run_SEMIF(cfg: DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    run_SEMIF()
+    run_SYNTH()

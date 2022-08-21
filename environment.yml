@@ -14,4 +14,3 @@ dependencies:
     - scikit-image
     - scikit-learn
     - scipy
-# TODO update
