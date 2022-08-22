@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import typing
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -32,11 +33,22 @@ class BoxCoordinates:
 
     @property
     def config(self):
+        if isinstance(self.top_left, np.ndarray):
+            _top_left = self.top_left.tolist()
+            _top_right = self.top_right.tolist()
+            _bottom_left = self.bottom_left.tolist()
+            _bottom_right = self.bottom_right.tolist()
+        else:
+            _top_left = self.top_left
+            _top_right = self.top_right
+            _bottom_left = self.bottom_left
+            _bottom_right = self.bottom_right
+
         _config = {
-            "top_left": self.top_left.tolist(),
-            "top_right": self.top_right.tolist(),
-            "bottom_left": self.bottom_left.tolist(),
-            "bottom_right": self.bottom_right.tolist()
+            "top_left": _top_left,
+            "top_right": _top_right,
+            "bottom_left": _bottom_left,
+            "bottom_right": _bottom_right
         }
 
         return _config
@@ -60,6 +72,13 @@ class BoxCoordinates:
                               bottom_left=self.bottom_left.copy(),
                               bottom_right=self.bottom_right.copy(),
                               is_scaleable=self.is_scaleable)
+
+    def __getitem__(self, key):
+
+        if not hasattr(self, key):
+            raise AttributeError(f"{self.__class__.__name__} has not attribute {key}")
+
+        return getattr(self, key)
 
 
 def init_empty():
@@ -397,11 +416,12 @@ class Box:
     bbox_id: str
     image_id: str
     local_centroid: list
-    local_coordinates: dict
+    local_coordinates: BoxCoordinates
     global_centroid: list
-    global_coordinates: dict
+    global_coordinates: BoxCoordinates
     cls: str
     is_primary: bool
+    overlapping_bbox_ids: List[BBox] = field(init=False, default_factory=lambda : [])
 
     def assign_species(self, species):
         self.cls = species
@@ -438,6 +458,8 @@ class Image:
     batch_id: str
     image_path: str
     image_id: str
+    plant_date: str
+    growth_stage: str
 
     def __post_init__(self):
         image_array = self.array
@@ -462,6 +484,8 @@ class Image:
             "batch_id": self.batch_id,
             "image_id": self.image_id,
             "image_path": self.image_path,
+            "plant_date": self.plant_date,
+            "growth_stage": self.growth_stage,
             "width": self.width,
             "height": self.height,
             "exif_meta": asdict(self.exif_meta),
@@ -527,6 +551,7 @@ class RemapImage(Image):
         _config = super(RemapImage, self).config
         _config["fullres_width"] = self.fullres_width
         _config["fullres_height"] = self.fullres_height
+        
 
         return _config
 
@@ -546,9 +571,10 @@ class ImageData(Image):
     schema_version: str = "1.0"
 
     def __post_init__(self):
-        self.width = self.fullres_width
-        self.height = self.fullres_height
-
+        # Overload the post init of the super class
+        # which reads the array for the width and height.
+        # The width and height will be available in the metadata
+        pass
     @property
     def config(self):
         _config = {
@@ -557,6 +583,8 @@ class ImageData(Image):
             "batch_id": self.batch_id,
             "image_id": self.image_id,
             "image_path": self.image_path,
+            "plant_date": self.plant_date,
+            "growth_stage": self.growth_stage,
             "width": self.width,
             "height": self.height,
             "exif_meta": asdict(self.exif_meta),
@@ -638,6 +666,8 @@ class CutoutProps:
     eccentricity: Union[float, list]
     solidity: Union[float, list]
     perimeter: Union[float, list]
+    is_green: bool
+    green_sum: int
 
 
 @dataclass
@@ -650,10 +680,12 @@ class Cutout:
     cutout_num: int
     datetime: datetime.datetime  # Datetime of original image creation
     cutout_props: CutoutProps
-    cutout_path: str = None
     cutout_id: str = field(init=False)
+    cutout_path: str = field(init=False)
     cls: str = None
     is_primary: bool = False
+    extends_border: bool = False
+    cutout_version: str = "1.0"
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self):
@@ -663,9 +695,7 @@ class Cutout:
     @property
     def array(self):
         # Read the image from the file and return the numpy array
-        cut_array = cv2.imread(
-            f"/home/admin_mkutugata/SemiF-AnnotationPipeline/data/semifield-cutouts/{self.cutout_path}"
-        )
+        cut_array = cv2.imread(self.cutout_path)
         cut_array = np.ascontiguousarray(
             cv2.cvtColor(cut_array, cv2.COLOR_BGR2RGB))
         return cut_array
@@ -684,6 +714,8 @@ class Cutout:
             "is_primary": self.is_primary,
             "datetime": self.datetime,
             "cutout_props": self.cutout_props,
+            "extends_border": self.extends_border,
+            "cutout_version": self.cutout_version,
             "schema_version": self.schema_version
         }
 
@@ -708,7 +740,6 @@ class Cutout:
                     cv2.cvtColor(cutout_array, cv2.COLOR_RGB2BGRA))
         return True
 
-
 # Synthetic Data Generation -------------------------------------------------------------------------
 @dataclass
 class Pot:
@@ -725,7 +756,7 @@ class Pot:
         pot_array = np.ascontiguousarray(
             cv2.cvtColor(pot_array, cv2.COLOR_BGR2RGBA))
         return pot_array
-
+    
     @property
     def config(self):
         _config = {
@@ -759,7 +790,7 @@ class Background:
         background_array = np.ascontiguousarray(
             cv2.cvtColor(background_array, cv2.COLOR_BGR2RGB))
         return background_array
-
+    
     @property
     def config(self):
         _config = {
@@ -790,7 +821,7 @@ class SynthImage:
 
     def __post_init__(self):
         self.synth_id = uuid.uuid4()
-
+    
     @property
     def config(self):
         _config = {
@@ -821,11 +852,9 @@ class SynthDataContainer:
     """Combines documents in a database with items in a directory to form data container for generating synthetic bench images. Includes lists of dataclasses for cutouts, pots, and backgrounds.
     """
     synthdir: str
-    batch_id: str
-    background_dir: str
-    pot_dir: str
-    cutout_dir: str
-
+    background_dir: str = None
+    pot_dir: str = None
+    cutout_dir: str = None
     cutouts: list[Cutout] = field(init=False, default=None)
     pots: list[Pot] = field(init=False, default=None)
     backgrounds: list[Background] = field(init=False, default=None)
@@ -834,7 +863,7 @@ class SynthDataContainer:
         self.backgrounds = self.get_dcs("Backgrounds")
         self.pots = self.get_dcs("Pots")
         self.cutouts = self.get_dcs("Cutouts")
-
+    
     def get_data_from_json(self, jsun):
         """ Open json and create dictionary
         """
@@ -842,7 +871,7 @@ class SynthDataContainer:
         with open(jsun) as json_file:
             data = json.load(json_file)
         return data
-
+        
     def get_jsons(self, collection):
         """ Gets json files
         """
@@ -851,18 +880,8 @@ class SynthDataContainer:
         collection_dir = collection + "_dir"
         if collection == "cutout":
             jsondir = Path(self.cutout_dir, getattr(self, collection_dir))
-            # jsons = jsondir.glob("*.json")
-            ## Temporary solution to get large cutouts first
-            jsons = jsondir.glob("*.png")
-            # make a generator for tuples of file path and size: ('/Path/to/the.file', 1024)
-            # all_files = (os.path.join(basedir, filename)
-            #              for basedir, dirs, files in os.walk(jsondir)
-            #              for filename in files)
-            sorted_files = sorted(jsons, key=os.path.getsize, reverse=True)
-            jsons = []
-            for x in sorted_files:
-                new_path = str(x).replace("png", "json")
-                jsons.append(new_path)
+            jsons = jsondir.glob("*.json")
+            jsons = [x for x in jsons]
         else:
             jsons = Path(self.synthdir, getattr(self,
                                                 collection_dir)).glob("*.json")
@@ -877,6 +896,7 @@ class SynthDataContainer:
         Places connected items in a list of dataclasses.
         """
         syn_datacls = {"cutout": Cutout, "pot": Pot, "background": Background}
+        
         cursor = self.get_jsons(collection_str)
 
         if collection_str == "Cutouts":
@@ -911,6 +931,9 @@ class SynthDataContainer:
 
         return docs
 
+    
+
+   
 
 CUTOUT_PROPS = [
     "area",  # float Area of the region i.e. number of pixels of the region scaled by pixel-area.
