@@ -11,26 +11,28 @@ import torch
 import torchvision.ops.boxes as bops
 from omegaconf import DictConfig
 from PIL import Image, ImageEnhance
+from semif_utils.utils import img2RGBA
 
 
 class SynthPipeline:
-
-    def __init__(self, datacontainer, cfg: DictConfig) -> None:
+    def __init__(self, data, cfg: DictConfig) -> None:
         self.synthdir = Path(cfg.synth.synthdir)
         self.count = cfg.synth.count
         self.back_dir = cfg.synth.backgrounddir
         self.pot_dir = cfg.synth.potdir
 
-        self.backgrounds = datacontainer.backgrounds
-        self.used_backs = []
+        self.backgrounds = data.backgrounds
+        self.back = None
+        self.back_ht, self.back_wd = None, None
 
-        self.pots = datacontainer.pots
-        self.used_pots = []
+        self.pots = data.pots
+        self.pot = None
+        self.pot_positions = None
+        self.pot_ht, self.pot_wd = None, None
 
-        self.cutouts = datacontainer.cutouts
-        self.used_cutouts = []
-
-        self.replace_backs = self.replace_backgrounds()
+        self.cutouts = data.cutouts
+        self.cutout = None
+        self.cut_ht, self.cut_wd = None, None
 
         self.imagedir = Path(self.synthdir, "images")
         self.imagedir.mkdir(parents=True, exist_ok=True)
@@ -38,6 +40,8 @@ class SynthPipeline:
         self.maskdir.mkdir(parents=True, exist_ok=True)
         self.json_dir = Path(self.synthdir, "metadata")
         self.json_dir.mkdir(parents=True, exist_ok=True)
+
+        self.fore_str = None
 
 #---------------------- Get images -------------------------------
 
@@ -47,44 +51,26 @@ class SynthPipeline:
         return True if self.count > len(self.backgrounds) else False
 
     def get_back(self, sortby=None):
-        # if self.replace_backs:
-        #     self.back = random.choice(self.backgrounds)
-        # else:
-        #     self.backgrounds = [
-        #         x for x in self.backgrounds if x not in self.used_backs
-        #     ]
-        #     self.back = random.choice(self.backgrounds)
-        # self.used_backs.append(self.back)
+        self.back = random.choice(self.backgrounds)
 
-        # return self.back
-        back = random.choice(self.backgrounds)
-        return back
+    def get_pot_positions(self):
+        self.pot_positions = rand_pot_grid((6368, 9560))
 
-    def get_pots(self, num_pots, sortby=None):
+    def get_pot(self):
+        self.pot = random.choice(self.pots)
 
-        # self.pots = [x for x in self.pots if x not in self.used_pots]
-        # if num_pots > self.count or len(self.pots) == 1:
-        #     self.pots = self.pots
-        # else:
-        #     self.pots = random.sample(self.pots, num_pots)
-        # self.used_pots.append(self.pots)
-        return self.pots
-
-    def get_cutouts(self, num_cutouts, sortby=None):
-        # self.cutouts = [x for x in self.cutouts if x not in self.used_cutouts]
-
-        # self.cutouts = random.sample(self.cutouts,
-        #  min(num_cutouts, len(self.cutouts)))
-        self.cutouts = random.sample(self.cutouts[:5000], 2000)
-        # self.used_cutouts.append(self.cutouts)
+    def get_cutouts(self, sortby=None):
         return self.cutouts
+
+    def prep_cutout(self):
+        self.cutout = random.choice(self.cutouts)
 
 #------------------- Overlap checks --------------------------------
 
     def check_overlap(self, y, x, potshape, pot_positions):  # x = w ; h = y
         """Check overlap from list of previous bbox coordinates"""
         if not None in pot_positions:
-            pot_h, pot_w, _ = potshape
+            pot_h, pot_w = potshape
 
             # adds pot dimensions to y,x position information
             x0, x1, y0, y1 = x, x + pot_w, y, y + pot_h
@@ -92,14 +78,17 @@ class SynthPipeline:
             r0 = Rect(Point(x0, y0), Point(x1, y1))
 
             for y_old, x_old, oldpotshape in pot_positions:
-                old_h, old_w, _ = oldpotshape
+                old_h, old_w = oldpotshape
                 x00, x11, y00, y11 = x_old, x_old + old_w, y_old, y_old + old_h
                 r1 = Rect(Point(x00, y00), Point(x11, y11))
-                while overlap(r0, r1):
-                    x, y = x + random.randint(-2500, 2500), y + random.randint(
-                        -2000, 2000)
+                ovrlap_var = overlap(r0, r1)
+                while ovrlap_var:
+                    x, y = x + random.randint(-150, 150), y + random.randint(
+                        -50, 50)
                     x0, x1, y0, y1 = x, x + pot_w, y, y + pot_h
                     r0 = Rect(Point(x0, y0), Point(x1, y1))
+                    if y > self.back.back_ht or x > self.back.back_wdt:
+                        ovrlap_var = True
         return y, x
 
     def check_negative_positions(self, topl_y, topl_x, fore):
@@ -115,20 +104,34 @@ class SynthPipeline:
         return topl_y, topl_x, fore
 
     def check_positive_position(self, topl_y, topl_x, potshape, backshape,
-                                fore):
+                                pot_arr):
         """ Crops foreground image (pot or plant) if position coordinates extend beyond background frame in positive direction.
         """
         pot_h, pot_w, _ = potshape
         back_h, back_w, _ = backshape
 
         if topl_x + pot_w > back_w:
-            back_w = back_w - topl_x
-            fore = fore[:, :back_w]
+            back_w_edge = topl_x + pot_w - back_w
+            pot_arr = pot_arr[:, :-back_w_edge]
 
         if topl_y + pot_h > back_h:
-            back_h = back_h - topl_y
-            fore = fore[:back_h, :]
-        return fore
+            print("topl_y + pot_h > back_h")
+            print("topl_y ", topl_y)
+            print("pot_h ", pot_h)
+            back_h_edge = topl_y + pot_h - back_h
+            print("back_h changed ", back_h)
+            pot_arr = pot_arr[:-back_h_edge, :]
+
+        return pot_arr
+
+    def center_on_background(self, y, x, back_shape, fore_shape):
+        # pot positions and shape top left corner
+        back_h, back_w = back_shape
+        fore_h, fore_w = fore_shape
+        newx = int(((back_w - fore_w) / 2) + x)
+        newy = int(((back_h - fore_h) / 2) + y)
+        # assert (newy > self.back.back_ht) and (newx > self.back.back_wdt), "Centering on background failed."
+        return newx, newy
 
 #-------------------------- Transform pots or plants --------------------------------------
 
@@ -165,48 +168,75 @@ class SynthPipeline:
 
 #-------------------------- Overlay and blend --------------------------------------
 
-    def blend(self, y, x, fore, back, mask=None):
+    def blend_pot(self, y, x, pot, back):
         # image info
         back_h, back_w, _ = back.shape
-        fore_h, fore_w, _ = fore.shape
+        pot_h, pot_w, _ = pot.shape
 
-        y2 = y + fore_h
-        x2 = x + fore_w
+        y2 = y + pot_h
+        x2 = x + pot_w
         if y2 > back_h:
             y2 = back_h
         if x2 > back_w:
             x2 = back_w
 
         # masks
-        fore_mask = fore[..., 3:] / 255
-        alpha_l = 1.0 - fore_mask
-        # blend
-        print("\nback shape", back.shape)
-        print("y", y)
-        print("y2", y2)
-        print("x", x)
-        print("x2", x2)
-        print("alpha_l ", alpha_l.shape)
-        print("fore_mask ", fore_mask.shape)
-        print("fore ", fore.shape)
-        print("Sliced background shape ", back[y:y2, x:x2].shape)
-        back[y:y2, x:x2] = alpha_l * back[y:y2, x:x2] + fore_mask * fore
-        if mask is None:
-            return back, y, x
-        else:
-            mask[y:y2, x:x2] = (255) * fore_mask + mask[y:y2, x:x2] * alpha_l
-            return back, mask, y, x
+        pot_mask = pot[..., 3:] / 255
+        alpha_l = 1.0 - pot_mask
+        back[y:y2, x:x2] = alpha_l * back[y:y2, x:x2] + pot_mask * pot
+        return back, y, x
 
-    def overlay(self, topl_y, topl_x, fore, back, mask=None):
-        # check positions
-        print("\nBefore check negative", (topl_y, topl_x))
-        topl_y, topl_x, fore = self.check_negative_positions(
-            topl_y, topl_x, fore)
-        print("After check negative", (topl_y, topl_x))
-        print()
-        fore = self.check_positive_position(topl_y, topl_x, fore.shape,
-                                            back.shape, fore)
-        return self.blend(topl_y, topl_x, fore, back, mask=mask)
+    def blend_cutout(self, y, x, cutout, pot, mask):
+        # image info
+        pot_h, pot_w, _ = pot.shape
+        cutout_h, cutout_w, _ = cutout.shape
+
+        y2 = y + cutout_h
+        x2 = x + cutout_w
+        if y2 > pot_h:
+            y2 = pot_h
+        if x2 > pot_w:
+            x2 = pot_w
+
+        # masks
+        cutout_mask = cutout[..., 3:] / 255
+        alpha_l = 1.0 - cutout_mask
+        pot[y:y2, x:x2] = alpha_l * pot[y:y2, x:x2] + cutout_mask * cutout
+        mask[y:y2, x:x2] = (255) * cutout_mask + mask[y:y2, x:x2] * alpha_l
+        return pot, mask, y, x
+
+    def overlay(self, topl_y, topl_x, fore_arr, back_arr, mask=None):
+
+        if "pot" in self.fore_str.lower():
+            # check positions
+            topl_y, topl_x, fore_arr = self.check_negative_positions(
+                topl_y, topl_x, fore_arr)
+
+            fore_arr = self.check_positive_position(topl_y, topl_x,
+                                                    fore_arr.shape,
+                                                    back_arr.shape, fore_arr)
+
+            fore_arr, arr_y, arr_x = self.blend_pot(topl_y, topl_x, fore_arr,
+                                                    back_arr)
+            return fore_arr, arr_y, arr_x
+
+        elif "cutout" in self.fore_str.lower():
+            fore_arr = img2RGBA(fore_arr)
+            # check positions
+            topl_y, topl_x, fore_arr = self.check_negative_positions(
+                topl_y, topl_x, fore_arr)
+
+            fore_arr = self.check_positive_position(topl_y, topl_x,
+                                                    fore_arr.shape,
+                                                    back_arr.shape, fore_arr)
+
+            fore_arr, mask, arr_y, arr_x = self.blend_cutout(topl_y,
+                                                             topl_x,
+                                                             fore_arr,
+                                                             back_arr,
+                                                             mask=mask)
+
+            return fore_arr, mask, arr_y, arr_x
 
     #---------------------- Save to directory and DB --------------------------------
 
@@ -245,22 +275,26 @@ def rand_pot_grid(img_shape):
     rand_ht = random.choice([2, 3])
 
     # Create width locations
-    x_wid = np.linspace(0, imgwid, rand_wid, dtype=int)
-    x_wid = x_wid[x_wid != 0]
-    x_diff = np.diff(x_wid)
-    x_diff = x_diff[0] if len(x_diff) > 1 else 0
-    xs = [(x - math.ceil(x_diff / 2)) if x != 0 else math.ceil(x / 2)
-          for x in x_wid]  # Accounts for 0 diff
+    wid = np.linspace(0, imgwid, rand_wid, dtype=int)
+    wid = wid[wid != 0]
+    wid_diff = np.diff(wid)
+
+    if len(wid_diff) >= 2:
+        wid_diff = wid_diff[0]
+    wid = [(x - math.ceil(wid_diff / 2)) if wid_diff != 0 else math.ceil(x / 2)
+           for x in wid]  # Accounts for 0 diff
 
     # Create height locations
-    y_ht = np.linspace(0, imght, rand_ht, dtype=int)
-    y_diff = np.diff(y_ht)[0]
-    y_ht = y_ht[y_ht != imght]
-    ys = [(y + int(y_diff / 2)) for y in y_ht]
-
+    ht = np.linspace(0, imght, rand_ht, dtype=int)
+    ht_diff = np.diff(ht)[0]
+    ht = ht[ht != imght]
+    ht = [(x + int(ht_diff / 2)) for x in ht]
     # Combine height and width to make coordinates
-    coords = list(itertools.product(ys, xs))
-
+    coords = list(itertools.product(wid, ht))
+    rand_x = 100 if rand_wid >= 4 else 600
+    rand_y = 100 if (rand_ht == 3) and (rand_wid >= 4) else 700
+    coords = [(x + random.randint(-rand_x, rand_x),
+               y + random.randint(-rand_y, rand_y)) for x, y in coords]
     return coords
 
 
@@ -281,50 +315,28 @@ def get_img_bbox(x, y, imgshape):
 def center2topleft(y, x, background_imgshape):
     """ Gets top left coordinates of an image from center point coordinate
     """
-    back_h, back_w, _ = background_imgshape
+    back_h, back_w = background_imgshape
     tpl_y = y - int(back_h / 2)
     tpl_x = x - int(back_w / 2)
     return tpl_y, tpl_x
 
 
-def transform_position(pot_position, imgshape, spread_factor):
+def transform_position(pot_position, imgshape):
     """ Applies random jitter factor to points and transforms them to top left image coordinates. 
     """
-    y, x = pot_position
-
-    # x = x + random.randint(-spread_factor, spread_factor)
-    # y = y + random.randint(-int(spread_factor / 3), int(spread_factor / 3))
-
+    x, y = pot_position
     tpl_y, tpl_x = center2topleft(y, x, imgshape)
 
     return tpl_y, tpl_x
 
 
-def center_on_background(y, x, back_shape, fore_shape):
-    # pot positions and shape top left corner
-    back_h, back_w, _ = back_shape
-    fore_h, fore_w, _ = fore_shape
-    newx = int(((back_w - fore_w) / 2) + x)
-    newy = int(((back_h - fore_h) / 2) + y)
-    return newx, newy
-
-
-def img2RGBA(img):
-    alpha = np.sum(img, axis=-1) > 0
-    alpha = np.uint8(alpha * 255)
-    img = np.dstack((img, alpha))
-    return img
-
-
 class Point(object):
-
     def __init__(self, x, y):
         self.x = x
         self.y = y
 
 
 class Rect(object):
-
     def __init__(self, p1, p2):
         '''Store the top, bottom, left and right values for points 
                p1 and p2 are the (corners) in either order
@@ -382,9 +394,3 @@ def save_dataclass_json(data_dict, path):
     json_path = Path(path)
     with open(json_path, 'w') as j:
         json.dump(data_dict, j, indent=4, default=str)
-
-
-def get_cutout_dir(batch_dir, cutout_dir):
-    batch = Path(batch_dir).name
-    cutout_dir = Path(cutout_dir, batch)
-    return cutout_dir

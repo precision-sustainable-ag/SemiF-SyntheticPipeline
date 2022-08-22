@@ -551,7 +551,7 @@ class RemapImage(Image):
         _config = super(RemapImage, self).config
         _config["fullres_width"] = self.fullres_width
         _config["fullres_height"] = self.fullres_height
-        
+
 
         return _config
 
@@ -680,11 +680,13 @@ class Cutout:
     cutout_num: int
     datetime: datetime.datetime  # Datetime of original image creation
     cutout_props: CutoutProps
+    cutout_path: Optional[str]
     cutout_id: str = field(init=False)
-    cutout_path: str = field(init=False)
     cls: str = None
     is_primary: bool = False
     extends_border: bool = False
+    cutout_ht: int = field(init=False)
+    cutout_wdt: int = field(init=False)
     cutout_version: str = "1.0"
     schema_version: str = SCHEMA_VERSION
 
@@ -695,10 +697,9 @@ class Cutout:
     @property
     def array(self):
         # Read the image from the file and return the numpy array
-        cut_array = cv2.imread(self.cutout_path)
-        cut_array = np.ascontiguousarray(
-            cv2.cvtColor(cut_array, cv2.COLOR_BGR2RGB))
-        return cut_array
+        array = cv2.imread(self.cutout_path)
+        array = np.ascontiguousarray(cv2.cvtColor(array, cv2.COLOR_BGR2RGB))
+        return array
 
     @property
     def config(self):
@@ -745,18 +746,20 @@ class Cutout:
 class Pot:
     pot_path: str
     pot_id: uuid = None
+    pot_ht: int = field(init=False)
+    pot_wdt: int = field(init=False)
 
     def __post_init__(self):
         self.pot_id = uuid.uuid4()
+        self.pot_ht, self.pot_wdt = self.array.shape[:2]
 
     @property
     def array(self):
         # Read the image from the file and return the numpy array
-        pot_array = cv2.imread(self.pot_path, cv2.IMREAD_UNCHANGED)
-        pot_array = np.ascontiguousarray(
-            cv2.cvtColor(pot_array, cv2.COLOR_BGR2RGBA))
-        return pot_array
-    
+        array = cv2.imread(self.pot_path, cv2.IMREAD_UNCHANGED)
+        array = np.ascontiguousarray(cv2.cvtColor(array, cv2.COLOR_BGR2RGBA))
+        return array
+
     @property
     def config(self):
         _config = {
@@ -779,18 +782,21 @@ class Pot:
 class Background:
     background_path: str
     background_id: uuid = None
+    back_ht: int = field(init=False)
+    back_wdt: int = field(init=False)
 
     def __post_init__(self):
         self.background_id = uuid.uuid4()
+        self.back_ht, self.back_wdt = self.array.shape[:2]
 
     @property
     def array(self):
         # Read the image from the file and return the numpy array
         background_array = cv2.imread(self.background_path)
         background_array = np.ascontiguousarray(
-            cv2.cvtColor(background_array, cv2.COLOR_BGR2RGB))
+            cv2.cvtColor(background_array, cv2.COLOR_BGR2BGRA))
         return background_array
-    
+
     @property
     def config(self):
         _config = {
@@ -821,7 +827,7 @@ class SynthImage:
 
     def __post_init__(self):
         self.synth_id = uuid.uuid4()
-    
+
     @property
     def config(self):
         _config = {
@@ -848,7 +854,7 @@ class SynthImage:
 
 
 @dataclass
-class SynthDataContainer:
+class SynthData:
     """Combines documents in a database with items in a directory to form data container for generating synthetic bench images. Includes lists of dataclasses for cutouts, pots, and backgrounds.
     """
     synthdir: str
@@ -863,7 +869,7 @@ class SynthDataContainer:
         self.backgrounds = self.get_dcs("Backgrounds")
         self.pots = self.get_dcs("Pots")
         self.cutouts = self.get_dcs("Cutouts")
-    
+
     def get_data_from_json(self, jsun):
         """ Open json and create dictionary
         """
@@ -871,7 +877,7 @@ class SynthDataContainer:
         with open(jsun) as json_file:
             data = json.load(json_file)
         return data
-        
+
     def get_jsons(self, collection):
         """ Gets json files
         """
@@ -879,7 +885,7 @@ class SynthDataContainer:
         collection = collection.lower().rstrip(collection[-1])
         collection_dir = collection + "_dir"
         if collection == "cutout":
-            jsondir = Path(self.cutout_dir, getattr(self, collection_dir))
+            jsondir = Path(self.cutout_dir)  #, getattr(self, collection_dir))
             jsons = jsondir.glob("*.json")
             jsons = [x for x in jsons]
         else:
