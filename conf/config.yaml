@@ -23,6 +23,6 @@ blob_names:
 
 data:
   datadir: ${general.workdir}/data
-  cutoutdir: ../${repo_names.semif_annotation}/data/${blob_names.cutout}/${general.batch_id}
+  cutoutdir: ../${repo_names.semif_annotation}/data/${blob_names.cutout}
   batchdir: ${data.cutoutdir}/${general.batch_id} # Is overiden by shell script
   
