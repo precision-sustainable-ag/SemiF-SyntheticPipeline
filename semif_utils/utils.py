@@ -86,11 +86,13 @@ def parse_dict(props_tabl):
             ndict[key] = float(val)
     return ndict
 
+
 def img2RGBA(img):
     alpha = np.sum(img, axis=-1) > 0
     alpha = np.uint8(alpha * 255)
     img = np.dstack((img, alpha))
     return img
+
 
 ######################################################
 ############### VEGETATION INDICES ###################

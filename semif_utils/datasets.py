@@ -76,7 +76,8 @@ class BoxCoordinates:
     def __getitem__(self, key):
 
         if not hasattr(self, key):
-            raise AttributeError(f"{self.__class__.__name__} has not attribute {key}")
+            raise AttributeError(
+                f"{self.__class__.__name__} has not attribute {key}")
 
         return getattr(self, key)
 
@@ -421,7 +422,8 @@ class Box:
     global_coordinates: BoxCoordinates
     cls: str
     is_primary: bool
-    overlapping_bbox_ids: List[BBox] = field(init=False, default_factory=lambda : [])
+    overlapping_bbox_ids: List[BBox] = field(init=False,
+                                             default_factory=lambda: [])
 
     def assign_species(self, species):
         self.cls = species
@@ -552,7 +554,6 @@ class RemapImage(Image):
         _config["fullres_width"] = self.fullres_width
         _config["fullres_height"] = self.fullres_height
 
-
         return _config
 
 
@@ -575,6 +576,7 @@ class ImageData(Image):
         # which reads the array for the width and height.
         # The width and height will be available in the metadata
         pass
+
     @property
     def config(self):
         _config = {
@@ -741,6 +743,7 @@ class Cutout:
                     cv2.cvtColor(cutout_array, cv2.COLOR_RGB2BGRA))
         return True
 
+
 # Synthetic Data Generation -------------------------------------------------------------------------
 @dataclass
 class Pot:
@@ -902,7 +905,7 @@ class SynthData:
         Places connected items in a list of dataclasses.
         """
         syn_datacls = {"cutout": Cutout, "pot": Pot, "background": Background}
-        
+
         cursor = self.get_jsons(collection_str)
 
         if collection_str == "Cutouts":
@@ -937,9 +940,6 @@ class SynthData:
 
         return docs
 
-    
-
-   
 
 CUTOUT_PROPS = [
     "area",  # float Area of the region i.e. number of pixels of the region scaled by pixel-area.
