@@ -10,7 +10,7 @@ import synthesize  # Do not remove
 log = logging.getLogger(__name__)
 
 
-@hydra.main(config_path="conf", config_name="config")
+@hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def run_SYNTH(cfg: DictConfig) -> None:
     cfg = OmegaConf.create(cfg)
     print(cfg.general.task)
