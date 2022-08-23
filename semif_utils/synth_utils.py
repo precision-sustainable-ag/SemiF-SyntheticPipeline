@@ -140,8 +140,13 @@ class SynthPipeline:
 
     def transform(self, fore):
         # get the alpha channel
+        if fore.shape[2] == 3:
+            fore = img2RGBA(fore)
+
         pil_fore = Image.fromarray(fore)
+
         fg_alpha = fore[:, :, 3]
+
         assert np.any(
             fg_alpha ==
             0), f'Foreground must have a 4th alpha layer for transparency.'
@@ -167,6 +172,7 @@ class SynthPipeline:
 
         # Add any other transformations here...
         fore = np.array(pil_fore)
+        print(fore.shape)
         return fore
 
 
@@ -225,7 +231,6 @@ class SynthPipeline:
             return fore_arr, arr_y, arr_x
 
         elif "cutout" in self.fore_str.lower():
-            fore_arr = img2RGBA(fore_arr)
             # check positions
             topl_y, topl_x, fore_arr = self.check_negative_positions(
                 topl_y, topl_x, fore_arr)
