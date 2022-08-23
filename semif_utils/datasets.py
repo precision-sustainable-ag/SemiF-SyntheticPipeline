@@ -1,7 +1,6 @@
 import datetime
 import json
 import os
-import typing
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -10,6 +9,9 @@ from typing import List, Optional, Union
 import cv2
 import exifread
 import numpy as np
+from omegaconf import DictConfig
+
+from semif_utils.synth_utils import FilterCutouts
 
 SCHEMA_VERSION = "1.0"
 
@@ -682,19 +684,19 @@ class Cutout:
     cutout_num: int
     datetime: datetime.datetime  # Datetime of original image creation
     cutout_props: CutoutProps
-    cutout_path: Optional[str]
-    cutout_id: str = field(init=False)
+    cutout_path: Optional[str] = None
+    cutout_id: Optional[str] = None
     cls: str = None
     is_primary: bool = False
     extends_border: bool = False
-    cutout_ht: int = field(init=False)
-    cutout_wdt: int = field(init=False)
+    cutout_ht: Optional[int] = None
+    cutout_wdt: Optional[int] = None
     cutout_version: str = "1.0"
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self):
         self.cutout_id = self.image_id + "_" + str(self.cutout_num)
-        self.cutout_path = str(Path(self.batch_id, self.cutout_id + ".png"))
+        # self.cutout_path = str(Path(self.batch_id, self.cutout_id + ".png"))
 
     @property
     def array(self):
@@ -861,6 +863,8 @@ class SynthData:
     """Combines documents in a database with items in a directory to form data container for generating synthetic bench images. Includes lists of dataclasses for cutouts, pots, and backgrounds.
     """
     synthdir: str
+    filter_cutouts: bool
+    filter_config: DictConfig
     background_dir: str = None
     pot_dir: str = None
     cutout_dir: str = None
@@ -869,11 +873,11 @@ class SynthData:
     backgrounds: list[Background] = field(init=False, default=None)
 
     def __post_init__(self):
-        self.backgrounds = self.get_dcs("Backgrounds")
-        self.pots = self.get_dcs("Pots")
-        self.cutouts = self.get_dcs("Cutouts")
+        self.backgrounds = self.get_dcs("background")
+        self.pots = self.get_dcs("pot")
+        self.cutouts = self.get_dcs("cutout")
 
-    def get_data_from_json(self, jsun):
+    def load_json(self, jsun):
         """ Open json and create dictionary
         """
         # Opening JSON file
@@ -884,60 +888,32 @@ class SynthData:
     def get_jsons(self, collection):
         """ Gets json files
         """
-        datas = []
-        collection = collection.lower().rstrip(collection[-1])
-        collection_dir = collection + "_dir"
-        if collection == "cutout":
-            jsondir = Path(self.cutout_dir)  #, getattr(self, collection_dir))
-            jsons = jsondir.glob("*.json")
-            jsons = [x for x in jsons]
-        else:
-            jsons = Path(self.synthdir, getattr(self,
-                                                collection_dir)).glob("*.json")
-        jsons = [x for x in jsons]
-        for jsun in jsons:
-            data = self.get_data_from_json(jsun)
-            datas.append(data)
-        return datas
+        pass
 
     def get_dcs(self, collection_str):
         """Connnects documents in a database collection with items in a directory.
         Places connected items in a list of dataclasses.
         """
-        syn_datacls = {"cutout": Cutout, "pot": Pot, "background": Background}
-
-        cursor = self.get_jsons(collection_str)
-
-        if collection_str == "Cutouts":
-            docdir = Path(self.cutout_dir).parent
-        else:
-            docdir = Path(self.synthdir)
-
-        path_str_ws = collection_str.lower().replace("s", "")
-        path_str = f"{path_str_ws}_path"
-
         docs = []
-        for doc in cursor:
-            doc_path = docdir / doc[path_str]
-            doc[path_str] = str(doc_path)
+        syn_datacls = {"cutout": Cutout, "pot": Pot, "background": Background}
+        data_cls = syn_datacls[collection_str]
+        class_dir = getattr(self, collection_str + "_dir")
+        meta_jsons = Path(class_dir).glob("*.json")
 
-            assert Path(doc_path).exists(
-            ), f"Image with path {str(doc_path)} does not exist."
+        if self.filter_cutouts and collection_str == "cutout":
+            meta_jsons = FilterCutouts(
+                meta_jsons,
+                self.filter_config).filtered_jsons.astype(str).values.tolist()
 
-            # Clean up doc and json by removoing _id from db
-            if "_id" in doc:
-                doc.pop("_id")
-            if "cutout_id" in doc:
-                cut_id = doc["cutout_id"]
-                doc.pop("cutout_id")
-
-            data_cls = syn_datacls[path_str_ws]
-            dc = data_cls(**doc)
-            if hasattr(dc, "cutout_id"):
-                dc.cutout_id = cut_id
-
+        for meta in meta_jsons:
+            meta_dict = self.load_json(meta)
+            class_path = collection_str + "_path"
+            meta_dict[class_path] = str(
+                Path(class_dir) / Path(meta_dict[class_path]).name)
+            dc = data_cls(**meta_dict)
             docs.append(dc)
 
+        # print(docs)
         return docs
 
 

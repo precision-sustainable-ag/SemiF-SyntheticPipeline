@@ -1,15 +1,13 @@
-import random
+import logging
 from dataclasses import asdict
 from pathlib import Path
 
-import cv2
 import numpy as np
 from omegaconf import DictConfig
 from tqdm import trange
-import logging
 
 from semif_utils.datasets import SynthData, SynthImage
-from semif_utils.synth_utils import (SynthPipeline, img2RGBA, clean_data,
+from semif_utils.synth_utils import (SynthPipeline, clean_data, img2RGBA,
                                      save_dataclass_json, transform_position)
 
 log = logging.getLogger(__name__)
@@ -18,6 +16,8 @@ log = logging.getLogger(__name__)
 def main(cfg: DictConfig) -> None:
     # Create synth data container
     data = SynthData(synthdir=cfg.synth.synthdir,
+                     filter_config=cfg,
+                     filter_cutouts=cfg.cutouts.filter,
                      background_dir=cfg.synth.backgrounddir,
                      pot_dir=cfg.synth.potdir,
                      cutout_dir=cfg.synth.cutout_batchdir)
@@ -42,9 +42,9 @@ def main(cfg: DictConfig) -> None:
             pot_position = syn.pot_positions[potidx]  # center (y,x)
             # Get single pot
             syn.get_pot()
-            pot_arr = syn.pot.array
+            pot_arr = syn.transform(syn.pot.array)
             syn.prep_cutout()
-            cutout_arr = syn.cutout.array
+            cutout_arr = syn.transform(syn.cutout.array)
 
             cutoutshape = syn.cutout.array.shape[:2]
             potshape = syn.pot.pot_ht, syn.pot.pot_wdt

@@ -4,13 +4,16 @@ import math
 import random
 import uuid
 from pathlib import Path
+from statistics import mean, median
 
 import cv2
 import numpy as np
+import pandas as pd
 import torch
 import torchvision.ops.boxes as bops
 from omegaconf import DictConfig
 from PIL import Image, ImageEnhance
+
 from semif_utils.utils import img2RGBA
 
 
@@ -166,6 +169,7 @@ class SynthPipeline:
         fore = np.array(pil_fore)
         return fore
 
+
 #-------------------------- Overlay and blend --------------------------------------
 
     def blend_pot(self, y, x, pot, back):
@@ -249,6 +253,107 @@ class SynthPipeline:
         cv2.imwrite(str(savepath), res)
         cv2.imwrite(str(savemask), mask)
         return Path(savepath), Path(savemask)
+
+
+class FilterCutouts:
+    def __init__(self, cutout_jsons, cfg: DictConfig) -> None:
+
+        self.cutout_jsons = cutout_jsons
+        self.cutoutdir = cfg.data.cutoutdir
+        self.batch_id = cfg.general.batch_id
+        self.species = cfg.cutouts.species
+        self.is_green = cfg.cutouts.is_green
+        self.is_primary = cfg.cutouts.is_primary
+        self.extends_border = cfg.cutouts.extends_border
+        self.green_sum_max = cfg.cutouts.green_sum_max
+        self.green_sum_min = cfg.cutouts.green_sum_min
+        self.save_csv = cfg.cutouts.save_csv
+        self.filtered_jsons = self.get_cutout_jsons()
+
+    def get_cutout_jsons(self):
+        df = self.cutoutjson2csv()
+        df = self.prep_clean(df)
+        df = self.set_and_sort(df)
+        return df["path"]
+
+    def read_cutout_json(self, path):
+        with open(path) as f:
+            cutout = json.load(f)
+        return cutout
+
+    def cutoutjson2csv(self):
+        # Get all json files
+        cutouts = []
+        for cutout in self.cutout_jsons:
+            # Get dictionaries
+            cutout = self.read_cutout_json(cutout)
+            row = cutout["cutout_props"]
+            cls = cutout["cls"]
+            # Extend nested dicts to single column header
+            for ro in row:
+                rec = {ro: row[ro]}
+                cutout.update(rec)
+                for cl in cls:
+                    spec = {cl: cls[cl]}
+                    cutout.update(spec)
+            # Remove duplicate nested dicts
+            cutout.pop("cutout_props")
+            cutout.pop("cls")
+            # Create and append df
+            cutouts.append(pd.DataFrame(cutout, index=[0]))
+        # Concat and reset index of main df
+        df = pd.concat(cutouts).reset_index()
+        # Save dataframe
+        if self.save_csv:
+            csv_path = f"{self.cutoutdir}/{self.batch_id}.csv"
+            if not csv_path.exists():
+                print(f"Creating cutout metadata csv...\nSaving at {csv_path}")
+                df.to_csv(csv_path, index=False)
+            else:
+                print("Metadata CSV already exists")
+        return df
+
+    def prep_clean(self, df):
+        """ 
+        green_sum to float
+        and creates new path columns.
+        """
+        df["green_sum"] = df["green_sum"].astype(float)
+        df["path"] = self.cutoutdir + "/" + df["cutout_path"].str.replace(
+            ".png", ".json", regex=False)
+        return df
+
+    def calc_thresh(self, df):
+        """ Calculates threshold values
+
+        NOT USED """
+        features = ["green_sum", "solidity", "area", "perimeter"]
+        stats = {"max": max, "min": min, "median": median, "mean": mean}
+
+        for feat in features:
+            for stat in stats:
+                val = df[feat]
+                new_val = getattr(val, stat)()
+                print(f"{feat} {stat}", new_val)
+
+    def set_and_sort(self, df):
+        """ Set thresholds and sort"""
+        if self.species:
+            print(f"\nUsing species sorting: {self.species}\n")
+            df = df[df["common_name"] == self.species]
+        if self.green_sum_max:
+            print(
+                f"Using green_sum: \nMax: {self.green_sum_max}\nMin: {self.green_sum_min}\n"
+            )
+            df = df[df["green_sum"] < self.green_sum_max]
+            df = df[df["green_sum"] > self.green_sum_min]
+        if self.is_primary:
+            print(f"Using Primary cutouts: {self.is_primary}\n")
+            df = df[df["is_primary"] == self.is_primary]
+        if self.extends_border == False:
+            print(f"Cutouts extend border: {self.extends_border}\n")
+            df = df[df["extends_border"] == self.extends_border]
+        return df
 
 
 ########################################################################
@@ -374,8 +479,6 @@ def clean_data(data):
         Takes in and returns a dictionary of dataclass to be 
         stored in json and db. 
     """
-    print("\nClean data: ")
-    print(data["background"][0])
     data["background"][0]["background_path"] = "/".join(
         Path(data["background"][0]["background_path"]).parts[-2:])
 
