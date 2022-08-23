@@ -1,6 +1,7 @@
 defaults:
   - maintenance: maintenance
   - synth: synth
+  - cutouts: cutouts
   - _self_
 
 hydra:
