@@ -118,11 +118,7 @@ class SynthPipeline:
             pot_arr = pot_arr[:, :-back_w_edge]
 
         if topl_y + pot_h > back_h:
-            print("topl_y + pot_h > back_h")
-            print("topl_y ", topl_y)
-            print("pot_h ", pot_h)
             back_h_edge = topl_y + pot_h - back_h
-            print("back_h changed ", back_h)
             pot_arr = pot_arr[:-back_h_edge, :]
 
         return pot_arr
@@ -172,7 +168,6 @@ class SynthPipeline:
 
         # Add any other transformations here...
         fore = np.array(pil_fore)
-        print(fore.shape)
         return fore
 
 
