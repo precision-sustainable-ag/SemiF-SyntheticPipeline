@@ -1,5 +1,5 @@
 
-count: 20000
+count: 10000
 pot_jitter: [100, 100]
 
 datadir: ${general.workdir}/data
