@@ -1,8 +1,8 @@
 filter: True
 species:
-is_green: True
+is_green:
 is_primary: True
 extends_border: False
 green_sum_max: 1000000
-green_sum_min: 50000
+green_sum_min: 500000
 save_csv: False # to create and save a csv of all cutout metadata

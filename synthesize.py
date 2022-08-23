@@ -21,6 +21,11 @@ def main(cfg: DictConfig) -> None:
                      background_dir=cfg.synth.backgrounddir,
                      pot_dir=cfg.synth.potdir,
                      cutout_dir=cfg.synth.cutout_batchdir)
+
+
+def pipeline(data):
+    data = data["data"]
+    cfg = data["cfg"]
     # Call pipeline
     syn = SynthPipeline(data, cfg)
     used_backgrounds = []
@@ -42,9 +47,11 @@ def main(cfg: DictConfig) -> None:
             pot_position = syn.pot_positions[potidx]  # center (y,x)
             # Get single pot
             syn.get_pot()
-            pot_arr = syn.transform(syn.pot.array)
+            pot_arr = syn.pot.array
+            pot_arr = syn.transform(p)
             syn.prep_cutout()
-            cutout_arr = syn.transform(syn.cutout.array)
+            cutout_arr = syn.cutout.array
+            cutout_arr = syn.transform(cutout_arr)
 
             cutoutshape = syn.cutout.array.shape[:2]
             potshape = syn.pot.pot_ht, syn.pot.pot_wdt
