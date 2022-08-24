@@ -292,6 +292,7 @@ class BBox:
 
 @dataclass
 class BatchMetadata:
+    """ NOT USED. LEGACY FROM AnnotationPipeline"""
     """ Batch metadata class for yaml loader"""
     blob_home: str
     data_root: str
@@ -432,6 +433,7 @@ class Box:
 
 
 @dataclass
+# Not used. Legacy class from AnnotationPipeline
 class BBoxFOV:
     top_left: list
     top_right: list
@@ -614,6 +616,7 @@ class ImageData(Image):
 
 @dataclass
 class Mask:
+    """ NOT USED. FROM LEGACY ANNOTATION Pipelien"""
     mask_id: str
     mask_path: str
     image_id: str

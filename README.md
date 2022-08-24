@@ -5,6 +5,17 @@
 * Pot and background images are located in this repository
 * Outputs (`images`, `masks`, and `metadata`) are also located in this repository.
 
+
+## Pipeline
+![](asset/Pipeline_flowchart.png)
+
+<br>
+
+## UML Class diagram
+
+![](asset/Class_diagrams-synthetic.png)
+
+
 ```
 SemiF-SyntheticPipeline
 └── data
