@@ -36,13 +36,21 @@ class SynthPipeline:
         self.cutouts = data.cutouts
         self.cutout = None
         self.cut_ht, self.cut_wd = None, None
+        if cfg.synth.savedir:
+            self.imagedir = Path(cfg.synth.savedir, "images")
+            self.imagedir.mkdir(parents=True, exist_ok=True)
+            self.maskdir = Path(cfg.synth.savedir, "masks")
+            self.maskdir.mkdir(parents=True, exist_ok=True)
+            self.json_dir = Path(cfg.synth.savedir, "metadata")
+            self.json_dir.mkdir(parents=True, exist_ok=True)
 
-        self.imagedir = Path(self.synthdir, "images")
-        self.imagedir.mkdir(parents=True, exist_ok=True)
-        self.maskdir = Path(self.synthdir, "masks")
-        self.maskdir.mkdir(parents=True, exist_ok=True)
-        self.json_dir = Path(self.synthdir, "metadata")
-        self.json_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            self.imagedir = Path(self.synthdir, "images")
+            self.imagedir.mkdir(parents=True, exist_ok=True)
+            self.maskdir = Path(self.synthdir, "masks")
+            self.maskdir.mkdir(parents=True, exist_ok=True)
+            self.json_dir = Path(self.synthdir, "metadata")
+            self.json_dir.mkdir(parents=True, exist_ok=True)
 
         self.fore_str = None
 
@@ -246,6 +254,7 @@ class SynthPipeline:
 
     def save_synth(self, res, mask):
         fname = uuid.uuid4().hex + ".png"
+
         savepath = Path(self.imagedir, fname)
         savemask = Path(self.maskdir, fname)
         res = cv2.cvtColor(res, cv2.COLOR_RGBA2BGRA)

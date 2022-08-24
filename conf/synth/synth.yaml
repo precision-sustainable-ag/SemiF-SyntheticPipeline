@@ -1,6 +1,8 @@
 
-count: 10000
+count: 20000
 pot_jitter: [100, 100]
+
+savedir: /media/hdd1/mkutu/wir/semifield-synth
 
 datadir: ${general.workdir}/data
 synthdir: ${data.datadir}/${blob_names.synth}

@@ -105,7 +105,7 @@ def main(cfg: DictConfig) -> None:
 
     processes = []
     procs = cpu_count() - 5
-    print(procs)
+
     for i in range(procs):
         p = Process(target=pipeline)
         p.start()
