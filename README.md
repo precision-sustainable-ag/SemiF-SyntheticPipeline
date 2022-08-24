@@ -7,13 +7,17 @@
 
 
 ## Pipeline
-![](asset/Pipeline_flowchart.png)
+<p align="left">
+  <img width="1060" height="600" src="asset/Pipeline_flowchart.png">
+</p>
 
 <br>
 
 ## UML Class diagram
-
-![](asset/Class_diagrams-synthetic.png)
+<p align="center">
+  <img src="asset/Class_diagrams-synthetic.png">
+</p>
+![]()
 
 
 ```
