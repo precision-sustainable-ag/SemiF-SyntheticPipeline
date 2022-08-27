@@ -1,0 +1,16 @@
+name: semif_synthetic
+channels:
+  - conda-forge
+  - conda-forge/label/dev
+dependencies:
+  - pyhton==3.9
+  - pip
+  - pip:
+    - hydra-core==1.2
+    - omegaconf==2.2
+    - opencv-python
+    - pandas
+    - pyyaml
+    - scikit-image
+    - scikit-learn
+    - scipy

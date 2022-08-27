@@ -1,0 +1,29 @@
+defaults:
+  - maintenance: maintenance
+  - synth: synth
+  - cutouts: cutouts
+  - _self_
+
+hydra:
+  run:
+    dir: ./
+  output_subdir: 
+
+general:
+  batch_id: ??? # Control the batch_id through the command line
+  task: synthesize
+  workdir: ${hydra:runtime.cwd}  # where the code is executed
+
+repo_names:
+  semif_annotation: SemiF-AnnotationPipeline
+  semif_snyth: SemiF-SyntheticPipeline
+
+blob_names:
+  synth: semifield-synth
+  cutout: semifield-cutouts
+
+data:
+  datadir: ${general.workdir}/data
+  cutoutdir: ../${repo_names.semif_annotation}/data/${blob_names.cutout}
+  batchdir: ${data.cutoutdir}/${general.batch_id} # Is overiden by shell script
+  

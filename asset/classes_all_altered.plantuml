@@ -1,0 +1,343 @@
+@startuml es_all
+set namespaceSeparator none
+BBox
+bbox_id : str
+cls : str
+config
+global_area
+global_centroid : ndarray
+global_coordinates
+image_id : str
+is_normalized : bool
+is_primary : bool
+local_area
+local_centroid : ndarray
+local_coordinates
+norm_local_area
+norm_local_centroid : ndarray
+norm_local_coordinates
+add_box(box)
+bb_iou(comparison_box, type)
+get_area(coordinates: BoxCoordinates) -> float
+get_centroid(coords: BoxCoordinates) -> np.ndarray
+set_global_centroid()
+set_local_centroid()
+set_local_scale(new_scale)
+set_norm_local_centroid()
+update_global_coordinates(global_coordinates: BoxCoordinates)
+
+BBoxFOV
+bottom_left : list
+bottom_right : list
+top_left : list
+top_right : list
+
+BBoxMetadata
+batch_id : str
+bboxes : list[Box]
+camera_info
+data_root : str
+exif_meta
+height : int
+image_id : str
+image_path : str
+width : int
+
+Background
+array
+back_ht : int
+back_wdt : int
+background_id : Optional[uuid]
+background_path : str
+config
+save_config(save_path)
+
+BatchMetadata
+batch_id : str
+blob_home : str
+config
+data_root : str
+image_list : List
+schema_version : str
+upload_datetime : str
+get_batch_images()
+save_config()
+
+Box
+bbox_id : str
+cls : str
+global_centroid : list
+global_coordinates
+image_id : str
+is_primary : bool
+local_centroid : list
+local_coordinates
+overlapping_bbox_ids : List[BBox]
+assign_species(species)
+
+BoxCoordinates
+bottom_left : ndarray
+bottom_right : ndarray
+config
+is_scaleable : bool
+scale : ndarray
+top_left : ndarray
+top_right : ndarray
+copy()
+set_scale(new_scale: np.ndarray)
+
+CameraInfo
+camera_location : ndarray
+focal_length : float
+fov
+pitch : float
+pixel_height : float
+pixel_width : float
+roll : float
+yaw : float
+
+Cutout
+array
+batch_id : str
+blob_home : str
+cls : Optional[str]
+config
+cutout_ht : Optional[int]
+cutout_id : Optional[str]
+cutout_num : int
+cutout_path : Optional[str]
+cutout_props
+cutout_version : str
+cutout_wdt : Optional[int]
+data_root : str
+datetime : datetime
+extends_border : bool
+image_id : str
+is_primary : bool
+schema_version : str
+save_config(save_path)
+save_cutout(cutout_array)
+
+CutoutProps
+area : Union[float, list]
+area_bbox : Union[float, list]
+area_convex : Union[float, list]
+axis_major_length : Union[float, list]
+axis_minor_length : Union[float, list]
+centroid0 : Union[float, list]
+centroid1 : Union[float, list]
+eccentricity : Union[float, list]
+green_sum : int
+is_green : bool
+perimeter : Union[float, list]
+solidity : Union[float, list]
+
+FilterCutouts
+batch_id
+cutout_jsons
+cutoutdir
+extends_border
+filtered_jsons
+green_sum_max
+green_sum_min
+is_green
+is_primary
+save_csv
+species
+calc_thresh(df)
+cutoutjson2csv()
+get_cutout_jsons()
+prep_clean(df)
+read_cutout_json(path)
+set_and_sort(df)
+
+Image
+array
+batch_id : str
+blob_home : str
+config
+data_root : str
+growth_stage : str
+height
+image_id : str
+image_path : str
+plant_date : str
+width
+save_config(save_path)
+
+ImageData
+bboxes : Optional[list[Box]]
+camera_info : Optional[CameraInfo]
+config
+cutout_ids : Optional[List[str]]
+exif_meta
+fullres_height : int
+fullres_width : int
+height : int
+schema_version : str
+width : int
+save_config(save_path)
+
+ImageMetadata
+ApplicationNotes : Optional[str]
+BitsPerSample : int
+BodySerialNumber : Optional[str]
+BrightnessValue : str
+Compression : int
+Contrast : int
+CustomRendered : int
+DateTime : str
+DateTimeDigitized : str
+DateTimeOriginal : str
+DigitalZoomRatio : str
+ExifOffset : int
+ExifVersion : list
+ExposureBiasValue : str
+ExposureMode : int
+ExposureProgram : int
+ExposureTime : str
+FNumber : str
+FileSource : int
+Flash : int
+FocalLength : str
+FocalLengthIn35mmFilm : int
+ISOSpeedRatings : int
+ImageDescription : Optional[str]
+ImageLength : int
+ImageWidth : int
+LensModel : str
+LensSpecification : list
+LightSource : int
+Make : str
+MakerNote : Optional[str]
+MaxApertureValue : str
+MeteringMode : int
+Model : str
+Orientation : int
+PhotometricInterpretation : int
+PlanarConfiguration : int
+Rating : int
+RecommendedExposureIndex : int
+ResolutionUnit : int
+SamplesPerPixel : int
+Saturation : int
+SceneCaptureType : int
+SceneType : int
+Sharpness : int
+Software : str
+SubIFDs : Optional[int]
+Tag : Optional[int]
+UserComment : Optional[str]
+WhiteBalance : int
+XResolution : str
+YResolution : str
+
+Mask
+array
+height : int
+image_id : str
+mask_id : str
+mask_path : str
+width : int
+save_mask(save_path)
+
+Pot
+array
+config
+pot_ht : int
+pot_id : Optional[uuid]
+pot_path : str
+pot_wdt : int
+save_config(save_path)
+
+RemapImage
+bboxes : list[BBox]
+camera_info
+config
+exif_meta : Optional[ImageMetadata]
+fullres_height : Optional[int]
+fullres_path : str
+fullres_width : Optional[int]
+height : int
+schema_version : str
+width : int
+get_exif()
+set_fullres_dims(fullres_width, fullres_height)
+
+SynthData
+background_dir : Optional[str]
+backgrounds : Optional[list[Background]]
+cutout_dir : Optional[str]
+cutouts : Optional[list[Cutout]]
+filter_config : DictConfig
+filter_cutouts : bool
+pot_dir : Optional[str]
+pots : Optional[list[Pot]]
+synthdir : str
+get_dcs(collection_str)
+get_jsons(collection)
+load_json(jsun)
+
+SynthImage
+background
+config
+cutouts : list[Cutout]
+data_root : str
+pots : list[Pot]
+synth_id : str
+synth_maskpath : str
+synth_path : str
+save_config(save_path)
+
+SynthPipeline
+back : NoneType
+back_dir
+back_ht : NoneType
+back_wd : NoneType
+backgrounds
+count
+cut_ht : NoneType
+cut_wd : NoneType
+cutout : NoneType
+cutouts
+fore_str : NoneType
+imagedir : Path
+json_dir : Path
+maskdir : Path
+pot : NoneType
+pot_dir
+pot_ht : NoneType
+pot_positions : NoneType
+pot_wd : NoneType
+pots
+synthdir : Path
+blend_cutout(y, x, cutout, pot, mask)
+blend_pot(y, x, pot, back)
+center_on_background(y, x, back_shape, fore_shape)
+check_negative_positions(topl_y, topl_x, fore)
+check_overlap(y, x, potshape, pot_positions)
+check_positive_position(topl_y, topl_x, potshape, backshape, pot_arr)
+get_back(sortby)
+get_cutouts(sortby)
+get_pot()
+get_pot_positions()
+overlay(topl_y, topl_x, fore_arr, back_arr, mask)
+prep_cutout()
+replace_backgrounds()
+save_synth(res, mask)
+transform(fore)
+
+ImageData --|> Image
+RemapImage --|> Image
+Background --* SynthImage : background
+BoxCoordinates --* BBox : local_coordinates
+BoxCoordinates --* BBox : global_coordinates
+BoxCoordinates --* BBox : norm_local_coordinates
+BoxCoordinates --* Box : local_coordinates
+BoxCoordinates --* Box : global_coordinates
+CameraInfo --* BBoxMetadata : camera_info
+CameraInfo --* RemapImage : camera_info
+CutoutProps --* Cutout : cutout_props
+ImageMetadata --* BBoxMetadata : exif_meta
+ImageMetadata --* ImageData : exif_meta
+@enduml
