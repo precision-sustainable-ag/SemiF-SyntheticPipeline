@@ -1,8 +1,93 @@
-filter: True
-species:
-is_green:
-is_primary: True
-extends_border: False
-green_sum_max: 1000000
-green_sum_min: 500000
+# Configuration file for choosing what type of cutouts you want in your synthetic data set
+
+mode: balanced # balanced (default), random , batches, species, features, state, mixed
+# sampling: stratey for sampling if not enough cutouts exists in specified category
+# replace = sampling with replacement
+# auto = redistributes cutouts across remaining categories  
+# none = without replacement (results in error message)
+sampling: # replace, auto, none
 save_csv: False # to create and save a csv of all cutout metadata
+
+species:   
+  # TX
+  speciesA: 10 # percent of total cutouts if using 'species'
+  # NC
+  AMPA:     # Palmer amaranth
+  AMAR2:    # Common ragweed
+  SEOB4:    # Sicklepod
+  XAST:     # Cocklebur
+  DISA:     # Large crabgrass
+  ELIN3:    # Goosegrass
+  URPL2:    # Broadleaf signalgrass
+  CYRO:     # Purple nutsedge
+  AMTU:     # Waterhemp
+  ECCR:     # Barnyardgrass
+  ECCO2:    # Jungle rice
+  URTE2:    # Texas millet
+  BASC5:    # Kochia
+  HEAN3:    # Common sunflower
+  PAHY:     # Ragweed parthenium
+  SOHA:     # Johnsongrass
+  GLMA4:    # Soybean
+  # MD
+  AMHY:     # Smooth pigweed
+  CHAL7:    # Common lambsquarters
+  PADI:     # Fall panicum
+  DAST:     # Jimson weed
+  ABTH:     # Velvetleaf
+  SEPU8:    # Yellow foxtail
+  SEFA:     # Giant foxtail
+  ERCA20:   # Horseweed
+  ZEA:      # Maize
+
+features:
+  dap: # days after planting; 
+  size: # large, medium, small, random (uses bbox area)
+  is_primary: True
+  extends_border: False
+  
+  green_sum: # True or False
+    max: 1000000
+    min: 500000
+  
+  morph:
+    area_mode: # random, balanced, custom
+    area_max:
+    area_min:
+    
+    area_bbox_mode:
+    area_bbox_max:
+    area_bbox_min:
+    
+    area_convex_mode:
+    area_convex_max:
+    area_convex_min:
+    
+    axis_major_length_mode:
+    axis_major_length_max:
+    axis_major_length_min:
+    
+    axis_minor_length_mode:
+    axis_minor_length_max:
+    axis_minor_length_min:
+    
+    
+    eccentricity_mode:
+    eccentricity_max:
+    eccentricity_min:
+    
+    
+    solidity_mode:
+    solidity_max:
+    solidity_min:
+    
+    perimeter_mode:
+    perimeter_max:
+    perimeter_min:
+
+state: # percent of species from each state if mode is 'state'
+    TX: 30 
+    NC: 20
+    MD: 50
+  
+date: # mm-dd-yyyy

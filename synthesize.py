@@ -1,14 +1,14 @@
 import logging
 from dataclasses import asdict
+from multiprocessing import Process, cpu_count
 from pathlib import Path
 
 import numpy as np
 from omegaconf import DictConfig
 from tqdm import trange
-from multiprocessing import Process, cpu_count
 
-from semif_utils.datasets import SynthData, SynthImage
-from semif_utils.synth_utils import (SynthPipeline, clean_data, img2RGBA,
+from synth_utils.datasets import SynthData, SynthImage
+from synth_utils.synth_utils import (SynthPipeline, clean_data,
                                      save_dataclass_json, transform_position)
 
 log = logging.getLogger(__name__)

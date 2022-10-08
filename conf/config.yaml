@@ -10,8 +10,8 @@ hydra:
   output_subdir: 
 
 general:
-  batch_id: ??? # Control the batch_id through the command line
-  task: synthesize
+  # batch_id: ??? # Control the batch_id through the command line
+  task: config_cutouts #config_cutouts synthesize
   workdir: ${hydra:runtime.cwd}  # where the code is executed
 
 repo_names:

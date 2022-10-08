@@ -1,5 +1,13 @@
 # SemiF-SyntheticPipeline
 
+
+# Workflow
+
+1. Choose cutouts by using configuration file
+2. Generate synthetic data
+
+
+
 # Data Structure
 
 * Pot and background images are located in this repository

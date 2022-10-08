@@ -14,7 +14,7 @@ import torchvision.ops.boxes as bops
 from omegaconf import DictConfig
 from PIL import Image, ImageEnhance
 
-from semif_utils.utils import img2RGBA
+from synth_utils.utils import img2RGBA
 
 
 class SynthPipeline:

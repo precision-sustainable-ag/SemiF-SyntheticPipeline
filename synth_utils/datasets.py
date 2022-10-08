@@ -11,7 +11,7 @@ import exifread
 import numpy as np
 from omegaconf import DictConfig
 
-from semif_utils.synth_utils import FilterCutouts
+from synth_utils.synth_utils import FilterCutouts
 
 SCHEMA_VERSION = "1.0"
 
