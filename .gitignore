@@ -2,7 +2,11 @@
 ## to provide an example of directory structure.
 
 #--------- Project Ignore ---------
+*assets
+# cutouts config csvs
+**.csv
 
+*data
 
 # Log files
 *.log
@@ -13,6 +17,9 @@
 # ---------- Misc -----------
 # Shell scripts
 *.sh
+
+# yapf code format
+*.style.yapf
 
 # Mac stuff
 **/.DS_Store

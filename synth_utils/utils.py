@@ -25,6 +25,12 @@ def read_json(path):
     return data
 
 
+def write_json(path, data):
+    # data = json.dumps(data, indent=4)
+    with open(path, "w") as outfile:
+        json.dump(data, outfile)
+
+
 ######################################################
 ################## GET METADATA ######################
 ######################################################
@@ -126,12 +132,13 @@ def make_exr(rgb_img):
     red = img[:, :, 0]
 
     exr = 1.4 * red - green
-    exr = np.where(exr < 0, 0, exr)  # Thresholding removes low negative values
+    exr = np.where(exr < 0, 0,
+                   exr)    # Thresholding removes low negative values
     return exr.astype("uint8")
 
 
 def make_exg_minus_exr(img):
-    img = img.astype(float)  # Rgb image
+    img = img.astype(float)    # Rgb image
     exg = make_exg(img)
     exr = make_exr(img)
     exgr = exg - exr
@@ -314,6 +321,20 @@ def apply_mask(img, mask, mask_color):
 ######################################################
 
 
+def trans_cutout(imgpath):
+    """ Get transparent cutout from cutout image with black background"""
+    img = cv2.cvtColor(cv2.imread(imgpath), cv2.COLOR_BGR2RGB)
+    # threshold on black to make a mask
+    color = (0, 0, 0)
+    mask = np.where((img == color).all(axis=2), 0, 255).astype(np.uint8)
+
+    # put mask into alpha channel
+    result = img.copy()
+    result = cv2.cvtColor(result, cv2.COLOR_BGR2BGRA)
+    result[:, :, 3] = mask
+    return result
+
+
 def crop_cutouts(img, add_padding=False):
     foreground = Image.fromarray(img)
     pil_crop_frground = foreground.crop(foreground.getbbox())
@@ -326,3 +347,12 @@ def crop_cutouts(img, add_padding=False):
             foreground.getbbox()[3] + 2,
         ))
     return array
+
+
+def get_species_info(path, cls, default_species="plant"):
+    with open(path) as f:
+        spec_info = json.load(f)
+        spec_info = (spec_info["species"][cls]
+                     if cls in spec_info["species"].keys() else
+                     spec_info["species"][default_species])
+    return spec_info

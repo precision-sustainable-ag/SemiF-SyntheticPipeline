@@ -1,115 +1,48 @@
+import json
 import logging
-from dataclasses import asdict
-from multiprocessing import Process, cpu_count
-from pathlib import Path
+import random
+from multiprocessing import Pool, cpu_count
 
 import numpy as np
 from omegaconf import DictConfig
-from tqdm import trange
+from tqdm import tqdm, trange
 
-from synth_utils.datasets import SynthData, SynthImage
-from synth_utils.synth_utils import (SynthPipeline, clean_data,
-                                     save_dataclass_json, transform_position)
+from synth_utils.config_utils import read_cutouts, sort_cutouts
+from synth_utils.datasets import SynthData
+from synth_utils.synth_utils import SynthPipeline
 
 log = logging.getLogger(__name__)
 
 
 def main(cfg: DictConfig) -> None:
-    def pipeline():
-        # Create synth data container
-        data = SynthData(synthdir=cfg.synth.synthdir,
-                         filter_config=cfg,
-                         filter_cutouts=cfg.cutouts.filter,
-                         background_dir=cfg.synth.backgrounddir,
-                         pot_dir=cfg.synth.potdir,
-                         cutout_dir=cfg.synth.cutout_batchdir)
-        # Call pipeline
-        syn = SynthPipeline(data, cfg)
+    alldf = read_cutouts(cfg.data.cutoutdir)
+    sort_cutouts(alldf, cfg, save_csv=True)
+    log.info("Cutouts sorted.")
+    with open(cfg.data.speciesinfo) as f:
+        spec_info = json.load(f)
+        spec_info = spec_info["species"]
+    # Create synth data container
+    log.info("Creating SynthData container")
+    synthdata = SynthData(synthdir=cfg.data.synthdir,
+                          cfg=cfg,
+                          background_dir=cfg.data.backgrounddir,
+                          pot_dir=cfg.data.potdir,
+                          color_map=spec_info)
 
-        used_backgrounds = []
+    # cutout_groups = synthdata.read_cutout_dcs()
+    log.info(f"SynthData container created.")
 
-        for cnt in trange(cfg.synth.count):
+    syn = SynthPipeline(synthdata, cfg)
 
-            # Get single background
-            syn.get_back()
-            syn.get_pot_positions()
-            back_arr = syn.back.array.copy()
-            back_arr_mask = np.zeros_like(back_arr)
+    if cfg.synth.multiprocess:
+        procs = cpu_count() - 3
 
-            # Iterate using number of pots
-            pot_positions = []
-            used_cutouts = []
-            used_pots = []
-
-            for potidx in range(len(syn.pot_positions)):
-                # Get pot and info
-                pot_position = syn.pot_positions[potidx]  # center (y,x)
-                # Get single pot
-                syn.get_pot()
-                pot_arr = syn.pot.array
-                pot_arr = syn.transform(pot_arr)
-                syn.prep_cutout()
-                cutout_arr = syn.cutout.array
-                cutout_arr = syn.transform(cutout_arr)
-
-                cutoutshape = syn.cutout.array.shape[:2]
-                potshape = syn.pot.pot_ht, syn.pot.pot_wdt
-
-                # Check coordinates for pot in top left corner
-                topl_y, topl_x = transform_position(
-                    pot_position, potshape)  # to top left corner
-                # topl_y, topl_x = syn.check_overlap(topl_y, topl_x, potshape,
-                #    pot_positions)
-                #Overlay pot on background
-                syn.fore_str = "Overlay pot"
-                potted, poty, potx = syn.overlay(topl_y, topl_x, pot_arr,
-                                                 back_arr)
-                # Get cutout position from pot position
-                cutx, cuty = syn.center_on_background(poty, potx, potshape,
-                                                      cutoutshape)
-                syn.fore_str = "Overlay cutout"
-                potted, mask, _, _ = syn.overlay(cuty,
-                                                 cutx,
-                                                 cutout_arr,
-                                                 back_arr,
-                                                 mask=back_arr_mask)
-
-                pot_positions.append([topl_y, topl_x, potshape])
-                used_cutouts.append(syn.cutout)
-                used_pots.append(syn.pot)
-            used_backgrounds.append(syn.back)
-
-            # Save synth image and mask
-            savepath, savemask = syn.save_synth(potted, mask[:, :, 0])
-
-            # Path info to save
-            savestem = savepath.stem
-            savepath = "/".join(savepath.parts[-2:])
-            savemask = "/".join(savemask.parts[-2:])
-            data_root = Path(cfg.synth.synthdir).name
-
-            # To SynthImage dataclass
-            synimage = SynthImage(data_root=data_root,
-                                  synth_path=savepath,
-                                  synth_maskpath=savemask,
-                                  pots=used_pots,
-                                  background=used_backgrounds,
-                                  cutouts=used_cutouts)
-            # Clean dataclass
-            data_dict = asdict(synimage)
-            synimage = clean_data(data_dict)
-
-            # To json
-            jsonpath = Path(syn.json_dir, savestem + ".json")
-            save_dataclass_json(synimage, jsonpath)
-
-    processes = []
-    procs = cpu_count() - 5
-
-    for i in range(procs):
-        p = Process(target=pipeline)
-        p.start()
-
-        processes.append(p)
-    for p in processes:
-        p.join()
+        with Pool(processes=procs) as pool:
+            with tqdm(total=syn.count) as pbar:
+                for _ in pool.imap_unordered(syn.pipeline):
+                    pbar.update()
+            pool.close()
+            pool.join()
+    else:
+        for i in range(0, cfg.synth.count):
+            syn.pipeline()

@@ -1,19 +1,26 @@
 import datetime
 import json
+import logging
 import os
+import random
 import uuid
 from dataclasses import asdict, dataclass, field
+from multiprocessing import Manager, Pool, Process, cpu_count
 from pathlib import Path
 from typing import List, Optional, Union
 
 import cv2
 import exifread
 import numpy as np
+import pandas as pd
 from omegaconf import DictConfig
+from tqdm import tqdm
 
-from synth_utils.synth_utils import FilterCutouts
+from synth_utils.utils import read_json
 
 SCHEMA_VERSION = "1.0"
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -84,6 +91,17 @@ class BoxCoordinates:
         return getattr(self, key)
 
 
+@dataclass
+class YOLOBoxCoordinates:
+    """ Normalize xywh. xy is centerpoint of bbox"""
+    cutout_id: str
+    class_id: int
+    x: float
+    y: float
+    w: float
+    h: float
+
+
 def init_empty():
     empty_array = np.array([])
     # Initialize with an empty array
@@ -141,28 +159,20 @@ class BBox:
     @property
     def config(self):
         _config = {
-            "bbox_id":
-            self.bbox_id,
-            "image_id":
-            self.image_id,
-            "local_centroid":
-            list(
-                self.norm_local_centroid),  # Always use normalized coordinates
-            "local_coordinates":
-            self.norm_local_coordinates.
-            config,  # Always use normalized coordinates
-            "global_centroid":
-            list(self.global_centroid),
-            "global_coordinates":
-            self.global_coordinates.config,
-            "is_primary":
-            self.is_primary,
-            "cls":
-            self.cls,
-            "overlapping_bbox_ids":
-            [box.bbox_id for box in self._overlapping_bboxes],
-            "num_overlapping_bboxes":
-            len(self._overlapping_bboxes)
+            "bbox_id": self.bbox_id,
+            "image_id": self.image_id,
+            "local_centroid": list(self.norm_local_centroid
+                                   ),    # Always use normalized coordinates
+            "local_coordinates": self.norm_local_coordinates.
+                                 config,    # Always use normalized coordinates
+            "global_centroid": list(self.global_centroid),
+            "global_coordinates": self.global_coordinates.config,
+            "is_primary": self.is_primary,
+            "cls": self.cls,
+            "overlapping_bbox_ids": [
+                box.bbox_id for box in self._overlapping_bboxes
+            ],
+            "num_overlapping_bboxes": len(self._overlapping_bboxes)
         }
         return _config
 
@@ -685,28 +695,29 @@ class Cutout:
     batch_id: str
     image_id: str
     cutout_num: int
-    datetime: datetime.datetime  # Datetime of original image creation
+    datetime: datetime.datetime    # Datetime of original image creation
+    dap: int    #days after planting
     cutout_props: CutoutProps
-    cutout_path: Optional[str] = None
-    cutout_id: Optional[str] = None
+    local_contours: List[float] = None
+    cutout_id: str = None
+    cutout_path: str = None
     cls: str = None
     is_primary: bool = False
     extends_border: bool = False
-    cutout_ht: Optional[int] = None
-    cutout_wdt: Optional[int] = None
+    xywh: list = None
     cutout_version: str = "1.0"
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self):
         self.cutout_id = self.image_id + "_" + str(self.cutout_num)
-        # self.cutout_path = str(Path(self.batch_id, self.cutout_id + ".png"))
 
     @property
     def array(self):
         # Read the image from the file and return the numpy array
-        array = cv2.imread(self.cutout_path)
-        array = np.ascontiguousarray(cv2.cvtColor(array, cv2.COLOR_BGR2RGB))
-        return array
+        cut_array = cv2.imread(self.cutout_path)
+        cut_array = np.ascontiguousarray(
+            cv2.cvtColor(cut_array, cv2.COLOR_BGR2RGB))
+        return cut_array
 
     @property
     def config(self):
@@ -717,6 +728,7 @@ class Cutout:
             "image_id": self.image_id,
             "cutout_id": self.cutout_id,
             "cutout_path": self.cutout_path,
+            "dap": self.dap,
             "cls": self.cls,
             "cutout_num": self.cutout_num,
             "is_primary": self.is_primary,
@@ -724,7 +736,8 @@ class Cutout:
             "cutout_props": self.cutout_props,
             "extends_border": self.extends_border,
             "cutout_version": self.cutout_version,
-            "schema_version": self.schema_version
+            "schema_version": self.schema_version,
+            "local_contours": self.local_contours
         }
 
         return _config
@@ -747,6 +760,44 @@ class Cutout:
         cv2.imwrite(str(cutout_path),
                     cv2.cvtColor(cutout_array, cv2.COLOR_RGB2BGRA))
         return True
+
+    def save_cropout(self, img_array):
+
+        fname = f"{self.image_id}_{self.cutout_num}.jpg"
+        cutout_path = Path(self.blob_home, self.data_root, self.batch_id,
+                           fname)
+        cv2.imwrite(str(cutout_path), cv2.cvtColor(img_array,
+                                                   cv2.COLOR_RGB2BGR))
+        return True
+
+    def save_verysmall_cropout(self, img_array, boxarea):
+
+        fname = f"{self.image_id}_{self.cutout_num}_{boxarea}.jpg"
+        cutout_path = Path(self.blob_home, self.data_root,
+                           self.batch_id + "_very_small")
+        cutout_path.mkdir(parents=True, exist_ok=True)
+        cutout_path = Path(cutout_path, fname)
+        cv2.imwrite(str(cutout_path), cv2.cvtColor(img_array,
+                                                   cv2.COLOR_RGB2BGR))
+        return True
+
+    def save_cutout_mask(self, mask):
+
+        fname = f"{self.image_id}_{self.cutout_num}_mask.png"
+        mask_path = Path(self.blob_home, self.data_root, self.batch_id, fname)
+        cv2.imwrite(str(mask_path), cv2.cvtColor(mask, cv2.COLOR_RGB2BGR))
+        return True
+
+
+class SynthCutout(Cutout):
+    synth_bbox: list = None
+
+    def __post_init__(self):
+        if self.synth_bbox is not None:
+            self.synth_bbox = [
+                YOLOBoxCoordinates(cutout_id, class_id, x, y, w, h)
+                for cutout_id, class_id, x, y, w, h in self.synth_bbox
+            ]
 
 
 # Synthetic Data Generation -------------------------------------------------------------------------
@@ -802,7 +853,7 @@ class Background:
         # Read the image from the file and return the numpy array
         background_array = cv2.imread(self.background_path)
         background_array = np.ascontiguousarray(
-            cv2.cvtColor(background_array, cv2.COLOR_BGR2BGRA))
+            cv2.cvtColor(background_array, cv2.COLOR_BGR2RGBA))
         return background_array
 
     @property
@@ -840,21 +891,20 @@ class SynthImage:
     def config(self):
         _config = {
             "data_root": self.data_root,
-            "background_id": self.background_id,
-            "data_root": self.data_root,
+            "synth_id": self.synth_id,
             "synth_path": self.synth_path,
             "synth_maskpath": self.synth_maskpath,
+            "synth_bbox": self.synth_bbox,
             "pots": self.pots,
             "background": self.background,
-            "cutouts": self.cutouts,
-            "synth_id": self.synth_id
+            "cutouts": self.cutouts
         }
         return _config
 
     def save_config(self, save_path):
         try:
-            save_image_path = Path(save_path, self.image_id + ".json")
-            with open(save_image_path, "w") as f:
+            # save_image_path = Path(save_path, self.image_id + ".json")
+            with open(save_path, "w") as f:
                 json.dump(self.config, f, indent=4, default=str)
         except Exception as e:
             raise e
@@ -866,50 +916,95 @@ class SynthData:
     """Combines documents in a database with items in a directory to form data container for generating synthetic bench images. Includes lists of dataclasses for cutouts, pots, and backgrounds.
     """
     synthdir: str
-    filter_cutouts: bool
-    filter_config: DictConfig
+    cfg: DictConfig
     background_dir: str = None
     pot_dir: str = None
-    cutout_dir: str = None
     cutouts: list[Cutout] = field(init=False, default=None)
     pots: list[Pot] = field(init=False, default=None)
     backgrounds: list[Background] = field(init=False, default=None)
+    color_map: dict = None
 
     def __post_init__(self):
-        self.backgrounds = self.get_dcs("background")
-        self.pots = self.get_dcs("pot")
-        self.cutouts = self.get_dcs("cutout")
 
-    def load_json(self, jsun):
-        """ Open json and create dictionary
-        """
-        # Opening JSON file
-        with open(jsun) as json_file:
+        self.backgrounds = self.get_pots_backs("background")
+        log.info(f"{len(self.backgrounds)} backgrounds collected.")
+        self.pots = self.get_pots_backs("pot")
+        log.info(f"{len(self.pots)} pots collected.")
+        self.cutouts = self.read_cutout_dcs()
+
+    def return_cutoutsdcs(self, jsonmeta):
+        group_list = []
+        with open(jsonmeta) as json_file:
             data = json.load(json_file)
-        return data
+            data["cutout_path"] = self.cfg.data.cutoutdir + "/" + data[
+                "cutout_path"]
+            cutoutdc = Cutout(**data)
+            group_list.append(cutoutdc)
 
-    def get_jsons(self, collection):
-        """ Gets json files
-        """
-        pass
+        return group_list
 
-    def get_dcs(self, collection_str):
+    def get_cutout_jsons(self):
+        # Read sorted csv
+        df = pd.read_csv(f"{self.cfg.job.jobdir}/filtered_cutouts.csv")
+        # Create path column
+        df["json_path"] = self.cfg.data.cutoutdir + "/" + df[
+            "cutout_path"].str.replace(".png", ".json", regex=False)
+        return df["json_path"]
+
+    def get_cut_groups(self, cutouts, replace):
+        # Create random sampler
+        rng = np.random.default_rng()
+        # Read list of jsons
+        cutout_groups = []
+        for i in range(0, self.cfg.synth.count):
+            sample_size = random.randint(self.cfg.synth.min_cutout_per_image,
+                                         self.cfg.synth.max_cutout_per_image)
+            if sample_size > len(cutouts):
+                sample_size = len(cutouts)
+                new_cuts = rng.choice(cutouts, sample_size, replace=replace)
+                cutout_groups.append(list(new_cuts))
+                for cut in new_cuts:
+                    cutouts.remove(cut)
+                break
+
+            else:
+                new_cuts = rng.choice(cutouts, sample_size, replace=replace)
+                cutout_groups.append(list(new_cuts))
+                for cut in new_cuts:
+                    cutouts.remove(cut)
+        return cutout_groups
+
+    def read_cutout_dcs(self):
+        labels = list(self.get_cutout_jsons())
+        # if self.group:
+        # labels = self.get_cut_groups(labels, replace)
+        cutouts = []
+        procs = cpu_count() - 1
+        with Pool(processes=procs) as pool:
+            with tqdm(total=len(labels)) as pbar:
+                for cutout in pool.imap_unordered(self.return_cutoutsdcs,
+                                                  labels):
+                    pbar.update()
+                    cutouts.append(cutout)
+            pool.close()
+            pool.join()
+        # self.cutouts = cutouts
+        log.info(f"{len(cutouts)} cutout groups create.")
+        log.info(f"{sum([len(x) for x in cutouts])} cutouts total.")
+        return cutouts
+
+    def get_pots_backs(self, collection_str):
         """Connnects documents in a database collection with items in a directory.
         Places connected items in a list of dataclasses.
         """
         docs = []
-        syn_datacls = {"cutout": Cutout, "pot": Pot, "background": Background}
+        syn_datacls = {"pot": Pot, "background": Background}
         data_cls = syn_datacls[collection_str]
         class_dir = getattr(self, collection_str + "_dir")
-        meta_jsons = Path(class_dir).glob("*.json")
-
-        if self.filter_cutouts and collection_str == "cutout":
-            meta_jsons = FilterCutouts(
-                meta_jsons,
-                self.filter_config).filtered_jsons.astype(str).values.tolist()
+        meta_jsons = list(Path(class_dir).glob("*.json"))
 
         for meta in meta_jsons:
-            meta_dict = self.load_json(meta)
+            meta_dict = read_json(meta)
             class_path = collection_str + "_path"
             meta_dict[class_path] = str(
                 Path(class_dir) / Path(meta_dict[class_path]).name)
@@ -921,15 +1016,15 @@ class SynthData:
 
 
 CUTOUT_PROPS = [
-    "area",  # float Area of the region i.e. number of pixels of the region scaled by pixel-area.
-    "area_bbox",  # float Area of the bounding box i.e. number of pixels of bounding box scaled by pixel-area.
-    "area_convex",  # float Are of the convex hull image, which is the smallest convex polygon that encloses the region.
-    "axis_major_length",  # float The length of the major axis of the ellipse that has the same normalized second central moments as the region.
-    "axis_minor_length",  # float The length of the minor axis of the ellipse that has the same normalized second central moments as the region.
-    "centroid",  # array Centroid coordinate tuple (row, col).
-    "eccentricity",  # float Eccentricity of the ellipse that has the same second-moments as the region. The eccentricity is the ratio of the focal distance (distance between focal points) over the major axis length. The value is in the interval [0, 1). When it is 0, the ellipse becomes a circle.
-    "extent",  # float Ratio of pixels in the region to pixels in the total bounding box. Computed as area / (rows * cols)
-    "solidity",  # float Ratio of pixels in the region to pixels of the convex hull image.
+    "area",    # float Area of the region i.e. number of pixels of the region scaled by pixel-area.
+    "area_bbox",    # float Area of the bounding box i.e. number of pixels of bounding box scaled by pixel-area.
+    "area_convex",    # float Are of the convex hull image, which is the smallest convex polygon that encloses the region.
+    "axis_major_length",    # float The length of the major axis of the ellipse that has the same normalized second central moments as the region.
+    "axis_minor_length",    # float The length of the minor axis of the ellipse that has the same normalized second central moments as the region.
+    "centroid",    # array Centroid coordinate tuple (row, col).
+    "eccentricity",    # float Eccentricity of the ellipse that has the same second-moments as the region. The eccentricity is the ratio of the focal distance (distance between focal points) over the major axis length. The value is in the interval [0, 1). When it is 0, the ellipse becomes a circle.
+    "extent",    # float Ratio of pixels in the region to pixels in the total bounding box. Computed as area / (rows * cols)
+    "solidity",    # float Ratio of pixels in the region to pixels of the convex hull image.
     # "label",  # int The label in the labeled input image.
-    "perimeter",  # float Perimeter of object which approximates the contour as a line through the centers of border pixels using a 4-connectivity.
+    "perimeter",    # float Perimeter of object which approximates the contour as a line through the centers of border pixels using a 4-connectivity.
 ]

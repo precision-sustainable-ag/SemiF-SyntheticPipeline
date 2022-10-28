@@ -2,6 +2,7 @@ defaults:
   - maintenance: maintenance
   - synth: synth
   - cutouts: cutouts
+  - override hydra/job_logging: custom
   - _self_
 
 hydra:
@@ -24,6 +25,18 @@ blob_names:
 
 data:
   datadir: ${general.workdir}/data
-  cutoutdir: ../${repo_names.semif_annotation}/data/${blob_names.cutout}
+  semif_anndir: ../${repo_names.semif_annotation}
+  cutoutdir: ${data.semif_anndir}/data/${blob_names.cutout}
   batchdir: ${data.cutoutdir}/${general.batch_id} # Is overiden by shell script
+  synthdir: ${data.datadir}/${blob_names.synth}
+  potdir: ${data.synthdir}/pots
+  backgrounddir: ${data.synthdir}/backgrounds
+  cutout_batchdir: ${data.cutoutdir}/${general.batch_id}
+  speciesinfo: ${data.semif_anndir}/data/semifield-utils/species_info.json # All species information
+  
+job:
+  jobname: exp_1
+  job_now: &nowdir ${now:%Y-%m-%d}/${now:%H-%M-%S}
+  jobdir: ${data.datadir}/${job.jobname}/${job.job_now}
+
   

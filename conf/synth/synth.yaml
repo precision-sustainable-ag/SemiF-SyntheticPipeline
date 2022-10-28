@@ -1,12 +1,9 @@
 
-count: 20000
+multiprocess: False
+unique_cutouts: True
+count: 10
+back_count:
+pot_count: 
+min_cutout_per_image: 1
+max_cutout_per_image: 15
 pot_jitter: [100, 100]
-
-savedir: /media/hdd1/mkutu/wir/semifield-synth
-
-datadir: ${general.workdir}/data
-synthdir: ${data.datadir}/${blob_names.synth}
-potdir: ${synth.synthdir}/pots
-backgrounddir: ${synth.synthdir}/backgrounds
-
-cutout_batchdir: ${data.cutoutdir}/${general.batch_id}
