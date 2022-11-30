@@ -26,13 +26,14 @@ blob_names:
 data:
   datadir: ${general.workdir}/data
   semif_anndir: ../${repo_names.semif_annotation}
-  cutoutdir: ${data.semif_anndir}/data/${blob_names.cutout}
+  # cutoutdir: ${data.semif_anndir}/data/${blob_names.cutout}
+  cutoutdir: /media/hdd1/mkutu/wir/semifield-cutouts
   batchdir: ${data.cutoutdir}/${general.batch_id} # Is overiden by shell script
   synthdir: ${data.datadir}/${blob_names.synth}
   potdir: ${data.synthdir}/pots
   backgrounddir: ${data.synthdir}/backgrounds
   cutout_batchdir: ${data.cutoutdir}/${general.batch_id}
-  speciesinfo: ${data.semif_anndir}/data/semifield-utils/species_info.json # All species information
+  speciesinfo: ${data.semif_anndir}/data/semifield-utils/species_information/species_info.json # All species information
   
 job:
   jobname: exp_1

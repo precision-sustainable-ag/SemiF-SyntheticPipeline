@@ -23,6 +23,7 @@ from synth_utils.utils import img2RGBA, read_json
 
 
 class SynthPipeline:
+
     def __init__(self, data, cfg: DictConfig) -> None:
         self.cfg = cfg
         self.data = data
@@ -45,6 +46,8 @@ class SynthPipeline:
 
         self.multi_coty_dist = cfg.cutouts.max_coty_dist.max
         self.plants_per_pot = cfg.cutouts.plants_per_pot
+        self.min_pots = cfg.cutouts.min_pots
+        self.max_pots = cfg.cutouts.max_pots
         self.cutouts = self.data.cutouts
         # self.used_cutouts = []
         self.cutout = None
@@ -79,7 +82,12 @@ class SynthPipeline:
         return random.choice(self.backgrounds)
 
     def get_pot_positions(self):
-        pots = random.randint(1, self.plants_per_pot)
+        # pots = random.randint(1, self.plants_per_pot)
+        pots = random.randint(self.min_pots, self.max_pots)
+        # pot_pos = multi_points_exclude(radius=550,
+        #                                rangeX=(0, 6368),
+        #                                rangeY=(0, 9560),
+        #                                qty=pots)
         pot_pos = rand_pot_grid(pots, (6368, 9560))
         return pot_pos
 
@@ -92,7 +100,7 @@ class SynthPipeline:
 
 #------------------- Overlap checks --------------------------------
 
-    def check_overlap(self, y, x, potshape, pot_positions):    # x = w ; h = y
+    def check_overlap(self, y, x, potshape, pot_positions):  # x = w ; h = y
         """Check overlap from list of previous bbox coordinates"""
         if not None in pot_positions:
             pot_h, pot_w = potshape
@@ -187,7 +195,7 @@ class SynthPipeline:
 
         # Adjust foreground brightness
         brightness_factor = random.random(
-        ) * .4 + .7    # Pick something between .7 and 1.1
+        ) * .4 + .7  # Pick something between .7 and 1.1
         enhancer = ImageEnhance.Brightness(pil_fore)
         pil_fore = enhancer.enhance(brightness_factor)
 
@@ -218,7 +226,7 @@ class SynthPipeline:
 
         # Adjust foreground brightness
         brightness_factor = random.random(
-        ) * .4 + .7    # Pick something between .7 and 1.1
+        ) * .4 + .7  # Pick something between .7 and 1.1
         enhancer = ImageEnhance.Brightness(pil_fore)
         pil_fore = enhancer.enhance(brightness_factor)
 
@@ -321,7 +329,7 @@ class SynthPipeline:
 
         return Path(savepath), Path(savemask)
 
-    def pipeline(self):
+    def pipeline(self, dummy):
         back = self.get_back()
         pot_positions = self.get_pot_positions()
         back_arr = back.array.copy()
@@ -333,59 +341,67 @@ class SynthPipeline:
         bboxes = []
         for potidx in range(len(pot_positions)):
             # Get pot and info
-            pot_position = pot_positions[potidx]    # center (y,x)
+            pot_position = pot_positions[potidx]  # center (y,x)
+            print(pot_position)
             # Get single pot
             self.get_pot()
             pot_arr = self.pot.array
             pot_arr = self.transform_pot(pot_arr)
             potshape = self.pot.pot_ht, self.pot.pot_wdt
             # Check coordinates for pot in top left corner
-            topl_y, topl_x = transform_position(
-                pot_position, potshape)    # to top left corner
+            topl_y, topl_x = transform_position(pot_position,
+                                                potshape)  # to top left corner
+            print(topl_y, topl_x)
             #Overlay pot on background
             self.fore_str = "Overlay pot"
-            potted, poty, potx = self.overlay(topl_y, topl_x, pot_arr,
-                                              back_arr)
+            potted, poty, potx = self.overlay(topl_y, topl_x, pot_arr, back_arr)
+            print(poty, potx)
             # Overlay cutouts
-            if self.plants_per_pot > 1:
-                new_pot_coords = get_random_point(
-                    (potx, poty), self.multi_coty_dist, self.plants_per_pot)
-                # self.cutout_group = random.choices(cutout_groups,
-                #                                    k=len(new_pot_coords))
+            # if self.plants_per_pot > 1:
+            #     # new_pot_coords = get_random_point(
+            #     #     (potx, poty), self.multi_coty_dist, self.plants_per_pot)
+            #     new_pot_coords = multi_points_exclude(radius=500,
+            #                                           rangeX=(0, 9200),
+            #                                           rangeY=(0, 6300),
+            #                                           qty=self.plants_per_pot)
+            #     # self.cutout_group = random.choices(cutout_groups,
+            #     #                                    k=len(new_pot_coords))
+            #     print(new_pot_coords)
+            # else:
+            #     new_pot_coords = [[potx, poty]]
+            # for pot_coord in new_pot_coords:
+            # print(pot_coord)
+            # potx, poty = pot_coord
+            self.cutout = self.get_cutouts()
+            cutout_arr = self.cutout.array
+            cutoutshape = self.cutout.array.shape[:2]
+            cutout_arr = self.transform_cutout(cutout_arr)
+            self.fore_str = "Overlay cutout"
+            cls = self.cutout.cls
+            if cls["USDA_symbol"] == "unknown":
+                self.cls_id = self.cmap["plant"]["class_id"]
             else:
-                new_pot_coords = [[potx, poty]]
-            for pot_coord in new_pot_coords:
-                potx, poty = pot_coord
-                self.cutout = self.get_cutouts()
-                cutout_arr = self.cutout.array
-                cutoutshape = self.cutout.array.shape[:2]
-                cutout_arr = self.transform_cutout(cutout_arr)
-                self.fore_str = "Overlay cutout"
-                cls = self.cutout.cls
-                if cls["USDA_symbol"] == "unknown":
-                    self.cls_id = self.cmap["plant"]["class_id"]
-                else:
-                    self.cls_id = self.cmap[cls["USDA_symbol"]]["class_id"]
+                self.cls_id = self.cmap[cls["USDA_symbol"]]["class_id"]
 
-                cutx, cuty = self.center_on_background(poty, potx, potshape,
-                                                       cutoutshape)
+            cutx, cuty = self.center_on_background(poty, potx, potshape,
+                                                   cutoutshape)
 
-                potted, mask, _, _, bbox = self.overlay(cuty,
-                                                        cutx,
-                                                        cutout_arr,
-                                                        back_arr,
-                                                        mask=back_arr_mask)
-                norm_center_x, norm_center_y, norm_w, norm_h = bbox
+            potted, mask, _, _, bbox = self.overlay(cuty,
+                                                    cutx,
+                                                    cutout_arr,
+                                                    back_arr,
+                                                    mask=back_arr_mask)
+            norm_center_x, norm_center_y, norm_w, norm_h = bbox
 
-                # bboxes.append(self.cutout.cutout_id, self.cls_id, norm_center_x,
-                #               norm_center_y, norm_w, norm_h)
-                used_pot_positions.append([topl_y, topl_x, potshape])
-                self.cutout.xywh = self.cutout.cutout_id, self.cls_id, norm_center_x, norm_center_y, norm_w, norm_h
-                txt_bbox = f"{self.cls_id} {norm_center_x} {norm_center_y} {norm_w} {norm_h}"
-                bboxes.append(txt_bbox)
-                cutout = asdict(self.cutout)
-                unique_cutouts.append(cutout)
-                used_pots.append(self.pot)
+            # bboxes.append(self.cutout.cutout_id, self.cls_id, norm_center_x,
+            #               norm_center_y, norm_w, norm_h)
+            used_pot_positions.append([topl_y, topl_x, potshape])
+            self.cutout.xywh = self.cutout.cutout_id, self.cls_id, norm_center_x, norm_center_y, norm_w, norm_h
+            txt_bbox = f"{self.cls_id} {norm_center_x} {norm_center_y} {norm_w} {norm_h}"
+            bboxes.append(txt_bbox)
+            cutout = asdict(self.cutout)
+            unique_cutouts.append(cutout)
+            used_pots.append(self.pot)
 
         # Save synth image and mask
         savepath, savemask = self.save_synth(potted, mask[:, :, 0])
@@ -421,6 +437,7 @@ class SynthPipeline:
 
 
 class FilterCutouts:
+
     def __init__(self, cutout_jsons, cfg: DictConfig) -> None:
 
         self.cutout_jsons = cutout_jsons
@@ -504,6 +521,38 @@ class FilterCutouts:
 #------------------- Helper functions --------------------------------
 
 
+def multi_points_exclude(radius=350,
+                         rangeX=(0, 9200),
+                         rangeY=(0, 6300),
+                         qty=10):
+    # radius = 200
+    # rangeX = (0, 2500)
+    # rangeY = (0, 2500)
+
+    # qty = 100  # or however many points you want
+
+    # Generate a set of all points within 200 of the origin, to be used as offsets later
+    # There's probably a more efficient way to do this.
+    deltas = set()
+    for x in range(-radius, radius + 1):
+        for y in range(-radius, radius + 1):
+            if x * x + y * y <= radius * radius:
+                deltas.add((x, y))
+
+    randPoints = []
+    excluded = set()
+    i = 0
+    while i < qty:
+        x = random.randrange(*rangeX)
+        y = random.randrange(*rangeY)
+        if (x, y) in excluded:
+            continue
+        randPoints.append((x, y))
+        i += 1
+        excluded.update((x + dx, y + dy) for (dx, dy) in deltas)
+    return randPoints
+
+
 def get_random_point(coord, max_dist, max_cotys):
     """ For adding cotyledons. Takes in coords and returns another coordinate randomely scattered.
         Define max distnace from og coord."""
@@ -549,9 +598,10 @@ def rand_pot_grid(num_pots, img_shape, max_cotys=None, max_coty_dist=None):
 
         if len(wid_diff) >= 2:
             wid_diff = wid_diff[0]
-        wid = [(x -
-                math.ceil(wid_diff / 2)) if wid_diff != 0 else math.ceil(x / 2)
-               for x in wid]    # Accounts for 0 diff
+        wid = [
+            (x - math.ceil(wid_diff / 2)) if wid_diff != 0 else math.ceil(x / 2)
+            for x in wid
+        ]  # Accounts for 0 diff
 
     if rand_ht == 1:
         ht = [int(imght / 2)]
@@ -564,8 +614,8 @@ def rand_pot_grid(num_pots, img_shape, max_cotys=None, max_coty_dist=None):
     # Combine height and width to make coordinates
     coords = list(itertools.product(wid, ht))
 
-    rand_x = 50    # if rand_wid >= 4 else 600
-    rand_y = 50    # if (rand_ht == 3) and (rand_wid >= 4) else 700
+    rand_x = 50  # if rand_wid >= 4 else 600
+    rand_y = 50  # if (rand_ht == 3) and (rand_wid >= 4) else 700
 
     if rand_wid == 1:
         rand_x = 3000
@@ -618,7 +668,7 @@ def pot_rows_cols(num_pots):
 def get_img_bbox(x, y, imgshape):
     pot_h, pot_w, _ = imgshape
     x0, x1, y0, y1 = x, x + pot_w, y, y + pot_h
-    bbox = [x0, y0, x1, y1]    # top right corner, bottom left corner
+    bbox = [x0, y0, x1, y1]  # top right corner, bottom left corner
     return bbox
 
 
@@ -641,12 +691,14 @@ def transform_position(pot_position, imgshape):
 
 
 class Point(object):
+
     def __init__(self, x, y):
         self.x = x
         self.y = y
 
 
 class Rect(object):
+
     def __init__(self, p1, p2):
         '''Store the top, bottom, left and right values for points 
                p1 and p2 are the (corners) in either order
@@ -692,8 +744,7 @@ def clean_data(data):
         pot["pot_path"] = "/".join(Path(pot["pot_path"]).parts[-2:])
 
     for cutout in data["cutouts"]:
-        cutout["cutout_path"] = "/".join(
-            Path(cutout["cutout_path"]).parts[-2:])
+        cutout["cutout_path"] = "/".join(Path(cutout["cutout_path"]).parts[-2:])
 
     return data
 

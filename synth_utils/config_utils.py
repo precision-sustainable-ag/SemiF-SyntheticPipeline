@@ -28,8 +28,8 @@ def read_cutouts(cutoutdir):
         x for x in Path(cutoutdir).glob("*") if x.name.startswith(batch_pref)
     ]
     cutout_csvs = [x for y in cutout_batchs for x in y.glob("*.csv")]
-    cutoutsdf = pd.concat([pd.read_csv(x)
-                           for x in cutout_csvs]).reset_index(drop=True)
+    cutoutsdf = pd.concat([pd.read_csv(x) for x in cutout_csvs
+                          ]).reset_index(drop=True)
     return cutoutsdf
 
 
@@ -45,8 +45,8 @@ def sort_cutouts(df, cfg, save_csv=False):
         if (scfg[x] != None) & (scfg[x] != False) & (scfg[x] != 0)
     ]
     assert cfg.cutouts.balanced or spec or (
-        cfg.cutouts.sample_size == "all"
-    ), "You must provide species proportions if 'balanced' is False"
+        cfg.cutouts.sample_size
+        == "all"), "You must provide species proportions if 'balanced' is False"
     assert not (
         cfg.cutouts.balanced and spec
     ), "You must provide species proportions or 'balanced' must be True\nbut not both."
