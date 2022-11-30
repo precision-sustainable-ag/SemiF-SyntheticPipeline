@@ -3,7 +3,10 @@
 
 #--------- Project Ignore ---------
 
-
+**exp*
+**Saved_cutouts
+**assets
+**.style.yapf
 # Log files
 *.log
 
