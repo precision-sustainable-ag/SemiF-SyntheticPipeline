@@ -6,15 +6,12 @@
 # cutouts config csvs
 **.csv
 
-<<<<<<< HEAD
 *data
 
-=======
 **exp*
 **Saved_cutouts
 **assets
 **.style.yapf
->>>>>>> feature/sort-cutouts
 # Log files
 *.log
 
