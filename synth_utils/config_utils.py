@@ -1,16 +1,14 @@
 import json
 import logging
-import os
-import sys
-
+from pprint import pprint
 from tqdm import tqdm
 
-sys.path.append("/home/weedsci/matt/SemiF-AnnotationPipeline")
+# sys.path.append("/home/weedsci/matt/SemiF-AnnotationPipeline")
 from dataclasses import asdict
 from pathlib import Path
 
 import pandas as pd
-from semif_utils.datasets import Cutout
+from SemiF_AnnotationPipeline.semif_utils.datasets import Cutout
 
 log = logging.getLogger(__name__)
 
@@ -28,8 +26,8 @@ def read_cutouts(cutoutdir):
         x for x in Path(cutoutdir).glob("*") if x.name.startswith(batch_pref)
     ]
     cutout_csvs = [x for y in cutout_batchs for x in y.glob("*.csv")]
-    cutoutsdf = pd.concat([pd.read_csv(x) for x in cutout_csvs
-                          ]).reset_index(drop=True)
+    cutoutsdf = pd.concat([pd.read_csv(x)
+                           for x in cutout_csvs]).reset_index(drop=True)
     return cutoutsdf
 
 
@@ -45,8 +43,8 @@ def sort_cutouts(df, cfg, save_csv=False):
         if (scfg[x] != None) & (scfg[x] != False) & (scfg[x] != 0)
     ]
     assert cfg.cutouts.balanced or spec or (
-        cfg.cutouts.sample_size
-        == "all"), "You must provide species proportions if 'balanced' is False"
+        cfg.cutouts.sample_size == "all"
+    ), "You must provide species proportions if 'balanced' is False"
     assert not (
         cfg.cutouts.balanced and spec
     ), "You must provide species proportions or 'balanced' must be True\nbut not both."
@@ -157,11 +155,29 @@ def cutoutmeta2csv(cutoutdir, batch_id, csv_savepath, save_df=True):
     for meta in tqdm(metas):
         # Get dictionaries
         cutout = asdict(get_cutout_meta(meta))
-
         row = cutout["cutout_props"]
-
         cls = cutout["cls"]
-        colors = cutout["cls"]["rgb"]
+        
+        # Color distribution data
+        cd = cutout["cutout_props"]["color_distribution"]
+        nd = dict()
+        for idx, c in enumerate(cd):
+            nd["hex_" + str(idx)] = c["hex"]
+            nd["rgb_" + str(idx)] = c["rgb"]
+            nd["occurences_"+ str(idx)] = int(c["occurence"])
+        # exit(1)
+        cutout.update(nd)
+        
+        # Descriptive stats
+        ds = cutout["cutout_props"]["descriptive_stats"]
+        nd = dict()
+        for d in ds:
+            chan_suff = d.split("_")[-1]
+            for chan in ds[d]:
+                
+                nd[chan_suff + "_" + chan] = ds[d][chan]        
+        cutout.update(nd)
+        
         # Extend nested dicts to single column header
         for ro in row:
             rec = {ro: row[ro]}
@@ -175,14 +191,14 @@ def cutoutmeta2csv(cutoutdir, batch_id, csv_savepath, save_df=True):
                     cutout.update(r)
                     cutout.update(g)
                     cutout.update(b)
-
                 cutout.update(spec)
-
         # Remove duplicate nested dicts
         cutout.pop("cutout_props")
         cutout.pop("cls")
         cutout.pop("rgb")
         cutout.pop("local_contours")
+        cutout.pop("descriptive_stats")
+        cutout.pop("color_distribution")
         # Create and append df
         cutdf = pd.DataFrame(cutout, index=[0])
         cutouts.append(cutdf)
@@ -198,16 +214,6 @@ def cutoutmeta2csv(cutoutdir, batch_id, csv_savepath, save_df=True):
                            na_position='first',
                            ignore_index=True,
                            key=None)
-    # Save dataframe
     if save_df:
         cutouts_df.to_csv(csv_savepath, index=False)
     return cutouts_df
-
-
-# Test
-# if __name__ == "__main__":
-#     path = "/home/weedsci/matt/SemiF-AnnotationPipeline/data/semifield-cutouts/MD_2022-07-05/MD_Row-10_1657032952_6.json"
-#     cutoutdir = "/home/weedsci/matt/SemiF-AnnotationPipeline/data/semifield-cutouts"
-#     batch_id = "MD_2022-07-06"
-#     csv_path = "MD_2022-07-06.csv"
-#     cutoutmeta2csv(cutoutdir, batch_id, csv_path)
