@@ -1,0 +1,38 @@
+## Main .gitignore file. While many are empty, directories are left inplace
+## to provide an example of directory structure.
+
+#--------- Project Ignore ---------
+*assets
+# cutouts config csvs
+**.csv
+
+*data
+
+# Log files
+*.log
+
+# Hydra files
+.hydra
+
+# ---------- Misc -----------
+# Shell scripts
+*.sh
+
+# yapf code format
+*.style.yapf
+
+# Mac stuff
+**/.DS_Store
+
+# Jupyter Notebook
+**.ipynb_checkpoints
+
+# Pytest cache
+**.pytest_cache
+
+# Pycache
+**__pycache __
+*.pyc
+
+# VsCode settings file
+*.vscode

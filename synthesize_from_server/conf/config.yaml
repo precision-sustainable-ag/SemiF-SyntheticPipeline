@@ -1,0 +1,37 @@
+defaults:
+  - maintenance: maintenance
+  - synth: synth
+  - cutouts: cutouts
+  - override hydra/job_logging: custom
+  - _self_
+
+hydra:
+  run:
+    dir: ./
+  output_subdir: 
+
+general:
+  # batch_id: ??? # Control the batch_id through the command line
+  task: config_cutouts #config_cutouts synthesize
+  workdir: ${hydra:runtime.cwd}  # where the code is executed
+
+repo_names:
+  semif_annotation: SemiF-AnnotationPipeline
+  semif_snyth: SemiF-SyntheticPipeline
+
+blob_names:
+  synth: semifield-synth
+  cutout: semifield-cutouts
+
+data:
+  datadir: ${general.workdir}/data
+  semif_anndir: ../${repo_names.semif_annotation}
+  # cutoutdir: ${data.semif_anndir}/data/${blob_names.cutout}
+  cutoutdir: /media/hdd1/mkutu/wir/semifield-cutouts
+  batchdir: ${data.cutoutdir}/${general.batch_id} # Is overiden by shell script
+  synthdir: ${data.datadir}/${blob_names.synth}
+  potdir: ${data.synthdir}/pots
+  backgrounddir: ${data.synthdir}/backgrounds
+  cutout_batchdir: ${data.cutoutdir}/${general.batch_id}
+  speciesinfo: ${data.semif_anndir}/data/semifield-utils/species_information/species_info.json # All species information
+  
