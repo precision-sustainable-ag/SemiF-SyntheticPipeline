@@ -2,7 +2,11 @@
 
 ## Setup
 
-Define data directory in conf/config.yaml
+1. Define SemiField input data directory in [conf/config.yaml](conf/config.yaml#L12)
+2. Define output saving location
+3. Configure your dataset in [conf/cutouts/cutouts.yaml](conf/cutouts/cutouts.yaml)
+
+
 
 
 

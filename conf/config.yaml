@@ -9,6 +9,8 @@ hydra:
     dir: ./
   output_subdir: 
 
+datadir: 
+
 general:
   batch_id: ??? # Control the batch_id through the command line
   task: synthesize
