@@ -1,5 +1,11 @@
 # SemiF-SyntheticPipeline
 
+## Setup
+
+Define data directory in conf/config.yaml
+
+
+
 # Data Structure
 
 * Pot and background images are located in this repository
