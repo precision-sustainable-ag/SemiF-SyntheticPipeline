@@ -1,19 +1,18 @@
 defaults:
-  - maintenance: maintenance
   - synth: synth
   - cutouts: cutouts
   - _self_
 
 hydra:
   run:
-    dir: ./
-  output_subdir: 
+    dir: ${general.workdir}/data/projects/${general.project_name}
+  output_subdir: ${general.workdir}/data/projects/${general.project_name}
 
 datadir: 
 
 general:
-  batch_id: ??? # Control the batch_id through the command line
-  task: synthesize
+  task: config_cutouts # config_cutouts, synthesize
+  project_name: all_big_cutouts
   workdir: ${hydra:runtime.cwd}  # where the code is executed
 
 repo_names:
@@ -21,11 +20,15 @@ repo_names:
   semif_snyth: SemiF-SyntheticPipeline
 
 blob_names:
+  developed: semifield-developed-images
   synth: semifield-synth
-  cutout: semifield-cutouts
+  cutout: semifield-cutouts  
 
 data:
   datadir: ${general.workdir}/data
-  cutoutdir: ../${repo_names.semif_annotation}/data/${blob_names.cutout}
-  batchdir: ${data.cutoutdir}/${general.batch_id} # Is overiden by shell script
+  # datadir: /mnt/research-projects/s/screberg/longterm_storage
+  developed: ${data.datadir}/${blob_names.developed}
+  cutoutdir: /mnt/research-projects/s/screberg/longterm_images/semifield-cutouts # ???
+  csvpath: ${general.workdir}/data/projects/${general.project_name}/${general.project_name}.csv
+  
   

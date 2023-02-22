@@ -1,11 +1,11 @@
 import logging
 from dataclasses import asdict
+from multiprocessing import Process, cpu_count
 from pathlib import Path
 
 import numpy as np
 from omegaconf import DictConfig
 from tqdm import trange
-from multiprocessing import Process, cpu_count
 
 from semif_utils.datasets import SynthData, SynthImage
 from semif_utils.synth_utils import (SynthPipeline, clean_data, img2RGBA,
@@ -15,14 +15,16 @@ log = logging.getLogger(__name__)
 
 
 def main(cfg: DictConfig) -> None:
+
     def pipeline():
         # Create synth data container
         data = SynthData(synthdir=cfg.synth.synthdir,
                          filter_config=cfg,
                          filter_cutouts=cfg.cutouts.filter,
                          background_dir=cfg.synth.backgrounddir,
-                         pot_dir=cfg.synth.potdir,
-                         cutout_dir=cfg.synth.cutout_batchdir)
+                         pot_dir=cfg.synth.potdir)
+        #  cutout_dir=cfg.synth.ctout_batchdir
+
         # Call pipeline
         syn = SynthPipeline(data, cfg)
 

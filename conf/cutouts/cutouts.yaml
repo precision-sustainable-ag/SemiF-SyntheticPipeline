@@ -1,17 +1,17 @@
 filter: True
 
 species:   # USDA symbol from list of species
+
 is_green:
 is_primary: True
 extends_border: False
 
-green_sum: # True or False
-  max: 1000000
-  min: 5000
+green_sum:
+  max: 10000000
+  min: 500
 
 area: # mean, 25, 50, 75 for choosing greater than 25%, 50% , 75% percentiles
   max: 
-  min: 
+  min: 50
 
-save_csv: False # to create and save a csv of all cutout metadata
-
+save_csv: True # to create and save a csv of all cutout metadata

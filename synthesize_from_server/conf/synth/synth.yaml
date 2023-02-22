@@ -1,9 +1,0 @@
-
-multiprocess: False
-unique_cutouts: True
-count: 10
-back_count:
-pot_count: 
-min_cutout_per_image: 1
-max_cutout_per_image: 15
-pot_jitter: [100, 100]

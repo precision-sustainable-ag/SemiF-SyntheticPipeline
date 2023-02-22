@@ -9,4 +9,4 @@ synthdir: ${data.datadir}/${blob_names.synth}
 potdir: ${synth.synthdir}/pots
 backgrounddir: ${synth.synthdir}/backgrounds
 
-cutout_batchdir: ${data.cutoutdir}/${general.batch_id}
+# cutout_batchdir: ${data.cutoutdir}/${general.batch_id}

@@ -11,7 +11,7 @@ import exifread
 import numpy as np
 from omegaconf import DictConfig
 
-from semif_utils.synth_utils import FilterCutouts
+from utils.synth_utils import FilterCutouts
 
 SCHEMA_VERSION = "1.0"
 
@@ -870,7 +870,7 @@ class SynthData:
     filter_config: DictConfig
     background_dir: str = None
     pot_dir: str = None
-    cutout_dir: str = None
+    # cutout_dir: str = None
     cutouts: list[Cutout] = field(init=False, default=None)
     pots: list[Pot] = field(init=False, default=None)
     backgrounds: list[Background] = field(init=False, default=None)
