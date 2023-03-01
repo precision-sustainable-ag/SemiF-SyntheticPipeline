@@ -1,14 +1,4 @@
 
-<<<<<<< HEAD
-multiprocess: False
-unique_cutouts: True
-count: 10
-back_count:
-pot_count: 
-min_cutout_per_image: 1
-max_cutout_per_image: 15
-pot_jitter: [100, 100]
-=======
 count: 10
 multiprocess: True
 export_yolo_bbox: True
@@ -23,4 +13,3 @@ potdir: ${synth.synthdir}/pots
 backgrounddir: ${synth.synthdir}/backgrounds
 
 # cutout_batchdir: ${data.cutoutdir}/${general.batch_id}
->>>>>>> fix-synth
