@@ -1,5 +1,4 @@
 defaults:
-  - maintenance: maintenance
   - synth: synth
   - cutouts: cutouts
   - override hydra/job_logging: custom
@@ -7,24 +6,34 @@ defaults:
 
 hydra:
   run:
-    dir: ./
-  output_subdir: 
+    dir: ${general.workdir}/data/projects/${general.project_name}
+  output_subdir: ${general.workdir}/data/projects/${general.project_name}
+
+datadir: 
 
 general:
+<<<<<<< HEAD
   # batch_id: ??? # Control the batch_id through the command line
   task: config_cutouts #config_cutouts synthesize
+=======
+  task: config_cutouts # config_cutouts, synthesize
+  project_name: all_big_cutouts
+>>>>>>> fix-synth
   workdir: ${hydra:runtime.cwd}  # where the code is executed
+  projectdir: ${general.workdir}/data/projects/${general.project_name}
 
 repo_names:
   semif_annotation: SemiF-AnnotationPipeline
   semif_snyth: SemiF-SyntheticPipeline
 
 blob_names:
+  developed: semifield-developed-images
   synth: semifield-synth
-  cutout: semifield-cutouts
+  cutout: semifield-cutouts  
 
 data:
   datadir: ${general.workdir}/data
+<<<<<<< HEAD
   semif_anndir: ../${repo_names.semif_annotation}
   # cutoutdir: ${data.semif_anndir}/data/${blob_names.cutout}
   cutoutdir: /media/hdd1/mkutu/wir/semifield-cutouts
@@ -41,3 +50,11 @@ job:
   jobdir: ${data.datadir}/${job.jobname}/${job.job_now}
 
   
+=======
+  # datadir: /mnt/research-projects/s/screberg/longterm_storage
+  developed: ${data.datadir}/${blob_names.developed}
+  cutoutdir: /mnt/research-projects/s/screberg/longterm_images/semifield-cutouts # ???
+  csvpath: ${general.projectdir}/${general.project_name}.csv
+  
+  
+>>>>>>> fix-synth

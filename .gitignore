@@ -31,7 +31,7 @@
 **.pytest_cache
 
 # Pycache
-**__pycache __
+__pycache__
 *.pyc
 
 # VsCode settings file

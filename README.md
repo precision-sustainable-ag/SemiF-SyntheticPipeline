@@ -1,5 +1,6 @@
 # SemiF-SyntheticPipeline
 
+<<<<<<< HEAD
 
 # Workflow
 
@@ -7,6 +8,27 @@
 2. Generate synthetic data
 
 
+=======
+## Setup
+
+### Config data csv
+Create a custom synthetic dataset by specifying various properties.
+
+1. Define SemiField-cutout input data directory in [conf/config.yaml](conf/config.yaml#L31)
+2. Configure your dataset in [conf/cutouts/cutouts.yaml](conf/cutouts/cutouts.yaml)
+3. Run
+    ```bash
+    python CONFIG.py general.task=config_cutouts
+    ```
+4. CSV along with processing log and saved configurations are saved in [data/projects/{project_name}](data/projects)
+
+### Generate Synthetic data
+
+1. Run
+    ```bash
+    python CONFIG.py general.task=synthesize
+    ```
+>>>>>>> fix-synth
 
 # Data Structure
 
