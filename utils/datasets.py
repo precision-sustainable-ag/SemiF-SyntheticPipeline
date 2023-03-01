@@ -13,15 +13,13 @@ import cv2
 import exifread
 import numpy as np
 import pandas as pd
-<<<<<<<< HEAD:synth_utils/datasets.py
+
 from omegaconf import DictConfig
 from tqdm import tqdm
 
 from synth_utils.utils import read_json
-========
 from dacite import from_dict
 from PIL import Image as PILImage
->>>>>>>> fix-synth:utils/datasets.py
 
 SCHEMA_VERSION = "1.0"
 
@@ -165,7 +163,6 @@ class BBox:
     @property
     def config(self):
         _config = {
-<<<<<<<< HEAD:synth_utils/datasets.py
             "bbox_id": self.bbox_id,
             "image_id": self.image_id,
             "local_centroid": list(self.norm_local_centroid
@@ -179,8 +176,7 @@ class BBox:
             "overlapping_bbox_ids": [
                 box.bbox_id for box in self._overlapping_bboxes
             ],
-            "num_overlapping_bboxes": len(self._overlapping_bboxes)
-========
+            "num_overlapping_bboxes": len(self._overlapping_bboxes),
             "bbox_id":
             self.bbox_id,
             "image_id":
@@ -205,7 +201,6 @@ class BBox:
             [box.bbox_id for box in self._overlapping_bboxes],
             "num_overlapping_bboxes":
             len(self._overlapping_bboxes)
->>>>>>>> fix-synth:utils/datasets.py
         }
         return _config
 
@@ -748,50 +743,37 @@ class Cutout:
     datetime: datetime.datetime    # Datetime of original image creation
     dap: int    #days after planting
     cutout_props: CutoutProps
-<<<<<<<< HEAD:synth_utils/datasets.py
     local_contours: List[float] = None
-========
     dap: str = None
     local_contours: str = None
     season: str = None
     # rgb_cropout_mean: List[float]
     # rgb_cutout_mean: List[float]
     # local_contours: List[float] = None
->>>>>>>> fix-synth:utils/datasets.py
     cutout_id: str = None
     cutout_path: str = None
     cls: str = None
     is_primary: bool = False
     extends_border: bool = False
-<<<<<<<< HEAD:synth_utils/datasets.py
     xywh: list = None
-========
->>>>>>>> fix-synth:utils/datasets.py
     cutout_version: str = "1.0"
     schema_version: str = SCHEMA_VERSION
     synth: bool = False
 
     def __post_init__(self):
         self.cutout_id = self.image_id + "_" + str(self.cutout_num)
-<<<<<<<< HEAD:synth_utils/datasets.py
-========
         if not self.synth:
             self.cutout_path = str(Path(self.batch_id,
                                         self.cutout_id + ".png"))
->>>>>>>> fix-synth:utils/datasets.py
-
     @property
     def array(self):
         # Read the image from the file and return the numpy array
         cut_array = cv2.imread(self.cutout_path)
-<<<<<<<< HEAD:synth_utils/datasets.py
         cut_array = np.ascontiguousarray(
             cv2.cvtColor(cut_array, cv2.COLOR_BGR2RGB))
-========
         cut_array = np.ascontiguousarray(cut_array)
         # cut_array = np.ascontiguousarray(
         #     cv2.cvtColor(cut_array, cv2.COLOR_BGR2RGB))
->>>>>>>> fix-synth:utils/datasets.py
         return cut_array
 
     @property
@@ -814,14 +796,11 @@ class Cutout:
             # "rgb_cutout_mean": self.rgb_cutout_mean,
             "extends_border": self.extends_border,
             "cutout_version": self.cutout_version,
-<<<<<<<< HEAD:synth_utils/datasets.py
             "schema_version": self.schema_version,
-            "local_contours": self.local_contours
-========
+            "local_contours": self.local_contours,
             "schema_version": self.schema_version
 
             # "local_contours": self.local_contours
->>>>>>>> fix-synth:utils/datasets.py
         }
 
         return _config
@@ -845,19 +824,16 @@ class Cutout:
                     cv2.cvtColor(cutout_array, cv2.COLOR_RGB2BGRA))
         return True
 
-<<<<<<<< HEAD:synth_utils/datasets.py
     def save_cropout(self, img_array):
 
         fname = f"{self.image_id}_{self.cutout_num}.jpg"
         cutout_path = Path(self.blob_home, self.data_root, self.batch_id,
                            fname)
-========
     def save_cropout(self, save_dir, img_array):
 
         fname = f"{self.image_id}_{self.cutout_num}.jpg"
         # cutout_path = Path(self.blob_home, self.data_root, self.batch_id, fname)
         cutout_path = Path(save_dir, self.batch_id, fname)
->>>>>>>> fix-synth:utils/datasets.py
         cv2.imwrite(str(cutout_path), cv2.cvtColor(img_array,
                                                    cv2.COLOR_RGB2BGR))
         return True
@@ -873,7 +849,6 @@ class Cutout:
                                                    cv2.COLOR_RGB2BGR))
         return True
 
-<<<<<<<< HEAD:synth_utils/datasets.py
     def save_cutout_mask(self, mask):
 
         fname = f"{self.image_id}_{self.cutout_num}_mask.png"
@@ -892,7 +867,6 @@ class SynthCutout(Cutout):
                 for cutout_id, class_id, x, y, w, h in self.synth_bbox
             ]
 
-========
     def save_cutout_mask(self, save_dir, mask):
 
         fname = f"{self.image_id}_{self.cutout_num}_mask.png"
@@ -901,7 +875,6 @@ class SynthCutout(Cutout):
         cv2.imwrite(str(mask_path), cv2.cvtColor(mask, cv2.COLOR_RGB2BGR))
         return True
 
->>>>>>>> fix-synth:utils/datasets.py
 
 # Synthetic Data Generation -------------------------------------------------------------------------
 @dataclass
@@ -1014,28 +987,22 @@ class SynthImage:
 class SynthData:
 
     synthdir: str
-<<<<<<<< HEAD:synth_utils/datasets.py
     cfg: DictConfig
     background_dir: str = None
     pot_dir: str = None
-========
     background_dir: str
     pot_dir: str
     cutout_dir: str
     cutout_csv: str
->>>>>>>> fix-synth:utils/datasets.py
     cutouts: list[Cutout] = field(init=False, default=None)
     pots: list[Pot] = field(init=False, default=None)
     backgrounds: list[Background] = field(init=False, default=None)
     color_map: dict = None
 
     def __post_init__(self):
-<<<<<<<< HEAD:synth_utils/datasets.py
-========
         self.backgrounds = self.get_backgrounds()
         self.pots = self.get_pots()
         self.cutouts = self.get_cutouts()
->>>>>>>> fix-synth:utils/datasets.py
 
         self.backgrounds = self.get_pots_backs("background")
         log.info(f"{len(self.backgrounds)} backgrounds collected.")
@@ -1052,7 +1019,6 @@ class SynthData:
             cutoutdc = Cutout(**data)
             group_list.append(cutoutdc)
 
-<<<<<<<< HEAD:synth_utils/datasets.py
         return group_list
 
     def get_cutout_jsons(self):
@@ -1106,14 +1072,11 @@ class SynthData:
         return cutouts
 
     def get_pots_backs(self, collection_str):
-========
     def get_pots(self):
->>>>>>>> fix-synth:utils/datasets.py
         """Connnects documents in a database collection with items in a directory.
         Places connected items in a list of dataclasses.
         """
         docs = []
-<<<<<<<< HEAD:synth_utils/datasets.py
         syn_datacls = {"pot": Pot, "background": Background}
         data_cls = syn_datacls[collection_str]
         class_dir = getattr(self, collection_str + "_dir")
@@ -1122,14 +1085,12 @@ class SynthData:
         for meta in meta_jsons:
             meta_dict = read_json(meta)
             class_path = collection_str + "_path"
-========
         meta_jsons = Path(self.pot_dir).glob("*.json")
 
         for meta in meta_jsons:
             meta_dict = self.load_json(meta)
             class_path = "pot" + "_path"
             # change path to suit local directory
->>>>>>>> fix-synth:utils/datasets.py
             meta_dict[class_path] = str(
                 Path(self.pot_dir) / Path(meta_dict[class_path]).name)
             dc = Pot(**meta_dict)
@@ -1181,14 +1142,11 @@ CUTOUT_PROPS = [
     "extent",    # float Ratio of pixels in the region to pixels in the total bounding box. Computed as area / (rows * cols)
     "solidity",    # float Ratio of pixels in the region to pixels of the convex hull image.
     # "label",  # int The label in the labeled input image.
-<<<<<<<< HEAD:synth_utils/datasets.py
     "perimeter",    # float Perimeter of object which approximates the contour as a line through the centers of border pixels using a 4-connectivity.
-========
     "perimeter",  # float Perimeter of object which approximates the contour as a line through the centers of border pixels using a 4-connectivity.
     # "intensity_max",  # Float Value with the greatest intensity in the region.
     # "intensity_mean",  # flaot Value with the mean intensity in the region.
     # "intensity_min",  # float Value with the least intensity in the region.
     # "feret_diameter_maxfloat",  # flaot Maximum Feret’s diameter computed as the longest distance between points around a region’s convex hull contour as determined by find_contours
     # "equivalent_diameter_area",  # float The diameter of a circle with the same area as the region.
->>>>>>>> fix-synth:utils/datasets.py
 ]
