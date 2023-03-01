@@ -1,66 +1,21 @@
 import json
 import logging
-<<<<<<< HEAD
-import random
-from multiprocessing import Pool, cpu_count
-=======
 from dataclasses import asdict
 from multiprocessing import Pool, Process, cpu_count, freeze_support
 from pathlib import Path
->>>>>>> fix-synth
 
 import cv2
 import numpy as np
 from omegaconf import DictConfig
 from tqdm import tqdm, trange
 
-<<<<<<< HEAD
-from synth_utils.config_utils import read_cutouts, sort_cutouts
-from synth_utils.datasets import SynthData
-from synth_utils.synth_utils import SynthPipeline
-=======
 from utils.datasets import SynthData, SynthImage
 from utils.synth_utils import (SynthPipeline, clean_data, img2RGBA,
                                save_dataclass_json, transform_position)
->>>>>>> fix-synth
 
 log = logging.getLogger(__name__)
 
 
-<<<<<<< HEAD
-def main(cfg: DictConfig) -> None:
-    alldf = read_cutouts(cfg.data.cutoutdir)
-    sort_cutouts(alldf, cfg, save_csv=True)
-    log.info("Cutouts sorted.")
-    with open(cfg.data.speciesinfo) as f:
-        spec_info = json.load(f)
-        spec_info = spec_info["species"]
-    # Create synth data container
-    log.info("Creating SynthData container")
-    synthdata = SynthData(synthdir=cfg.data.synthdir,
-                          cfg=cfg,
-                          background_dir=cfg.data.backgrounddir,
-                          pot_dir=cfg.data.potdir,
-                          color_map=spec_info)
-
-    # cutout_groups = synthdata.read_cutout_dcs()
-    log.info(f"SynthData container created.")
-
-    syn = SynthPipeline(synthdata, cfg)
-
-    if cfg.synth.multiprocess:
-        procs = cpu_count() - 3
-
-        with Pool(processes=procs) as pool:
-            with tqdm(total=syn.count) as pbar:
-                for _ in pool.imap_unordered(syn.pipeline):
-                    pbar.update()
-            pool.close()
-            pool.join()
-    else:
-        for i in range(0, cfg.synth.count):
-            syn.pipeline()
-=======
 def synth_image(cuts, pots, back, cfg):
     """ Operates to produce single image
 
@@ -167,4 +122,3 @@ def main(cfg: DictConfig) -> None:
     else:
         for cuts, pots, back, cfg in tqdm(all_args):
             synth_image(cuts, pots, back, cfg)
->>>>>>> fix-synth
