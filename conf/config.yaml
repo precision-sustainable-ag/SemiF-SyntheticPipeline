@@ -14,6 +14,7 @@ general:
   task: config_cutouts # config_cutouts, synthesize
   project_name: all_big_cutouts
   workdir: ${hydra:runtime.cwd}  # where the code is executed
+  projectdir: ${general.workdir}/data/projects/${general.project_name}
 
 repo_names:
   semif_annotation: SemiF-AnnotationPipeline
@@ -29,6 +30,6 @@ data:
   # datadir: /mnt/research-projects/s/screberg/longterm_storage
   developed: ${data.datadir}/${blob_names.developed}
   cutoutdir: /mnt/research-projects/s/screberg/longterm_images/semifield-cutouts # ???
-  csvpath: ${general.workdir}/data/projects/${general.project_name}/${general.project_name}.csv
+  csvpath: ${general.projectdir}/${general.project_name}.csv
   
   

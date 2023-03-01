@@ -9,9 +9,9 @@ from typing import List, Optional, Union
 import cv2
 import exifread
 import numpy as np
-from omegaconf import DictConfig
-
-from utils.synth_utils import FilterCutouts
+import pandas as pd
+from dacite import from_dict
+from PIL import Image as PILImage
 
 SCHEMA_VERSION = "1.0"
 
@@ -95,6 +95,7 @@ class BBox:
     bbox_id: str
     image_id: str
     cls: str
+    instance_id: List[int] = field(default=None)
     local_coordinates: BoxCoordinates = field(init=True,
                                               default_factory=init_empty)
     global_coordinates: BoxCoordinates = field(init=True,
@@ -159,6 +160,8 @@ class BBox:
             self.is_primary,
             "cls":
             self.cls,
+            "instance_id":
+            self.instance_id,
             "overlapping_bbox_ids":
             [box.bbox_id for box in self._overlapping_bboxes],
             "num_overlapping_bboxes":
@@ -292,54 +295,13 @@ class BBox:
 
 @dataclass
 class BatchMetadata:
-    """ NOT USED. LEGACY FROM AnnotationPipeline"""
     """ Batch metadata class for yaml loader"""
     blob_home: str
     data_root: str
     batch_id: str
     upload_datetime: str
-    image_list: List = field(init=False)
+    image_list: List
     schema_version: str = SCHEMA_VERSION
-
-    def __post_init__(self):
-        self.image_list = self.get_batch_images()
-
-    def get_batch_images(self):
-        imgdir = Path(self.blob_home, self.data_root, self.batch_id, "images")
-        extensions = ["*.jpg", "*.JPG", "*.jpeg", "*.JPEG"]
-        images = []
-        for ext in extensions:
-            images.extend(Path(imgdir).glob(ext))
-        image_ids = [image.stem for image in images]
-        image_list = []
-
-        for ids, imgp in zip(image_ids, images):
-            image_list.append(str("/".join(imgp.parts[-2:])))
-
-        return image_list
-
-    @property
-    def config(self):
-        _config = {
-            "blob_home": self.blob_home,
-            "data_root": self.data_root,
-            "batch_id": self.batch_id,
-            "upload_datetime": self.upload_datetime,
-            "image_list": self.image_list,
-            "schema_version": self.schema_version
-        }
-
-        return _config
-
-    def save_config(self):
-        try:
-            save_batch_path = Path(self.blob_home, self.data_root,
-                                   self.batch_id, self.batch_id + ".json")
-            with open(save_batch_path, "w") as f:
-                json.dump(self.config, f, indent=4, default=str)
-        except Exception as e:
-            raise e
-        return True
 
 
 # Image dataclasses ----------------------------------------------------------
@@ -425,6 +387,7 @@ class Box:
     global_coordinates: BoxCoordinates
     cls: str
     is_primary: bool
+    instance_id: List[int] = field(default=None)
     overlapping_bbox_ids: List[BBox] = field(init=False,
                                              default_factory=lambda: [])
 
@@ -433,7 +396,6 @@ class Box:
 
 
 @dataclass
-# Not used. Legacy class from AnnotationPipeline
 class BBoxFOV:
     top_left: list
     top_right: list
@@ -459,13 +421,12 @@ class Image:
     """Parent class for RemapImage and ImageData.
 
     """
+
     blob_home: str
     data_root: str
     batch_id: str
     image_path: str
     image_id: str
-    plant_date: str
-    growth_stage: str
 
     def __post_init__(self):
         image_array = self.array
@@ -475,8 +436,7 @@ class Image:
     @property
     def array(self):
         # Read the image from the file and return the numpy array
-        img_path = Path(self.blob_home, self.data_root, self.batch_id,
-                        self.image_path)
+        img_path = Path(self.rel_path, self.image_id + ".jpg")
         img_array = cv2.imread(str(img_path))
         img_array = np.ascontiguousarray(
             cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB))
@@ -490,8 +450,6 @@ class Image:
             "batch_id": self.batch_id,
             "image_id": self.image_id,
             "image_path": self.image_path,
-            "plant_date": self.plant_date,
-            "growth_stage": self.growth_stage,
             "width": self.width,
             "height": self.height,
             "exif_meta": asdict(self.exif_meta),
@@ -515,6 +473,7 @@ class Image:
 @dataclass
 class RemapImage(Image):
     """ For remapping labels (remap_labels) """
+    rel_path: str
     bboxes: list[BBox]
     camera_info: CameraInfo
     fullres_path: str
@@ -557,6 +516,7 @@ class RemapImage(Image):
         _config = super(RemapImage, self).config
         _config["fullres_width"] = self.fullres_width
         _config["fullres_height"] = self.fullres_height
+        _config["rel_path"] = self.rel_path
 
         return _config
 
@@ -564,7 +524,7 @@ class RemapImage(Image):
 @dataclass
 class ImageData(Image):
     """ Dataclass for segmentation data generation"""
-
+    rel_path: str
     width: int
     height: int
     exif_meta: ImageMetadata
@@ -589,8 +549,6 @@ class ImageData(Image):
             "batch_id": self.batch_id,
             "image_id": self.image_id,
             "image_path": self.image_path,
-            "plant_date": self.plant_date,
-            "growth_stage": self.growth_stage,
             "width": self.width,
             "height": self.height,
             "exif_meta": asdict(self.exif_meta),
@@ -599,6 +557,7 @@ class ImageData(Image):
             "bboxes": [asdict(x) for x in self.bboxes],
             "fullres_height": self.fullres_height,
             "fullres_width": self.fullres_width,
+            "rel_path": self.rel_path,
             "schema_version": self.schema_version
         }
 
@@ -613,10 +572,37 @@ class ImageData(Image):
             raise e
         return True
 
+    def save_binary_mask(self, save_path, binary_mask):
+
+        fname = f"{self.image_id}.png"
+        mask_path = Path(self.blob_home, self.data_root, self.batch_id,
+                         "meta_masks", "binary_masks", fname)
+        cv2.imwrite(str(mask_path), binary_mask.astype(np.uint8))
+        return True
+
+    def save_semantic_mask(self, save_path, semantic_mask):
+
+        pil_mask = PILImage.fromarray(semantic_mask[..., 1])
+        fname = f"{self.image_id}.png"
+        # mask_path = Path(self.blob_home, self.data_root, self.batch_id,
+        #  "meta_masks", "semantic_masks", fname)
+        mask_path = Path(save_path, fname)
+        # cv2.imwrite(str(mask_path), semantic_mask.astype(np.uint8))
+        pil_mask = pil_mask.save(mask_path)
+        return True
+
+    def save_instance_mask(self, save_path, instance_mask):
+
+        fname = f"{self.image_id}.png"
+        mask_path = Path(save_path, fname)
+        pil_mask = PILImage.fromarray(instance_mask)
+        pil_mask = pil_mask.save(mask_path)
+        # cv2.imwrite(str(mask_path), instance_mask.astype(np.uint8))
+        return True
+
 
 @dataclass
 class Mask:
-    """ NOT USED. FROM LEGACY ANNOTATION Pipelien"""
     mask_id: str
     mask_path: str
     image_id: str
@@ -662,6 +648,10 @@ class CutoutProps:
     "extent",  # float Ratio of pixels in the region to pixels in the total bounding box. Computed as area / (rows * cols)
     "solidity",  # float Ratio of pixels in the region to pixels of the convex hull image.
     "perimeter",  # float Perimeter of object which approximates the contour as a line 
+    "blur_effect", float, Compute a metric that indicates the strength of blur in an image (0 for no blur, 1 for maximal blur)
+    "num_components", int number of connected mask components
+    "color_distribution", dict (hex number, rgb, and occurnce) of top 12 most common colors. Excludes zero (black)
+    "descriptive stats", dict, calculates descriptives stats of individual channels while excluding 0 (black)
     """
     area: Union[float, list]
     area_bbox: Union[float, list]
@@ -671,12 +661,42 @@ class CutoutProps:
     centroid0: Union[float, list]
     centroid1: Union[float, list]
     eccentricity: Union[float, list]
+    extent: float
     solidity: Union[float, list]
     perimeter: Union[float, list]
     is_green: bool
     green_sum: int
+    exg_sum: float
+    blur_effect: float
+    num_components: int
+    color_distribution: dict
+    cropout_descriptive_stats: dict
+    cutout_descriptive_stats: dict
 
 
+# For Segmentation -------------------------------------------------------------------------------------
+
+
+@dataclass
+class Color:
+
+    species: str
+    hex: str = field(init=False)
+    rgb: List[int] = field(init=False)
+
+    def __post_init__(self):
+        self.rgb = ""
+
+
+@dataclass
+class SegmentData:
+    species_info: str
+    species: str
+    bbox: tuple
+    bbox_size_th: int
+
+
+# Cutout -------------------------------------------------------------------------------------
 @dataclass
 class Cutout:
     """Per cutout. Goes to PlantCutouts"""
@@ -687,32 +707,42 @@ class Cutout:
     cutout_num: int
     datetime: datetime.datetime  # Datetime of original image creation
     cutout_props: CutoutProps
-    cutout_path: Optional[str] = None
-    cutout_id: Optional[str] = None
+    dap: str = None
+    local_contours: str = None
+    season: str = None
+    # rgb_cropout_mean: List[float]
+    # rgb_cutout_mean: List[float]
+    # local_contours: List[float] = None
+    cutout_id: str = None
+    cutout_path: str = None
     cls: str = None
     is_primary: bool = False
     extends_border: bool = False
-    cutout_ht: Optional[int] = None
-    cutout_wdt: Optional[int] = None
     cutout_version: str = "1.0"
     schema_version: str = SCHEMA_VERSION
+    synth: bool = False
 
     def __post_init__(self):
         self.cutout_id = self.image_id + "_" + str(self.cutout_num)
-        # self.cutout_path = str(Path(self.batch_id, self.cutout_id + ".png"))
+        if not self.synth:
+            self.cutout_path = str(Path(self.batch_id,
+                                        self.cutout_id + ".png"))
 
     @property
     def array(self):
         # Read the image from the file and return the numpy array
-        array = cv2.imread(self.cutout_path)
-        array = np.ascontiguousarray(cv2.cvtColor(array, cv2.COLOR_BGR2RGB))
-        return array
+        cut_array = cv2.imread(self.cutout_path)
+        cut_array = np.ascontiguousarray(cut_array)
+        # cut_array = np.ascontiguousarray(
+        #     cv2.cvtColor(cut_array, cv2.COLOR_BGR2RGB))
+        return cut_array
 
     @property
     def config(self):
         _config = {
             "blob_home": self.blob_home,
             "data_root": self.data_root,
+            "season": self.season,
             "batch_id": self.batch_id,
             "image_id": self.image_id,
             "cutout_id": self.cutout_id,
@@ -722,30 +752,62 @@ class Cutout:
             "is_primary": self.is_primary,
             "datetime": self.datetime,
             "cutout_props": self.cutout_props,
+            # "rgb_cropout_mean": self.rgb_cropout_mean,
+            # "rgb_cutout_mean": self.rgb_cutout_mean,
             "extends_border": self.extends_border,
             "cutout_version": self.cutout_version,
             "schema_version": self.schema_version
+
+            # "local_contours": self.local_contours
         }
 
         return _config
 
-    def save_config(self, save_path):
+    def save_config(self, save_dir):
         try:
-            save_cutout_path = Path(self.blob_home, self.data_root,
-                                    self.batch_id, self.cutout_id + ".json")
+            save_cutout_path = Path(save_dir, self.batch_id,
+                                    self.cutout_id + ".json")
             with open(save_cutout_path, "w") as f:
                 json.dump(self.config, f, indent=4, default=str)
         except Exception as e:
             raise e
         return True
 
-    def save_cutout(self, cutout_array):
+    def save_cutout(self, save_dir, cutout_array):
 
         fname = f"{self.image_id}_{self.cutout_num}.png"
-        cutout_path = Path(self.blob_home, self.data_root, self.batch_id,
-                           fname)
+        # cutout_path = Path(self.blob_home, self.data_root, self.batch_id, fname)
+        cutout_path = Path(save_dir, self.batch_id, fname)
         cv2.imwrite(str(cutout_path),
                     cv2.cvtColor(cutout_array, cv2.COLOR_RGB2BGRA))
+        return True
+
+    def save_cropout(self, save_dir, img_array):
+
+        fname = f"{self.image_id}_{self.cutout_num}.jpg"
+        # cutout_path = Path(self.blob_home, self.data_root, self.batch_id, fname)
+        cutout_path = Path(save_dir, self.batch_id, fname)
+        cv2.imwrite(str(cutout_path), cv2.cvtColor(img_array,
+                                                   cv2.COLOR_RGB2BGR))
+        return True
+
+    def save_verysmall_cropout(self, img_array, boxarea):
+
+        fname = f"{self.image_id}_{self.cutout_num}_{boxarea}.jpg"
+        cutout_path = Path(self.blob_home, self.data_root,
+                           self.batch_id + "_very_small")
+        cutout_path.mkdir(parents=True, exist_ok=True)
+        cutout_path = Path(cutout_path, fname)
+        cv2.imwrite(str(cutout_path), cv2.cvtColor(img_array,
+                                                   cv2.COLOR_RGB2BGR))
+        return True
+
+    def save_cutout_mask(self, save_dir, mask):
+
+        fname = f"{self.image_id}_{self.cutout_num}_mask.png"
+        # mask_path = Path(self.blob_home, self.data_root, self.batch_id, fname)
+        mask_path = Path(save_dir, self.batch_id, fname)
+        cv2.imwrite(str(mask_path), cv2.cvtColor(mask, cv2.COLOR_RGB2BGR))
         return True
 
 
@@ -754,19 +816,17 @@ class Cutout:
 class Pot:
     pot_path: str
     pot_id: uuid = None
-    pot_ht: int = field(init=False)
-    pot_wdt: int = field(init=False)
 
     def __post_init__(self):
         self.pot_id = uuid.uuid4()
-        self.pot_ht, self.pot_wdt = self.array.shape[:2]
 
     @property
     def array(self):
         # Read the image from the file and return the numpy array
-        array = cv2.imread(self.pot_path, cv2.IMREAD_UNCHANGED)
-        array = np.ascontiguousarray(cv2.cvtColor(array, cv2.COLOR_BGR2RGBA))
-        return array
+        pot_array = cv2.imread(self.pot_path, cv2.IMREAD_UNCHANGED)
+        pot_array = np.ascontiguousarray(
+            cv2.cvtColor(pot_array, cv2.COLOR_BGR2BGRA))
+        return pot_array
 
     @property
     def config(self):
@@ -790,12 +850,9 @@ class Pot:
 class Background:
     background_path: str
     background_id: uuid = None
-    back_ht: int = field(init=False)
-    back_wdt: int = field(init=False)
 
     def __post_init__(self):
         self.background_id = uuid.uuid4()
-        self.back_ht, self.back_wdt = self.array.shape[:2]
 
     @property
     def array(self):
@@ -831,6 +888,7 @@ class SynthImage:
     pots: list[Pot]
     background: Background
     cutouts: list[Cutout]
+    pot_positions: list[float]
     synth_id: str = field(init=False)
 
     def __post_init__(self):
@@ -863,22 +921,20 @@ class SynthImage:
 
 @dataclass
 class SynthData:
-    """Combines documents in a database with items in a directory to form data container for generating synthetic bench images. Includes lists of dataclasses for cutouts, pots, and backgrounds.
-    """
+
     synthdir: str
-    filter_cutouts: bool
-    filter_config: DictConfig
-    background_dir: str = None
-    pot_dir: str = None
-    # cutout_dir: str = None
+    background_dir: str
+    pot_dir: str
+    cutout_dir: str
+    cutout_csv: str
     cutouts: list[Cutout] = field(init=False, default=None)
     pots: list[Pot] = field(init=False, default=None)
     backgrounds: list[Background] = field(init=False, default=None)
 
     def __post_init__(self):
-        self.backgrounds = self.get_dcs("background")
-        self.pots = self.get_dcs("pot")
-        self.cutouts = self.get_dcs("cutout")
+        self.backgrounds = self.get_backgrounds()
+        self.pots = self.get_pots()
+        self.cutouts = self.get_cutouts()
 
     def load_json(self, jsun):
         """ Open json and create dictionary
@@ -888,35 +944,54 @@ class SynthData:
             data = json.load(json_file)
         return data
 
-    def get_jsons(self, collection):
-        """ Gets json files
-        """
-        pass
-
-    def get_dcs(self, collection_str):
+    def get_pots(self):
         """Connnects documents in a database collection with items in a directory.
         Places connected items in a list of dataclasses.
         """
         docs = []
-        syn_datacls = {"cutout": Cutout, "pot": Pot, "background": Background}
-        data_cls = syn_datacls[collection_str]
-        class_dir = getattr(self, collection_str + "_dir")
-        meta_jsons = Path(class_dir).glob("*.json")
-
-        if self.filter_cutouts and collection_str == "cutout":
-            meta_jsons = FilterCutouts(
-                meta_jsons,
-                self.filter_config).filtered_jsons.astype(str).values.tolist()
+        meta_jsons = Path(self.pot_dir).glob("*.json")
 
         for meta in meta_jsons:
             meta_dict = self.load_json(meta)
-            class_path = collection_str + "_path"
+            class_path = "pot" + "_path"
+            # change path to suit local directory
             meta_dict[class_path] = str(
-                Path(class_dir) / Path(meta_dict[class_path]).name)
-            dc = data_cls(**meta_dict)
+                Path(self.pot_dir) / Path(meta_dict[class_path]).name)
+            dc = Pot(**meta_dict)
             docs.append(dc)
+        return docs
 
-        # print(docs)
+    def get_backgrounds(self):
+        docs = []
+        meta_jsons = Path(self.background_dir).glob("*.json")
+
+        for meta in meta_jsons:
+            meta_dict = self.load_json(meta)
+            class_path = "background" + "_path"
+            # change path to suit local directory
+            meta_dict[class_path] = str(
+                Path(self.background_dir) / Path(meta_dict[class_path]).name)
+            dc = Background(**meta_dict)
+            docs.append(dc)
+        return docs
+
+    def get_cutouts(self):
+        
+        docs = []
+
+        df = pd.read_csv(self.cutout_csv)
+        df["temp_path"] = self.cutout_dir + "/" + df['cutout_path']
+
+        for _, meta in df.iterrows():
+            meta_path = meta["temp_path"].replace(".png", ".json")
+            meta_dict = self.load_json(meta_path)
+        
+            meta_dict["cutout_path"] = str(
+                Path(self.cutout_dir) / Path(meta_dict["cutout_path"]))
+            # Flag for adjusting path
+            meta_dict["synth"] = True
+            dc = Cutout(**meta_dict)
+            docs.append(dc)
         return docs
 
 
@@ -932,4 +1007,9 @@ CUTOUT_PROPS = [
     "solidity",  # float Ratio of pixels in the region to pixels of the convex hull image.
     # "label",  # int The label in the labeled input image.
     "perimeter",  # float Perimeter of object which approximates the contour as a line through the centers of border pixels using a 4-connectivity.
+    # "intensity_max",  # Float Value with the greatest intensity in the region.
+    # "intensity_mean",  # flaot Value with the mean intensity in the region.
+    # "intensity_min",  # float Value with the least intensity in the region.
+    # "feret_diameter_maxfloat",  # flaot Maximum Feret’s diameter computed as the longest distance between points around a region’s convex hull contour as determined by find_contours
+    # "equivalent_diameter_area",  # float The diameter of a circle with the same area as the region.
 ]

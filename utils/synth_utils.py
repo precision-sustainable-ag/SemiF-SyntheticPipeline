@@ -19,22 +19,22 @@ from utils.utils import img2RGBA
 
 class SynthPipeline:
 
-    def __init__(self, data, cfg: DictConfig) -> None:
+    def __init__(self, cfg: DictConfig) -> None:
         self.synthdir = Path(cfg.synth.synthdir)
-        self.count = cfg.synth.count
-        self.back_dir = cfg.synth.backgrounddir
-        self.pot_dir = cfg.synth.potdir
+        # self.count = cfg.synth.count
+        # self.back_dir = cfg.synth.backgrounddir
+        # self.pot_dir = cfg.synth.potdir
 
-        self.backgrounds = data.backgrounds
-        self.back = None
-        self.back_ht, self.back_wd = None, None
+        # self.backgrounds = data.backgrounds
+        # self.back = None
+        # self.back_ht, self.back_wd = None, None
 
-        self.pots = data.pots
-        self.pot = None
+        # self.pots = data.pots
+        # self.pot = None
         self.pot_positions = None
-        self.pot_ht, self.pot_wd = None, None
+        # self.pot_ht, self.pot_wd = None, None
 
-        self.cutouts = data.cutouts
+        # self.cutouts = data.cutouts
         self.cutout = None
         self.cut_ht, self.cut_wd = None, None
         if cfg.synth.savedir:
@@ -57,25 +57,21 @@ class SynthPipeline:
 
 #---------------------- Get images -------------------------------
 
-    def replace_backgrounds(self):
-        """Checks if count is larger than total number of backgrounds. Returns True for replacements. 
-        """
-        return True if self.count > len(self.backgrounds) else False
-
-    def get_back(self, sortby=None):
-        self.back = random.choice(self.backgrounds)
+    # def get_back(self, sortby=None):
+    #     self.back = random.choice(self.backgrounds)
 
     def get_pot_positions(self):
         self.pot_positions = rand_pot_grid((6368, 9560))
+        return self.pot_positions
 
-    def get_pot(self):
-        self.pot = random.choice(self.pots)
+    # def get_pot(self):
+    #     self.pot = random.choice(self.pots)
 
-    def get_cutouts(self, sortby=None):
-        return self.cutouts
+    # def get_cutouts(self, sortby=None):
+    #     return self.cutouts
 
-    def prep_cutout(self):
-        self.cutout = random.choice(self.cutouts)
+    # def prep_cutout(self):
+    #     self.cutout = random.choice(self.cutouts)
 
 #------------------- Overlap checks --------------------------------
 
@@ -258,8 +254,8 @@ class SynthPipeline:
 
         savepath = Path(self.imagedir, fname)
         savemask = Path(self.maskdir, fname)
-        res = cv2.cvtColor(res, cv2.COLOR_RGBA2BGRA)
-        mask = cv2.cvtColor(mask, cv2.COLOR_RGBA2BGRA)
+        # res = cv2.cvtColor(res, cv2.COLOR_RGBA2BGRA)
+        # mask = cv2.cvtColor(mask, cv2.COLOR_RGBA2BGRA)
         cv2.imwrite(str(savepath), res)
         cv2.imwrite(str(savemask), mask)
         return Path(savepath), Path(savemask)

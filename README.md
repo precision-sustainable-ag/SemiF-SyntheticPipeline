@@ -9,11 +9,16 @@ Create a custom synthetic dataset by specifying various properties.
 2. Configure your dataset in [conf/cutouts/cutouts.yaml](conf/cutouts/cutouts.yaml)
 3. Run
     ```bash
-    python CONFIG.py
+    python CONFIG.py general.task=config_cutouts
     ```
 4. CSV along with processing log and saved configurations are saved in [data/projects/{project_name}](data/projects)
 
 ### Generate Synthetic data
+
+1. Run
+    ```bash
+    python CONFIG.py general.task=synthesize
+    ```
 
 # Data Structure
 
