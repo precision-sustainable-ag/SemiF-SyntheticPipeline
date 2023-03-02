@@ -6,11 +6,14 @@ from pathlib import Path
 import cv2
 import numpy as np
 from omegaconf import DictConfig
+from PIL import Image
 from tqdm import tqdm, trange
 
 from utils.datasets import SynthData, SynthImage
 from utils.synth_utils import (SynthPipeline, clean_data, img2RGBA,
+                               meta2yolo_prep, metadata2yolo_labels,
                                save_dataclass_json, transform_position)
+from utils.utils import cutouts_bbox
 
 log = logging.getLogger(__name__)
 
@@ -34,9 +37,13 @@ def synth_image(cuts, pots, back, cfg):
     used_cutout_positions = []
     back_arr = back.array.copy()
     back_arr_mask = np.zeros_like(back_arr)
+    back_hw = back_arr.shape[:2]
 
     pot_positions = syn.get_pot_positions()
     for pot, pot_position, cutout in zip(pots, pot_positions,cuts):
+        cutout.local_contours = None
+        
+        # cutout.cutout_props.local_contour = None
         # Get pot and info
         pot_arr = pot.array
         pot_arr = syn.transform(pot_arr)
@@ -46,6 +53,8 @@ def synth_image(cuts, pots, back, cfg):
         cutout_arr = cutout.array
         cutout_arr = syn.transform(cutout_arr)
         cutoutshape = cutout_arr.shape[:2]
+        
+        cutout.synth_hwc = cutout_arr.shape
         
         # Check coordinates for pot in top left corner
         topl_y, topl_x = transform_position(pot_position, potshape)  # to top left corner
@@ -59,16 +68,23 @@ def synth_image(cuts, pots, back, cfg):
         cutx, cuty = syn.center_on_background(poty, potx, potshape,
                                                 cutoutshape)
         syn.fore_str = "Overlay cutout"
-        potted, mask, _, _ = syn.overlay(cuty,
+        potted, mask, cut_tly, cut_tlx = syn.overlay(cuty, 
                                             cutx,
                                             cutout_arr,
                                             back_arr,
                                             mask=back_arr_mask)
         used_pot_positions.append([topl_y, topl_x, potshape])
-        used_cutout_positions.append([cutx, cuty, cutoutshape])
+
+        # Add yolov labels
+        xnorm, ynorm = float(cut_tlx/ back_hw[1]), float(cut_tly/back_hw[0])
+        w, h = float(cutout_arr.shape[1]/ back_hw[1]), float(cutout_arr.shape[0]/ back_hw[0])
+
+        cutout.synth_norm_xywh = xnorm, ynorm, w, h
+
         used_cutouts.append(cutout)
         used_pots.append(pot)
     used_backgrounds.append(back)
+
     # Save synth image and mask
     savepath, savemask = syn.save_synth(potted, mask[:, :, 0])
 
@@ -83,6 +99,8 @@ def synth_image(cuts, pots, back, cfg):
                             synth_maskpath=savemask,
                             pots=used_pots,
                             background=used_backgrounds,
+                            # synth_cut_norm_xy=used_cutout_positions,
+                            synthimg_pix_hwc=potted.shape,
                             cutouts=used_cutouts)
     # Clean dataclass
     data_dict = asdict(synimage)
@@ -121,3 +139,15 @@ def main(cfg: DictConfig) -> None:
     else:
         for cuts, pots, back, cfg in tqdm(all_args):
             synth_image(cuts, pots, back, cfg)
+
+    if cfg.synth.export_yolo_labels:
+        log.info("Creating Yolo formatted labels.")
+        jsonpaths = sorted(list(Path(cfg.synth.savedir, "metadata").glob("*.json")))
+        imgpaths =  sorted(list(Path(cfg.synth.savedir, "images").glob("*.png")))
+        data = []
+        for imgp, jsonp in zip(imgpaths, jsonpaths):
+            if imgp.stem != jsonp.stem:
+                log.error("Metadata (json) and image (png) file stems do not match. Yolo label processing failed.")
+            data.append(meta2yolo_prep(jsonp, imgp))
+        
+        metadata2yolo_labels(cfg.synth.savedir, data)

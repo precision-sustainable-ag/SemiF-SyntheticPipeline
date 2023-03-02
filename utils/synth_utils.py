@@ -172,7 +172,9 @@ class SynthPipeline:
         pil_fore = enhancer.enhance(brightness_factor)
 
         # Add any other transformations here...
-        fore = np.array(pil_fore)
+        # Crop to extent
+        pil_fore_cropped = pil_fore.crop(pil_fore.getbbox())
+        fore = np.array(pil_fore_cropped)
         return fore
 
 
@@ -506,3 +508,50 @@ def save_dataclass_json(data_dict, path):
     json_path = Path(path)
     with open(json_path, 'w') as j:
         json.dump(data_dict, j, indent=4, default=str)
+
+def get_cutout_meta(path):
+        with open(path) as f:
+            j = json.load(f)
+        return j
+
+
+######################## YOLO LABELS ##############################
+
+def meta2yolo_prep(jsonpath, imgpath):
+    """Operates on a single json file. Creates a dictionary that contains the image path, class id, and bounding box coordinates. Used later in another function.
+
+    Args:
+        jsonpath (str): path to json file
+        imgpath (str): path to image
+    """
+    # Create a list of dictionaries with img paths and all bboxes
+    meta = get_cutout_meta(jsonpath)
+    cutouts = meta["cutouts"]
+    cuts = []
+    for cutout in cutouts:
+        cls_id = cutout["cls"]["class_id"]
+        cuts.append(cutout["synth_norm_xywh"])
+    data_dict = {"img_path": imgpath, "bbox": cuts, "cls_id": cls_id}
+    return data_dict
+
+def metadata2yolo_labels(datadir, data):
+    """Creates YoloV... formatted label text files from metadata dictionary. Saves to data directory location.
+
+    Args:
+        datadir (str): path to where labels will be saved
+        data (dict): dictionary that contains image name, class_id, and list of bboxes
+    """
+    savedir = Path(datadir, "yolo_labels")
+    savedir.mkdir(exist_ok=True, parents=True)
+
+    for i in data:
+        txt_path = Path(savedir, Path(i["img_path"]).stem + ".txt")
+        lines = []
+        cls_id = i["cls_id"]
+        for bounding_box in i["bbox"]:
+            line = [round(x, 8) for x in bounding_box]
+            line.insert(0, cls_id)
+            s = " ".join(map(str, line))
+            lines.append(s)
+        with open(txt_path, 'w') as f:
+            f.writelines([f"{line}\n" for line in lines])

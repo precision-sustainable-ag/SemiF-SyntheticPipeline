@@ -710,6 +710,9 @@ class Cutout:
     dap: str = None
     local_contours: str = None
     season: str = None
+    og_img_position: list = None
+    synth_norm_xywh: list = None
+    synth_hwc: list = None
     # rgb_cropout_mean: List[float]
     # rgb_cutout_mean: List[float]
     # local_contours: List[float] = None
@@ -748,6 +751,9 @@ class Cutout:
             "cutout_id": self.cutout_id,
             "cutout_path": self.cutout_path,
             "cls": self.cls,
+            "og_img_position": self.og_img_position,
+            "synth_norm_xy": self.synth_norm_xy,
+            "synth_hwc": self.synth_hwc,
             "cutout_num": self.cutout_num,
             "is_primary": self.is_primary,
             "datetime": self.datetime,
@@ -888,7 +894,7 @@ class SynthImage:
     pots: list[Pot]
     background: Background
     cutouts: list[Cutout]
-    pot_positions: list[float]
+    synthimg_pix_hwc: list
     synth_id: str = field(init=False)
 
     def __post_init__(self):
@@ -905,6 +911,7 @@ class SynthImage:
             "pots": self.pots,
             "background": self.background,
             "cutouts": self.cutouts,
+            "synthimg_shape": self.synthimg_pix_hwc,
             "synth_id": self.synth_id
         }
         return _config

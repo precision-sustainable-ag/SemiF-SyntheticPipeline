@@ -326,3 +326,33 @@ def crop_cutouts(img, add_padding=False):
             foreground.getbbox()[3] + 2,
         ))
     return array
+
+def cutouts_bbox(cutout, cut_tlx, cut_tly):
+    # Get just the bbox of pixels
+    crop_2_extent = crop_cutouts(cutout)
+    # Compare wit
+    og_cut_hw = cutout.shape[:2]
+    cropped_hw = crop_2_extent.shape[:2] #hw
+    
+    h_diff = og_cut_hw[0] - cropped_hw[0]
+    w_diff = og_cut_hw[1] - cropped_hw[1]
+    
+    crop_tlx = cut_tlx + int((w_diff/2))
+    crop_tly = cut_tly + int((h_diff/2))
+    if crop_tlx < 0:
+        crop_tlx = 0
+    if crop_tly < 0:
+        crop_tly = 0
+
+    w, h = crop_2_extent.shape[1], crop_2_extent.shape[0]
+    return crop_tlx, crop_tly, w, h
+
+    
+    foreground = Image.fromarray(img)
+    pil_crop_frground = foreground.crop((
+            foreground.getbbox()[0] - 2,
+            foreground.getbbox()[1] - 2,
+            foreground.getbbox()[2] + 2,
+            foreground.getbbox()[3] + 2,
+        ))
+    return array
