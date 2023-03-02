@@ -113,7 +113,6 @@ def synth_image(cuts, pots, back, cfg):
 
 def main(cfg: DictConfig) -> None:
 
-    # def pipeline():
     # Create synth data container
     data = SynthData(synthdir=cfg.synth.synthdir,
                      background_dir=cfg.synth.backgrounddir,
@@ -121,17 +120,18 @@ def main(cfg: DictConfig) -> None:
                      cutout_dir=cfg.data.cutoutdir,
                      cutout_csv=cfg.data.csvpath)
 
+    # Data prep
     num_images = cfg.synth.count
-
     all_args = []
     for num in range(num_images):
+        # Randomized
         num_cuts = np.random.randint(1, 10, size=1)
         cuts = np.random.choice(data.cutouts, num_cuts, replace=False)
         pots = np.random.choice(data.pots, num_cuts, replace=True)
         back = np.random.choice(data.backgrounds, 1)[0]
-        
         all_args.append((cuts, pots, back, cfg))
 
+    # Multi- or single-processing
     if cfg.synth.multiprocess:
         procs = cpu_count() - 5
         with Pool(procs) as pool:
@@ -140,6 +140,7 @@ def main(cfg: DictConfig) -> None:
         for cuts, pots, back, cfg in tqdm(all_args):
             synth_image(cuts, pots, back, cfg)
 
+    # YOLO labels
     if cfg.synth.export_yolo_labels:
         log.info("Creating Yolo formatted labels.")
         jsonpaths = sorted(list(Path(cfg.synth.savedir, "metadata").glob("*.json")))

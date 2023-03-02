@@ -211,6 +211,7 @@ class SynthPipeline:
             x2 = pot_w
 
         # masks
+        # TODO add color to the masks depending on unique rgb values
         cutout_mask = cutout[..., 3:] / 255
         alpha_l = 1.0 - cutout_mask
         pot[y:y2, x:x2] = alpha_l * pot[y:y2, x:x2] + cutout_mask * cutout
