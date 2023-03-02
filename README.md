@@ -7,6 +7,7 @@ Create a custom synthetic dataset by specifying various properties.
 
 1. Define SemiField-cutout input data directory in [conf/config.yaml](conf/config.yaml#L31)
 2. Configure your dataset in [conf/cutouts/cutouts.yaml](conf/cutouts/cutouts.yaml)
+3. Fill in a unique project name (`project_name`) in [conf/config.yaml](conf/cutouts/cutouts.yaml#L)
 3. Run
     ```bash
     python CONFIG.py general.task=config_cutouts
@@ -15,7 +16,16 @@ Create a custom synthetic dataset by specifying various properties.
 
 ### Generate Synthetic data
 
-1. Run
+Using the configured dataset csv in [data/projects/{project_name}](data/projects), `images`, `masks`, and `metadata` by default will be created in similarly named folders (respectively). Optionally, YOLO formatted labels can be produced in a `yolo_labels` folder.
+
+| Configs | Description | Default |
+| --- | --- | --- |
+| `count` | the number of synthetic images to generate | 10 |
+| `multiprocess` | Flag to use multiprocessing. `False` makes it easier to debug | `True` |
+| `export_yolo_labels` | `True` creates a `yolo_labels` folder in `<project_name>/results` for Yolo formatted `.txt` files for bounding box locations in normalized `class` `x` `y` `width` `height` | `False` |
+| `pot_jitter` | amount of random movement in the x and y position of pots | `[100, 100]` |
+
+2. Run
     ```bash
     python CONFIG.py general.task=synthesize
     ```
