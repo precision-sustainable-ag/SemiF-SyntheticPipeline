@@ -27,7 +27,7 @@ Using the configured dataset csv in [data/projects/{project_name}](data/projects
 
 2. Run
     ```bash
-    python CONFIG.py general.task=synthesize
+    python SYNTH.py general.task=synthesize
     ```
 
 # Data Structure

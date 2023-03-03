@@ -1,8 +1,10 @@
 import datetime
 import json
+import logging
 import os
 import uuid
 from dataclasses import asdict, dataclass, field
+from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -12,9 +14,11 @@ import numpy as np
 import pandas as pd
 from dacite import from_dict
 from PIL import Image as PILImage
+from tqdm import tqdm
 
 SCHEMA_VERSION = "1.0"
 
+log = logging.getLogger(__name__)
 
 @dataclass
 class BoxCoordinates:
@@ -981,25 +985,29 @@ class SynthData:
             dc = Background(**meta_dict)
             docs.append(dc)
         return docs
-
+    
     def get_cutouts(self):
-        
-        docs = []
-
-        df = pd.read_csv(self.cutout_csv)
+        df = pd.read_csv(self.cutout_csv, low_memory=False)
         df["temp_path"] = self.cutout_dir + "/" + df['cutout_path']
+        procs = cpu_count() - 5
+        metas = [meta for _, meta in df.iterrows()]
+        log.info("Creating cutout dataclasses.")
+        with Pool(procs) as p:
+            results = p.map(self.load_cutouts_dc, metas)
+            p.close()
+            p.join()
+        return results
 
-        for _, meta in df.iterrows():
-            meta_path = meta["temp_path"].replace(".png", ".json")
-            meta_dict = self.load_json(meta_path)
+    def load_cutouts_dc(self, meta):
+        meta_path = meta["temp_path"].replace(".png", ".json")
+        meta_dict = self.load_json(meta_path)
         
-            meta_dict["cutout_path"] = str(
+        meta_dict["cutout_path"] = str(
                 Path(self.cutout_dir) / Path(meta_dict["cutout_path"]))
             # Flag for adjusting path
-            meta_dict["synth"] = True
-            dc = Cutout(**meta_dict)
-            docs.append(dc)
-        return docs
+        meta_dict["synth"] = True
+        dc = Cutout(**meta_dict)
+        return dc
 
 
 CUTOUT_PROPS = [

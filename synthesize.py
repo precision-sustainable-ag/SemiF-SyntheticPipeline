@@ -1,19 +1,16 @@
 import logging
 from dataclasses import asdict
-from multiprocessing import Pool, Process, cpu_count, freeze_support
+from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
-import cv2
 import numpy as np
 from omegaconf import DictConfig
-from PIL import Image
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 from utils.datasets import SynthData, SynthImage
-from utils.synth_utils import (SynthPipeline, clean_data, img2RGBA,
-                               meta2yolo_prep, metadata2yolo_labels,
-                               save_dataclass_json, transform_position)
-from utils.utils import cutouts_bbox
+from utils.synth_utils import SynthPipeline
+from utils.utils import (clean_data, meta2yolo_prep, metadata2yolo_labels,
+                         save_dataclass_json, transform_position)
 
 log = logging.getLogger(__name__)
 
@@ -34,16 +31,17 @@ def synth_image(cuts, pots, back, cfg):
     used_cutouts = []
     used_pots = []
     used_backgrounds = []
-    used_cutout_positions = []
+    # used_cutout_positions = []
     back_arr = back.array.copy()
     back_arr_mask = np.zeros_like(back_arr)
     back_hw = back_arr.shape[:2]
-
     pot_positions = syn.get_pot_positions()
     for pot, pot_position, cutout in zip(pots, pot_positions,cuts):
         cutout.local_contours = None
+        rgb = cutout.cls["rgb"]
+        bgra = [rgb[2], rgb[1], rgb[0]]
         
-        # cutout.cutout_props.local_contour = None
+        
         # Get pot and info
         pot_arr = pot.array
         pot_arr = syn.transform(pot_arr)
@@ -64,6 +62,7 @@ def synth_image(cuts, pots, back, cfg):
         potted, poty, potx = syn.overlay(topl_y, topl_x, pot_arr,
                                                  back_arr)
         
+        
         # Get cutout position from pot position
         cutx, cuty = syn.center_on_background(poty, potx, potshape,
                                                 cutoutshape)
@@ -72,7 +71,11 @@ def synth_image(cuts, pots, back, cfg):
                                             cutx,
                                             cutout_arr,
                                             back_arr,
-                                            mask=back_arr_mask)
+                                            mask=back_arr_mask,
+                                            bgra=bgra)
+        
+        # Place color in used color list (palette)
+        syn.bgra_palette.append(bgra)
         used_pot_positions.append([topl_y, topl_x, potshape])
 
         # Add yolov labels
@@ -86,7 +89,7 @@ def synth_image(cuts, pots, back, cfg):
     used_backgrounds.append(back)
 
     # Save synth image and mask
-    savepath, savemask = syn.save_synth(potted, mask[:, :, 0])
+    savepath, savemask = syn.save_synth(potted, mask[:,:,:3])
 
     # # Path info to save
     savestem = savepath.stem
@@ -114,6 +117,7 @@ def synth_image(cuts, pots, back, cfg):
 def main(cfg: DictConfig) -> None:
 
     # Create synth data container
+    log.info("Creating synthetic dataclasses.")
     data = SynthData(synthdir=cfg.synth.synthdir,
                      background_dir=cfg.synth.backgrounddir,
                      pot_dir=cfg.synth.potdir,
@@ -121,11 +125,14 @@ def main(cfg: DictConfig) -> None:
                      cutout_csv=cfg.data.csvpath)
 
     # Data prep
+    log.info("Organizing cutouts, pots, and backgrounds for each image.")
     num_images = cfg.synth.count
     all_args = []
     for num in range(num_images):
         # Randomized
-        num_cuts = np.random.randint(1, 10, size=1)
+        min_cutouts = cfg.synth.num_cutouts.min
+        max_cutouts = cfg.synth.num_cutouts.max
+        num_cuts = np.random.randint(min_cutouts, max_cutouts, size=1)
         cuts = np.random.choice(data.cutouts, num_cuts, replace=False)
         pots = np.random.choice(data.pots, num_cuts, replace=True)
         back = np.random.choice(data.backgrounds, 1)[0]
@@ -133,10 +140,12 @@ def main(cfg: DictConfig) -> None:
 
     # Multi- or single-processing
     if cfg.synth.multiprocess:
+        log.info("Starting multiprocessing.")
         procs = cpu_count() - 5
         with Pool(procs) as pool:
             pool.starmap(synth_image, all_args)
     else:
+        log.info("Starting single image processing.")
         for cuts, pots, back, cfg in tqdm(all_args):
             synth_image(cuts, pots, back, cfg)
 

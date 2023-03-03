@@ -1,42 +1,24 @@
-import itertools
-import json
-import math
 import random
 import uuid
 from pathlib import Path
-from statistics import mean, median
 
 import cv2
 import numpy as np
-import pandas as pd
-import torch
-import torchvision.ops.boxes as bops
 from omegaconf import DictConfig
 from PIL import Image, ImageEnhance
 
-from utils.utils import img2RGBA
+from utils.utils import Point, Rect, img2RGBA, overlap, rand_pot_grid
 
 
 class SynthPipeline:
 
     def __init__(self, cfg: DictConfig) -> None:
         self.synthdir = Path(cfg.synth.synthdir)
-        # self.count = cfg.synth.count
-        # self.back_dir = cfg.synth.backgrounddir
-        # self.pot_dir = cfg.synth.potdir
-
-        # self.backgrounds = data.backgrounds
-        # self.back = None
-        # self.back_ht, self.back_wd = None, None
-
-        # self.pots = data.pots
-        # self.pot = None
+        self.bgra_palette = [[0,0,0]]
         self.pot_positions = None
-        # self.pot_ht, self.pot_wd = None, None
-
-        # self.cutouts = data.cutouts
         self.cutout = None
         self.cut_ht, self.cut_wd = None, None
+        # Create folders
         if cfg.synth.savedir:
             self.imagedir = Path(cfg.synth.savedir, "images")
             self.imagedir.mkdir(parents=True, exist_ok=True)
@@ -198,7 +180,7 @@ class SynthPipeline:
         back[y:y2, x:x2] = alpha_l * back[y:y2, x:x2] + pot_mask * pot
         return back, y, x
 
-    def blend_cutout(self, y, x, cutout, pot, mask):
+    def blend_cutout(self, y, x, cutout, pot, mask, bgra):
         # image info
         pot_h, pot_w, _ = pot.shape
         cutout_h, cutout_w, _ = cutout.shape
@@ -216,9 +198,24 @@ class SynthPipeline:
         alpha_l = 1.0 - cutout_mask
         pot[y:y2, x:x2] = alpha_l * pot[y:y2, x:x2] + cutout_mask * cutout
         mask[y:y2, x:x2] = (255) * cutout_mask + mask[y:y2, x:x2] * alpha_l
+        mask = mask[:,:,:3] # this is dumb but whatever
+        
+        # Already used colors
+        palette = np.array(self.bgra_palette).transpose()
+
+        # all(2) force all channels to be equal
+        # any(-1) matches any color
+        temp_mask = (mask[y:y2, x:x2][:,:,:, None] == palette).all(2).any(-1)
+
+        # target color
+        bgra = np.array(bgra)
+
+        # np.where to remap mask while keeping palette colors:
+        mask[y:y2, x:x2] = np.where(temp_mask[:,:,None], mask[y:y2, x:x2], bgra[None,None,:])
+        
         return pot, mask, y, x
 
-    def overlay(self, topl_y, topl_x, fore_arr, back_arr, mask=None):
+    def overlay(self, topl_y, topl_x, fore_arr, back_arr,bgra=None, mask=None):
 
         if "pot" in self.fore_str.lower():
             # check positions
@@ -246,7 +243,8 @@ class SynthPipeline:
                                                              topl_x,
                                                              fore_arr,
                                                              back_arr,
-                                                             mask=mask)
+                                                             mask,
+                                                             bgra)
 
             return fore_arr, mask, arr_y, arr_x
 
@@ -262,297 +260,3 @@ class SynthPipeline:
         cv2.imwrite(str(savepath), res)
         cv2.imwrite(str(savemask), mask)
         return Path(savepath), Path(savemask)
-
-
-class FilterCutouts:
-
-    def __init__(self, cutout_jsons, cfg: DictConfig) -> None:
-
-        self.cutout_jsons = cutout_jsons
-        self.cutoutdir = cfg.data.cutoutdir
-        self.batch_id = cfg.general.batch_id
-        self.species = cfg.cutouts.species
-        self.is_green = cfg.cutouts.is_green
-        self.is_primary = cfg.cutouts.is_primary
-        self.extends_border = cfg.cutouts.extends_border
-        self.green_sum_max = cfg.cutouts.green_sum_max
-        self.green_sum_min = cfg.cutouts.green_sum_min
-        self.save_csv = cfg.cutouts.save_csv
-        self.filtered_jsons = self.get_cutout_jsons()
-
-    def get_cutout_jsons(self):
-        df = self.cutoutjson2csv()
-        df = self.prep_clean(df)
-        df = self.set_and_sort(df)
-        return df["path"]
-
-    def read_cutout_json(self, path):
-        with open(path) as f:
-            cutout = json.load(f)
-        return cutout
-
-    def cutoutjson2csv(self):
-        # Get all json files
-        cutouts = []
-        for cutout in self.cutout_jsons:
-            # Get dictionaries
-            cutout = self.read_cutout_json(cutout)
-            row = cutout["cutout_props"]
-            cls = cutout["cls"]
-            # Extend nested dicts to single column header
-            for ro in row:
-                rec = {ro: row[ro]}
-                cutout.update(rec)
-                for cl in cls:
-                    spec = {cl: cls[cl]}
-                    cutout.update(spec)
-            # Remove duplicate nested dicts
-            cutout.pop("cutout_props")
-            cutout.pop("cls")
-            # Create and append df
-            cutouts.append(pd.DataFrame(cutout, index=[0]))
-        # Concat and reset index of main df
-        df = pd.concat(cutouts).reset_index()
-        # Save dataframe
-        if self.save_csv:
-            csv_path = f"{self.cutoutdir}/{self.batch_id}.csv"
-            if not csv_path.exists():
-                print(f"Creating cutout metadata csv...\nSaving at {csv_path}")
-                df.to_csv(csv_path, index=False)
-            else:
-                print("Metadata CSV already exists")
-        return df
-
-    def prep_clean(self, df):
-        """ 
-        green_sum to float
-        and creates new path columns.
-        """
-        df["green_sum"] = df["green_sum"].astype(float)
-        df["path"] = self.cutoutdir + "/" + df["cutout_path"].str.replace(
-            ".png", ".json", regex=False)
-        return df
-
-    def calc_thresh(self, df):
-        """ Calculates threshold values
-
-        NOT USED """
-        features = ["green_sum", "solidity", "area", "perimeter"]
-        stats = {"max": max, "min": min, "median": median, "mean": mean}
-
-        for feat in features:
-            for stat in stats:
-                val = df[feat]
-                new_val = getattr(val, stat)()
-                print(f"{feat} {stat}", new_val)
-
-    def set_and_sort(self, df):
-        """ Set thresholds and sort"""
-        if self.species:
-            print(f"\nUsing species sorting: {self.species}\n")
-            df = df[df["common_name"] == self.species]
-        if self.green_sum_max:
-            print(
-                f"Using green_sum: \nMax: {self.green_sum_max}\nMin: {self.green_sum_min}\n"
-            )
-            df = df[df["green_sum"] < self.green_sum_max]
-            df = df[df["green_sum"] > self.green_sum_min]
-        if self.is_primary:
-            print(f"Using Primary cutouts: {self.is_primary}\n")
-            df = df[df["is_primary"] == self.is_primary]
-        if self.extends_border == False:
-            print(f"Cutouts extend border: {self.extends_border}\n")
-            df = df[df["extends_border"] == self.extends_border]
-        return df
-
-
-########################################################################
-########################################################################
-#------------------- Helper functions --------------------------------
-def rand_pot_grid(img_shape):
-    """Creates a set of grid-like coordinates based on image size.
-       The number of coordinates (pots) is based on randomely choosing
-       the number rows and columns. Coordinates are evenly spaced both 
-       vertically and horizontally based on image shape and number of 
-       rows and columns. Zero coordinates are removed as are the maximum
-       extent of the image (img.shape).
-
-    Args:
-        img_shape (tuple): shape of image
-
-    Returns:
-        coords: list of tuples, evenly spaced coordinates
-    """
-
-    imght, imgwid = img_shape[:2]
-
-    rand_wid = random.randint(2, 5)
-    rand_ht = random.choice([2, 3])
-
-    # Create width locations
-    wid = np.linspace(0, imgwid, rand_wid, dtype=int)
-    wid = wid[wid != 0]
-    wid_diff = np.diff(wid)
-
-    if len(wid_diff) >= 2:
-        wid_diff = wid_diff[0]
-    wid = [(x - math.ceil(wid_diff / 2)) if wid_diff != 0 else math.ceil(x / 2)
-           for x in wid]  # Accounts for 0 diff
-
-    # Create height locations
-    ht = np.linspace(0, imght, rand_ht, dtype=int)
-    ht_diff = np.diff(ht)[0]
-    ht = ht[ht != imght]
-    ht = [(x + int(ht_diff / 2)) for x in ht]
-    # Combine height and width to make coordinates
-    coords = list(itertools.product(wid, ht))
-    rand_x = 100 if rand_wid >= 4 else 600
-    rand_y = 100 if (rand_ht == 3) and (rand_wid >= 4) else 700
-    coords = [(x + random.randint(-rand_x, rand_x),
-               y + random.randint(-rand_y, rand_y)) for x, y in coords]
-    return coords
-
-
-def bbox_iou(box1, box2):
-    box1 = torch.tensor([box1], dtype=torch.float)
-    box2 = torch.tensor([box2], dtype=torch.float)
-    iou = bops.box_iou(box1, box2)
-    return iou
-
-
-def get_img_bbox(x, y, imgshape):
-    pot_h, pot_w, _ = imgshape
-    x0, x1, y0, y1 = x, x + pot_w, y, y + pot_h
-    bbox = [x0, y0, x1, y1]  # top right corner, bottom left corner
-    return bbox
-
-
-def center2topleft(y, x, background_imgshape):
-    """ Gets top left coordinates of an image from center point coordinate
-    """
-    back_h, back_w = background_imgshape
-    tpl_y = y - int(back_h / 2)
-    tpl_x = x - int(back_w / 2)
-    return tpl_y, tpl_x
-
-
-def transform_position(pot_position, imgshape):
-    """ Applies random jitter factor to points and transforms them to top left image coordinates. 
-    """
-    x, y = pot_position
-    tpl_y, tpl_x = center2topleft(y, x, imgshape)
-
-    return tpl_y, tpl_x
-
-
-class Point(object):
-
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-
-class Rect(object):
-
-    def __init__(self, p1, p2):
-        '''Store the top, bottom, left and right values for points 
-               p1 and p2 are the (corners) in either order
-        '''
-        self.left = min(p1.x, p2.x)
-        self.right = max(p1.x, p2.x)
-        self.bottom = min(p1.y, p2.y)
-        self.top = max(p1.y, p2.y)
-
-
-def overlap(r1, r2):
-    '''Overlapping rectangles overlap both horizontally & vertically
-    '''
-    return range_overlap(r1.left, r1.right,
-                         r2.left, r2.right) and range_overlap(
-                             r1.bottom, r1.top, r2.bottom, r2.top)
-
-
-def range_overlap(a_min, a_max, b_min, b_max):
-    '''Neither range is completely greater than the other
-    '''
-    return (a_min <= b_max) and (b_min <= a_max)
-
-
-def dict_to_json(dic, path):
-    json_path = Path(path)
-    with open(json_path, 'w') as j:
-        json.dump(dic, j, indent=4, default=str)
-
-
-def clean_data(data):
-    """ Convert absolute pot and background paths to relative.
-        Takes the last two components of a path object for each.
-        
-        Takes in and returns a dictionary of dataclass to be 
-        stored in json and db. 
-    """
-    data["background"][0]["background_path"] = "/".join(
-        Path(data["background"][0]["background_path"]).parts[-2:])
-
-    pots = data["pots"]
-    for pot in pots:
-        pot["pot_path"] = "/".join(Path(pot["pot_path"]).parts[-2:])
-
-    for cutout in data["cutouts"]:
-        cutout["cutout_path"] = "/".join(
-            Path(cutout["cutout_path"]).parts[-2:])
-
-    return data
-
-
-def save_dataclass_json(data_dict, path):
-    json_path = Path(path)
-    with open(json_path, 'w') as j:
-        json.dump(data_dict, j, indent=4, default=str)
-
-def get_cutout_meta(path):
-        with open(path) as f:
-            j = json.load(f)
-        return j
-
-
-######################## YOLO LABELS ##############################
-
-def meta2yolo_prep(jsonpath, imgpath):
-    """Operates on a single json file. Creates a dictionary that contains the image path, class id, and bounding box coordinates. Used later in another function.
-
-    Args:
-        jsonpath (str): path to json file
-        imgpath (str): path to image
-    """
-    # Create a list of dictionaries with img paths and all bboxes
-    meta = get_cutout_meta(jsonpath)
-    cutouts = meta["cutouts"]
-    cuts = []
-    for cutout in cutouts:
-        cls_id = cutout["cls"]["class_id"]
-        cuts.append(cutout["synth_norm_xywh"])
-    data_dict = {"img_path": imgpath, "bbox": cuts, "cls_id": cls_id}
-    return data_dict
-
-def metadata2yolo_labels(datadir, data):
-    """Creates YoloV... formatted label text files from metadata dictionary. Saves to data directory location.
-
-    Args:
-        datadir (str): path to where labels will be saved
-        data (dict): dictionary that contains image name, class_id, and list of bboxes
-    """
-    savedir = Path(datadir, "yolo_labels")
-    savedir.mkdir(exist_ok=True, parents=True)
-
-    for i in data:
-        txt_path = Path(savedir, Path(i["img_path"]).stem + ".txt")
-        lines = []
-        cls_id = i["cls_id"]
-        for bounding_box in i["bbox"]:
-            line = [round(x, 8) for x in bounding_box]
-            line.insert(0, cls_id)
-            s = " ".join(map(str, line))
-            lines.append(s)
-        with open(txt_path, 'w') as f:
-            f.writelines([f"{line}\n" for line in lines])

@@ -12,7 +12,7 @@ datadir:
 
 general:
   task: config_cutouts # config_cutouts, synthesize
-  project_name: all_big_cutouts
+  project_name: very_big
   workdir: ${hydra:runtime.cwd}  # where the code is executed
   projectdir: ${general.workdir}/data/projects/${general.project_name}
 

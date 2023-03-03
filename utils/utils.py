@@ -1,13 +1,17 @@
+import itertools
 import json
+import math
 import os
 import platform
+import random
 from datetime import datetime
-from difflib import get_close_matches
 from pathlib import Path
 
 import cv2
 import numpy as np
 import pandas as pd
+import torch
+import torchvision.ops.boxes as bops
 from PIL import Image
 from scipy import ndimage
 from skimage import morphology, segmentation
@@ -356,3 +360,200 @@ def cutouts_bbox(cutout, cut_tlx, cut_tly):
             foreground.getbbox()[3] + 2,
         ))
     return array
+
+
+
+########################################################################
+########################################################################
+#------------------- Helper functions --------------------------------
+def rand_pot_grid(img_shape):
+    """Creates a set of grid-like coordinates based on image size.
+       The number of coordinates (pots) is based on randomely choosing
+       the number rows and columns. Coordinates are evenly spaced both 
+       vertically and horizontally based on image shape and number of 
+       rows and columns. Zero coordinates are removed as are the maximum
+       extent of the image (img.shape).
+
+    Args:
+        img_shape (tuple): shape of image
+
+    Returns:
+        coords: list of tuples, evenly spaced coordinates
+    """
+
+    imght, imgwid = img_shape[:2]
+
+    rand_wid = random.randint(2, 5)
+    rand_ht = random.choice([2, 3])
+
+    # Create width locations
+    wid = np.linspace(0, imgwid, rand_wid, dtype=int)
+    wid = wid[wid != 0]
+    wid_diff = np.diff(wid)
+
+    if len(wid_diff) >= 2:
+        wid_diff = wid_diff[0]
+    wid = [(x - math.ceil(wid_diff / 2)) if wid_diff != 0 else math.ceil(x / 2)
+           for x in wid]  # Accounts for 0 diff
+
+    # Create height locations
+    ht = np.linspace(0, imght, rand_ht, dtype=int)
+    ht_diff = np.diff(ht)[0]
+    ht = ht[ht != imght]
+    ht = [(x + int(ht_diff / 2)) for x in ht]
+    # Combine height and width to make coordinates
+    coords = list(itertools.product(wid, ht))
+    rand_x = 100 if rand_wid >= 4 else 600
+    rand_y = 100 if (rand_ht == 3) and (rand_wid >= 4) else 700
+    coords = [(x + random.randint(-rand_x, rand_x),
+               y + random.randint(-rand_y, rand_y)) for x, y in coords]
+    return coords
+
+
+def bbox_iou(box1, box2):
+    box1 = torch.tensor([box1], dtype=torch.float)
+    box2 = torch.tensor([box2], dtype=torch.float)
+    iou = bops.box_iou(box1, box2)
+    return iou
+
+
+def get_img_bbox(x, y, imgshape):
+    pot_h, pot_w, _ = imgshape
+    x0, x1, y0, y1 = x, x + pot_w, y, y + pot_h
+    bbox = [x0, y0, x1, y1]  # top right corner, bottom left corner
+    return bbox
+
+
+def center2topleft(y, x, background_imgshape):
+    """ Gets top left coordinates of an image from center point coordinate
+    """
+    back_h, back_w = background_imgshape
+    tpl_y = y - int(back_h / 2)
+    tpl_x = x - int(back_w / 2)
+    return tpl_y, tpl_x
+
+
+def transform_position(pot_position, imgshape):
+    """ Applies random jitter factor to points and transforms them to top left image coordinates. 
+    """
+    x, y = pot_position
+    tpl_y, tpl_x = center2topleft(y, x, imgshape)
+
+    return tpl_y, tpl_x
+
+
+class Point(object):
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+
+class Rect(object):
+
+    def __init__(self, p1, p2):
+        '''Store the top, bottom, left and right values for points 
+               p1 and p2 are the (corners) in either order
+        '''
+        self.left = min(p1.x, p2.x)
+        self.right = max(p1.x, p2.x)
+        self.bottom = min(p1.y, p2.y)
+        self.top = max(p1.y, p2.y)
+
+
+def overlap(r1, r2):
+    '''Overlapping rectangles overlap both horizontally & vertically
+    '''
+    return range_overlap(r1.left, r1.right,
+                         r2.left, r2.right) and range_overlap(
+                             r1.bottom, r1.top, r2.bottom, r2.top)
+
+
+def range_overlap(a_min, a_max, b_min, b_max):
+    '''Neither range is completely greater than the other
+    '''
+    return (a_min <= b_max) and (b_min <= a_max)
+
+
+def dict_to_json(dic, path):
+    json_path = Path(path)
+    with open(json_path, 'w') as j:
+        json.dump(dic, j, indent=4, default=str)
+
+
+def clean_data(data):
+    """ Convert absolute pot and background paths to relative.
+        Takes the last two components of a path object for each.
+        
+        Takes in and returns a dictionary of dataclass to be 
+        stored in json and db. 
+    """
+    data["background"][0]["background_path"] = "/".join(
+        Path(data["background"][0]["background_path"]).parts[-2:])
+
+    pots = data["pots"]
+    for pot in pots:
+        pot["pot_path"] = "/".join(Path(pot["pot_path"]).parts[-2:])
+
+    for cutout in data["cutouts"]:
+        cutout["cutout_path"] = "/".join(
+            Path(cutout["cutout_path"]).parts[-2:])
+
+    return data
+
+
+def save_dataclass_json(data_dict, path):
+    json_path = Path(path)
+    with open(json_path, 'w') as j:
+        json.dump(data_dict, j, indent=4, default=str)
+
+def get_cutout_meta(path):
+        with open(path) as f:
+            j = json.load(f)
+        return j
+
+
+######################## YOLO LABELS ##############################
+
+def meta2yolo_prep(jsonpath, imgpath):
+    """Operates on a single json file. Creates a dictionary that contains the image path, class id, and bounding box coordinates. Used later in another function.
+
+    Args:
+        jsonpath (str): path to json file
+        imgpath (str): path to image
+    """
+    # Create a list of dictionaries with img paths and all bboxes
+    meta = get_cutout_meta(jsonpath)
+    cutouts = meta["cutouts"]
+    cuts = []
+    cls_ids = []
+    bboxes = []
+    for cutout in cutouts:
+        cls_ids.append(cutout["cls"]["class_id"])
+        bboxes.append(cutout["synth_norm_xywh"])
+        
+        # cuts.append(cutout["synth_norm_xywh"])
+    data_dict = {"img_path": imgpath, "bboxes": bboxes, "cls_ids": cls_ids}
+    return data_dict
+
+def metadata2yolo_labels(datadir, data):
+    """Creates YoloV... formatted label text files from metadata dictionary. Saves to data directory location.
+
+    Args:
+        datadir (str): path to where labels will be saved
+        data (dict): dictionary that contains image name, class_id, and list of bboxes
+    """
+    savedir = Path(datadir, "yolo_labels")
+    savedir.mkdir(exist_ok=True, parents=True)
+
+    for i in data:
+        txt_path = Path(savedir, Path(i["img_path"]).stem + ".txt")
+        lines = []
+        # cls_id = i["cls_ids"]
+        for cls_id, bounding_box in zip(i["cls_ids"], i["bboxes"]):
+            line = [round(x, 8) for x in bounding_box]
+            line.insert(0, cls_id)
+            s = " ".join(map(str, line))
+            lines.append(s)
+        with open(txt_path, 'w') as f:
+            f.writelines([f"{line}\n" for line in lines])

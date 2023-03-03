@@ -1,8 +1,15 @@
-
-count: 4
+count: 10
 multiprocess: True
 export_yolo_labels: True
 pot_jitter: [100, 100]
+
+num_cutouts:
+  min: 1
+  max: 10
+
+cutouts_per_pot:
+  min: 5
+  max: 20
 
 # savedir: /media/hdd1/mkutu/wir/semifield-synth
 # savedir: ${general.workdir}/data/semifield-synth
