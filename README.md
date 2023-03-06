@@ -10,7 +10,7 @@ Create a custom synthetic dataset by specifying various properties.
 3. Fill in a unique project name (`project_name`) in [conf/config.yaml](conf/cutouts/cutouts.yaml#L)
 3. Run
     ```bash
-    python CONFIG.py general.task=config_cutouts
+    python SYNTH.py general.task=config_cutouts
     ```
 4. CSV along with processing log and saved configurations are saved in [data/projects/{project_name}](data/projects)
 

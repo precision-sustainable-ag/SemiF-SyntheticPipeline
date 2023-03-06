@@ -46,6 +46,7 @@ class SynthPipeline:
         self.pot_positions = rand_pot_grid((6368, 9560))
         return self.pot_positions
 
+    
     # def get_pot(self):
     #     self.pot = random.choice(self.pots)
 
@@ -251,12 +252,12 @@ class SynthPipeline:
     #---------------------- Save to directory and DB --------------------------------
 
     def save_synth(self, res, mask):
-        fname = uuid.uuid4().hex + ".png"
+        fname = uuid.uuid4().hex + ".jpg"
 
         savepath = Path(self.imagedir, fname)
         savemask = Path(self.maskdir, fname)
         # res = cv2.cvtColor(res, cv2.COLOR_RGBA2BGRA)
         # mask = cv2.cvtColor(mask, cv2.COLOR_RGBA2BGRA)
-        cv2.imwrite(str(savepath), res)
+        cv2.imwrite(str(savepath), res[:,:,:3])
         cv2.imwrite(str(savemask), mask)
         return Path(savepath), Path(savemask)

@@ -6,6 +6,7 @@ import platform
 import random
 from datetime import datetime
 from pathlib import Path
+from random import randrange
 
 import cv2
 import numpy as np
@@ -557,3 +558,60 @@ def metadata2yolo_labels(datadir, data):
             lines.append(s)
         with open(txt_path, 'w') as f:
             f.writelines([f"{line}\n" for line in lines])
+
+######################################################
+################# POT POSITIONS ######################
+######################################################
+
+def compare_points(pt1, pts, dist_thresh=400):
+    if len(pts) == 0:
+        return False
+    trues = []
+    
+    for pt in pts:    
+        dist = math.dist(pt1, pt)
+        
+        if dist > dist_thresh:
+            trues.append(True)
+        else:
+            trues.append(False)
+    return all(trues)
+
+
+def rand_positions(minx, maxx, miny, maxy, num_points, min_distance):
+    """Gets random point positions. Returns a list of positions that are 
+    separated by a certain distance and within a given bounds.
+
+    Args:
+        minx (int): min x for all points
+        maxx (int): max x for all points
+        miny (int): min y for all points
+        maxy (int): max y for all points
+        num_points (int): number of points to return
+        min_distance (int): minimum distance between points (euclidean distance)
+
+    Returns:
+        ptlist (list): list of all points
+    """
+    pt = [0,0]
+    ptlist=[] #inizialize a void lists for red point coordinates
+
+    pointcounter=0 #initizlize counter for the while loop
+    while True: #create a potentailly infinite loop! pay attention!
+        if pointcounter<num_points: #set the number of point you want to add (in this case 20)
+                x_Ptshift=randrange(minx, maxx,1) #x shift of a red point 
+                y_Ptshift=randrange(miny, maxy,1) #y shift of a red point
+                ptx=pt[0]+ x_Ptshift#x coordinate of a red point
+                pty=pt[1]+ y_Ptshift #y coordinate of a red point
+                pt_pos=[ptx,pty]
+                if len(ptlist) == 0:
+                     separated = True
+                else:
+                    separated = compare_points(pt_pos, ptlist, dist_thresh=min_distance)
+                if separated:
+                    ptlist.append(pt_pos) # add to a list with this notation [x1,y1],[x2,y2]
+                    
+                    pointcounter+=1 #add one to the counter of how many points you have in your list 
+        else: #when pointcounter reach the number of points you want the while cicle ends
+            break
+    return ptlist
