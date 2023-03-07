@@ -1,8 +1,9 @@
+from pathlib import Path
+
+import pandas as pd
 from omegaconf import DictConfig
 
 from utils.config_cutouts_utils import ConfigCutouts
-import pandas as pd
-from pathlib import Path
 
 
 def main(cfg: DictConfig) -> None:

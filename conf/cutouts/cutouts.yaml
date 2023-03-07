@@ -7,11 +7,11 @@ is_primary:
 extends_border: False
 
 green_sum:
-  max: 10000000000
-  min: 5000000
+  max: 1000000
+  min: 500
 
 area: # mean, 25, 50, 75 for choosing greater than 25%, 50% , 75% percentiles
-  max: 
+  max: 50
   min: 
 
 save_csv: True # to create and save a csv of all cutout metadata

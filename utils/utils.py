@@ -5,6 +5,7 @@ import os
 import platform
 import random
 from datetime import datetime
+from math import sqrt
 from pathlib import Path
 from random import randrange
 
@@ -332,18 +333,19 @@ def crop_cutouts(img, add_padding=False):
         ))
     return array
 
+
 def cutouts_bbox(cutout, cut_tlx, cut_tly):
     # Get just the bbox of pixels
     crop_2_extent = crop_cutouts(cutout)
     # Compare wit
     og_cut_hw = cutout.shape[:2]
-    cropped_hw = crop_2_extent.shape[:2] #hw
-    
+    cropped_hw = crop_2_extent.shape[:2]  #hw
+
     h_diff = og_cut_hw[0] - cropped_hw[0]
     w_diff = og_cut_hw[1] - cropped_hw[1]
-    
-    crop_tlx = cut_tlx + int((w_diff/2))
-    crop_tly = cut_tly + int((h_diff/2))
+
+    crop_tlx = cut_tlx + int((w_diff / 2))
+    crop_tly = cut_tly + int((h_diff / 2))
     if crop_tlx < 0:
         crop_tlx = 0
     if crop_tly < 0:
@@ -352,16 +354,14 @@ def cutouts_bbox(cutout, cut_tlx, cut_tly):
     w, h = crop_2_extent.shape[1], crop_2_extent.shape[0]
     return crop_tlx, crop_tly, w, h
 
-    
     foreground = Image.fromarray(img)
     pil_crop_frground = foreground.crop((
-            foreground.getbbox()[0] - 2,
-            foreground.getbbox()[1] - 2,
-            foreground.getbbox()[2] + 2,
-            foreground.getbbox()[3] + 2,
-        ))
+        foreground.getbbox()[0] - 2,
+        foreground.getbbox()[1] - 2,
+        foreground.getbbox()[2] + 2,
+        foreground.getbbox()[3] + 2,
+    ))
     return array
-
 
 
 ########################################################################
@@ -508,13 +508,15 @@ def save_dataclass_json(data_dict, path):
     with open(json_path, 'w') as j:
         json.dump(data_dict, j, indent=4, default=str)
 
+
 def get_cutout_meta(path):
-        with open(path) as f:
-            j = json.load(f)
-        return j
+    with open(path) as f:
+        j = json.load(f)
+    return j
 
 
 ######################## YOLO LABELS ##############################
+
 
 def meta2yolo_prep(jsonpath, imgpath):
     """Operates on a single json file. Creates a dictionary that contains the image path, class id, and bounding box coordinates. Used later in another function.
@@ -532,10 +534,11 @@ def meta2yolo_prep(jsonpath, imgpath):
     for cutout in cutouts:
         cls_ids.append(cutout["cls"]["class_id"])
         bboxes.append(cutout["synth_norm_xywh"])
-        
+
         # cuts.append(cutout["synth_norm_xywh"])
     data_dict = {"img_path": imgpath, "bboxes": bboxes, "cls_ids": cls_ids}
     return data_dict
+
 
 def metadata2yolo_labels(datadir, data):
     """Creates YoloV... formatted label text files from metadata dictionary. Saves to data directory location.
@@ -559,23 +562,67 @@ def metadata2yolo_labels(datadir, data):
         with open(txt_path, 'w') as f:
             f.writelines([f"{line}\n" for line in lines])
 
+
 ######################################################
 ################# POT POSITIONS ######################
 ######################################################
+
 
 def compare_points(pt1, pts, dist_thresh=400):
     if len(pts) == 0:
         return False
     trues = []
-    
-    for pt in pts:    
+
+    for pt in pts:
         dist = math.dist(pt1, pt)
-        
+
         if dist > dist_thresh:
             trues.append(True)
         else:
             trues.append(False)
     return all(trues)
+
+
+def rand_multicut_positions(pot_center, num_points, mindist, maxdist):
+    """Altered from https://stackoverflow.com/questions/18670974/how-to-get-a-series-of-random-points-in-a-specific-range-of-distances-from-a-ref
+
+    Args:
+        pot_center (_type_): _description_
+        num_points (_type_): _description_
+        mindist (_type_): _description_
+        maxdist (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    cutptlist = []  #inizialize a void lists for red point coordinates
+
+    maxc = int(
+        sqrt((maxdist**2) / 2)
+    )  #from the euclidean distance formula you can get the max      coordinate
+
+    pointcounter = 0  #initizlize counter for the while loop
+    while True:  #create a potentailly infinite loop! pay attention!
+        if pointcounter < num_points:  #set the number of point you want to add (in this case 20)
+            x_cutPtshift = randrange(-maxc, maxc, 1)  #x shift of a red point
+            y_cutPtshift = randrange(-maxc, maxc, 1)  #y shift of a red point
+            if sqrt(
+                    x_cutPtshift**2 + y_cutPtshift**2
+            ) > mindist:  #if the point create go beyond the minimum distance
+                ptcutx = pot_center[
+                    0] + x_cutPtshift  #x coordinate of a red point
+                ptcuty = pot_center[
+                    1] + y_cutPtshift  #y coordinate of a red point
+                ptcut = [ptcutx, ptcuty]  #list with the x,y,z coordinates
+                if ptcut not in cutptlist:  #avoid to create red point with the same coordinates
+                    cutptlist.append(
+                        ptcut
+                    )  # add to a list with this notation [x1,y1],[x2,y2]
+                    pointcounter += 1  #add one to the counter of how many points you have in your list
+        else:  #when pointcounter reach the number of points you want the while cicle ends
+            break
+
+    return cutptlist
 
 
 def rand_positions(minx, maxx, miny, maxy, num_points, min_distance):
@@ -593,25 +640,28 @@ def rand_positions(minx, maxx, miny, maxy, num_points, min_distance):
     Returns:
         ptlist (list): list of all points
     """
-    pt = [0,0]
-    ptlist=[] #inizialize a void lists for red point coordinates
+    pt = [0, 0]
+    ptlist = []  #inizialize a void lists for red point coordinates
 
-    pointcounter=0 #initizlize counter for the while loop
-    while True: #create a potentailly infinite loop! pay attention!
-        if pointcounter<num_points: #set the number of point you want to add (in this case 20)
-                x_Ptshift=randrange(minx, maxx,1) #x shift of a red point 
-                y_Ptshift=randrange(miny, maxy,1) #y shift of a red point
-                ptx=pt[0]+ x_Ptshift#x coordinate of a red point
-                pty=pt[1]+ y_Ptshift #y coordinate of a red point
-                pt_pos=[ptx,pty]
-                if len(ptlist) == 0:
-                     separated = True
-                else:
-                    separated = compare_points(pt_pos, ptlist, dist_thresh=min_distance)
-                if separated:
-                    ptlist.append(pt_pos) # add to a list with this notation [x1,y1],[x2,y2]
-                    
-                    pointcounter+=1 #add one to the counter of how many points you have in your list 
-        else: #when pointcounter reach the number of points you want the while cicle ends
+    pointcounter = 0  #initizlize counter for the while loop
+    while True:  #create a potentailly infinite loop! pay attention!
+        if pointcounter < num_points:  #set the number of point you want to add (in this case 20)
+            x_Ptshift = randrange(minx, maxx, 1)  #x shift of a red point
+            y_Ptshift = randrange(miny, maxy, 1)  #y shift of a red point
+            ptx = pt[0] + x_Ptshift  #x coordinate of a red point
+            pty = pt[1] + y_Ptshift  #y coordinate of a red point
+            pt_pos = [ptx, pty]
+            if len(ptlist) == 0:
+                separated = True
+            else:
+                separated = compare_points(pt_pos,
+                                           ptlist,
+                                           dist_thresh=min_distance)
+            if separated:
+                ptlist.append(
+                    pt_pos)  # add to a list with this notation [x1,y1],[x2,y2]
+
+                pointcounter += 1  #add one to the counter of how many points you have in your list
+        else:  #when pointcounter reach the number of points you want the while cicle ends
             break
     return ptlist

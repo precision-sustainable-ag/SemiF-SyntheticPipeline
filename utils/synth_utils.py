@@ -14,7 +14,7 @@ class SynthPipeline:
 
     def __init__(self, cfg: DictConfig) -> None:
         self.synthdir = Path(cfg.synth.synthdir)
-        self.bgra_palette = [[0,0,0]]
+        self.bgra_palette = [[0, 0, 0]]
         self.pot_positions = None
         self.cutout = None
         self.cut_ht, self.cut_wd = None, None
@@ -39,14 +39,13 @@ class SynthPipeline:
 
 #---------------------- Get images -------------------------------
 
-    # def get_back(self, sortby=None):
-    #     self.back = random.choice(self.backgrounds)
+# def get_back(self, sortby=None):
+#     self.back = random.choice(self.backgrounds)
 
     def get_pot_positions(self):
         self.pot_positions = rand_pot_grid((6368, 9560))
         return self.pot_positions
 
-    
     # def get_pot(self):
     #     self.pot = random.choice(self.pots)
 
@@ -199,24 +198,31 @@ class SynthPipeline:
         alpha_l = 1.0 - cutout_mask
         pot[y:y2, x:x2] = alpha_l * pot[y:y2, x:x2] + cutout_mask * cutout
         mask[y:y2, x:x2] = (255) * cutout_mask + mask[y:y2, x:x2] * alpha_l
-        mask = mask[:,:,:3] # this is dumb but whatever
-        
+        mask = mask[:, :, :3]  # this is dumb but whatever
+
         # Already used colors
         palette = np.array(self.bgra_palette).transpose()
 
         # all(2) force all channels to be equal
         # any(-1) matches any color
-        temp_mask = (mask[y:y2, x:x2][:,:,:, None] == palette).all(2).any(-1)
+        temp_mask = (mask[y:y2, x:x2][:, :, :, None] == palette).all(2).any(-1)
 
         # target color
         bgra = np.array(bgra)
 
         # np.where to remap mask while keeping palette colors:
-        mask[y:y2, x:x2] = np.where(temp_mask[:,:,None], mask[y:y2, x:x2], bgra[None,None,:])
-        
+        mask[y:y2, x:x2] = np.where(temp_mask[:, :, None], mask[y:y2, x:x2],
+                                    bgra[None, None, :])
+
         return pot, mask, y, x
 
-    def overlay(self, topl_y, topl_x, fore_arr, back_arr,bgra=None, mask=None):
+    def overlay(self,
+                topl_y,
+                topl_x,
+                fore_arr,
+                back_arr,
+                bgra=None,
+                mask=None):
 
         if "pot" in self.fore_str.lower():
             # check positions
@@ -240,12 +246,8 @@ class SynthPipeline:
                                                     fore_arr.shape,
                                                     back_arr.shape, fore_arr)
 
-            fore_arr, mask, arr_y, arr_x = self.blend_cutout(topl_y,
-                                                             topl_x,
-                                                             fore_arr,
-                                                             back_arr,
-                                                             mask,
-                                                             bgra)
+            fore_arr, mask, arr_y, arr_x = self.blend_cutout(
+                topl_y, topl_x, fore_arr, back_arr, mask, bgra)
 
             return fore_arr, mask, arr_y, arr_x
 
@@ -258,6 +260,6 @@ class SynthPipeline:
         savemask = Path(self.maskdir, fname)
         # res = cv2.cvtColor(res, cv2.COLOR_RGBA2BGRA)
         # mask = cv2.cvtColor(mask, cv2.COLOR_RGBA2BGRA)
-        cv2.imwrite(str(savepath), res[:,:,:3])
+        cv2.imwrite(str(savepath), res[:, :, :3])
         cv2.imwrite(str(savemask), mask)
         return Path(savepath), Path(savemask)

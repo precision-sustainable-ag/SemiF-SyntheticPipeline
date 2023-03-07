@@ -20,6 +20,7 @@ SCHEMA_VERSION = "1.0"
 
 log = logging.getLogger(__name__)
 
+
 @dataclass
 class BoxCoordinates:
     top_left: np.ndarray
@@ -985,7 +986,7 @@ class SynthData:
             dc = Background(**meta_dict)
             docs.append(dc)
         return docs
-    
+
     def get_cutouts(self):
         df = pd.read_csv(self.cutout_csv, low_memory=False)
         df["temp_path"] = self.cutout_dir + "/" + df['cutout_path']
@@ -1001,10 +1002,10 @@ class SynthData:
     def load_cutouts_dc(self, meta):
         meta_path = meta["temp_path"].replace(".png", ".json")
         meta_dict = self.load_json(meta_path)
-        
+
         meta_dict["cutout_path"] = str(
-                Path(self.cutout_dir) / Path(meta_dict["cutout_path"]))
-            # Flag for adjusting path
+            Path(self.cutout_dir) / Path(meta_dict["cutout_path"]))
+        # Flag for adjusting path
         meta_dict["synth"] = True
         dc = Cutout(**meta_dict)
         return dc

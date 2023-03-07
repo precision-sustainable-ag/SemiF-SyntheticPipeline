@@ -1,5 +1,5 @@
 count: 5
-multiprocess: True
+multiprocess: False
 export_yolo_labels: True
 
 pot_jitter: [100, 100]
@@ -8,12 +8,16 @@ mode: symmetric #symmetric # symmetric, dense
 
 use_pots: True
 min_pot_dist: 1500
+
 min_pots: 1
 max_pots: 12
-num_cutouts:
-  min: 4
-  max: 6
 
+multicutouts: True
+min_multicutout_dist: 1 # distants of plants in a single pot
+
+num_cutouts:
+  min: 2
+  max: 5
 
 
 cutouts_per_pot:
