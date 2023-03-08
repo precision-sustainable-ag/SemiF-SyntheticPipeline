@@ -528,7 +528,6 @@ def meta2yolo_prep(jsonpath, imgpath):
     # Create a list of dictionaries with img paths and all bboxes
     meta = get_cutout_meta(jsonpath)
     cutouts = meta["cutouts"]
-    cuts = []
     cls_ids = []
     bboxes = []
     for cutout in cutouts:
@@ -560,6 +559,7 @@ def metadata2yolo_labels(datadir, data):
             s = " ".join(map(str, line))
             lines.append(s)
         with open(txt_path, 'w') as f:
+            print(lines)
             f.writelines([f"{line}\n" for line in lines])
 
 

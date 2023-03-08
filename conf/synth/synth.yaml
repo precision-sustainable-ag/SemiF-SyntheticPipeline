@@ -4,25 +4,25 @@ export_yolo_labels: True
 
 pot_jitter: [100, 100]
 
-mode: symmetric #symmetric # symmetric, dense
 
-use_pots: True
+
+use_pots: False
+# pot placement
+mode: no pots  # symmetric, random, no pots
 min_pot_dist: 1500
-
-min_pots: 1
+# Number of pots
+min_pots: 6
 max_pots: 12
 
 multicutouts: True
 min_multicutout_dist: 1 # distants of plants in a single pot
-
-num_cutouts:
-  min: 2
-  max: 5
-
-
 cutouts_per_pot:
-  min: 5
-  max: 20
+  min: 30
+  max: 60
+
+no_pots:
+  min_cut_dist: 10
+  max_cut_dist: 100
 
 # savedir: /media/hdd1/mkutu/wir/semifield-synth
 # savedir: ${general.workdir}/data/semifield-synth

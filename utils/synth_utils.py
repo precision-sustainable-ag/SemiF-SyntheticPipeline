@@ -254,10 +254,10 @@ class SynthPipeline:
     #---------------------- Save to directory and DB --------------------------------
 
     def save_synth(self, res, mask):
-        fname = uuid.uuid4().hex + ".jpg"
+        fstem = uuid.uuid4().hex
 
-        savepath = Path(self.imagedir, fname)
-        savemask = Path(self.maskdir, fname)
+        savepath = Path(self.imagedir, fstem + ".jpg")
+        savemask = Path(self.maskdir, fstem + ".png")
         # res = cv2.cvtColor(res, cv2.COLOR_RGBA2BGRA)
         # mask = cv2.cvtColor(mask, cv2.COLOR_RGBA2BGRA)
         cv2.imwrite(str(savepath), res[:, :, :3])
