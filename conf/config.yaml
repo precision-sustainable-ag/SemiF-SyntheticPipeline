@@ -1,35 +1,21 @@
 defaults:
-  - synth: synth
-  - cutouts: cutouts
+  - cutout_filters: default
+  - paths: default
   - _self_
 
 hydra:
   run:
-    dir: ${general.workdir}/data/projects/${general.project_name}
-  output_subdir: ${general.workdir}/data/projects/${general.project_name}
-
-datadir: 
+    dir: ${paths.workdir}/data/projects/${general.project_name}
+  output_subdir: ${paths.workdir}/data/projects/${general.project_name}
 
 general:
-  task: config_cutouts # config_cutouts, synthesize
-  project_name: very_big
-  workdir: ${hydra:runtime.cwd}  # where the code is executed
-  projectdir: ${general.workdir}/data/projects/${general.project_name}
+  project_name: test_cutouts
 
-repo_names:
-  semif_annotation: SemiF-AnnotationPipeline
-  semif_snyth: SemiF-SyntheticPipeline
+tasks:
+  # - transfer_data
+  # - synthesize
+  - filter_cutouts
 
-blob_names:
-  developed: semifield-developed-images
-  synth: semifield-synth
-  cutout: semifield-cutouts  
-
-data:
-  datadir: ${general.workdir}/data
-  # datadir: /mnt/research-projects/s/screberg/longterm_storage
-  developed: ${data.datadir}/${blob_names.developed}
-  cutoutdir: /mnt/research-projects/s/screberg/longterm_images/semifield-cutouts # ???
-  csvpath: ${general.projectdir}/${general.project_name}.csv
-  
-  
+synthesize:
+  parallel: False
+  parallel_workers: 5

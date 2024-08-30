@@ -1,209 +1,90 @@
+
 # SemiF-SyntheticPipeline
 
-## Setup
 
-### Config data csv
-Create a custom synthetic dataset by specifying various properties.
+## Installation and Setup
 
-1. Define SemiField-cutout input data directory in [conf/config.yaml](conf/config.yaml#L31)
-2. Configure your dataset in [conf/cutouts/cutouts.yaml](conf/cutouts/cutouts.yaml)
-3. Fill in a unique project name (`project_name`) in [conf/config.yaml](conf/cutouts/cutouts.yaml#L)
-3. Run
-    ```bash
-    python SYNTH.py general.task=config_cutouts
-    ```
-4. CSV along with processing log and saved configurations are saved in [data/projects/{project_name}](data/projects)
+### Installing Conda
+To manage the project's dependencies efficiently, we use Conda, a powerful package manager and environment manager. Follow these steps to install Conda if you haven't already:
 
-### Generate Synthetic data
-
-Using the configured dataset csv in [data/projects/{project_name}](data/projects), `images`, `masks`, and `metadata` by default will be created in similarly named folders (respectively). Optionally, YOLO formatted labels can be produced in a `yolo_labels` folder.
-
-| Configs | Description | Default |
-| --- | --- | --- |
-| `count` | the number of synthetic images to generate | 10 |
-| `multiprocess` | Flag to use multiprocessing. `False` makes it easier to debug | `True` |
-| `export_yolo_labels` | `True` creates a `yolo_labels` folder in `<project_name>/results` for Yolo formatted `.txt` files for bounding box locations in normalized `class` `x` `y` `width` `height` | `False` |
-| `pot_jitter` | amount of random movement in the x and y position of pots | `[100, 100]` |
-
-2. Run
-    ```bash
-    python SYNTH.py general.task=synthesize
-    ```
-
-# Data Structure
-
-* Pot and background images are located in this repository
-* Outputs (`images`, `masks`, and `metadata`) are also located in this repository.
+1. Download the appropriate version of Miniconda for your operating system from the official [Miniconda website](https://docs.anaconda.com/free/miniconda/).
+2. Follow the installation instructions provided on the website for your OS. This typically involves running the installer from the command line and following the on-screen prompts.
+3. Once installed, open a new terminal window and type `conda list` to ensure Conda was installed correctly. You should see a list of installed packages.
 
 
-## Pipeline
-![](asset/Pipeline_flowchart.png)
+### Setting Up Your Environment Using an Environment File
+After installing Conda, you can set up an environment for this project using an environment file, which specifies all necessary dependencies. Here's how:
 
-<br>
+1. Clone this repository to your local machine.
+2. Navigate to the repository directory in your terminal.
+3. Locate the `environment.yaml` file in the repository. This file contains the list of packages needed for the project.
+4. Create a new Conda environment by running the following command:
+   ```bash
+   conda env create -f environment.yaml
+   ```
+   This command reads the `environment.yaml` file and creates an environment with the name and dependencies specified within it.
 
-## UML Class diagram
+5. Once the environment is created, activate it with:
+   ```bash
+   conda activate <env_name>
+   ```
+   Replace `<env_name>` with the name of the environment specified in the `environment.yaml` file.
 
-![](asset/Class_diagrams-synthetic.png)
+## Transfer data
+The **transfer data script** manages downloading and reporting of cutouts from NCSU's locker storage to a local directory. 
 
 
-```
-SemiF-SyntheticPipeline
-└── data
-    └── semifield-synth
-        ├── backgrounds
-        │   ├── background_1.json
-        │   └── background_1.png
-        ├── pots
-        │   ├── pot_1.json
-        │   └── pot_1.png
-        ├── images
-        │   ├── c2cd770ad1ba4543803bbce4cc4b6184.png
-        │   └── cccd3d7264624a72a3b11888bf2edde6.png
-        ├── masks
-        │   ├── c2cd770ad1ba4543803bbce4cc4b6184.png
-        │   └── cccd3d7264624a72a3b11888bf2edde6.png
-        └── metadata
-            ├── c2cd770ad1ba4543803bbce4cc4b6184.json
-            └── cccd3d7264624a72a3b11888bf2edde6.json
-```  
-* Cutouts are taken from the Semifield-cutout directory, in this example, another repository.
+- **Batch Downloading:** Automatically downloads image cutouts from a specified NFS directory to a local directory, with checks to skip batches that have already been fully downloaded.
+- **Concurrency:** Utilizes multithreading with a configurable number of workers to speed up the download process.
+- **Comprehensive Reporting:** Generates and updates a CSV report that tracks the number of unique cutouts per batch and folder size in MiB of batches that have been downloaded.
+- **Logging:** Includes detailed logging to track the progress and status of the downloading and reporting processes.
 
-```
-SemiF-AnnotationPipeline
-└── data
-    └── semifield-cutouts
-        └── MD_2022-06-28
-            ├── MD_2_2_1655826744.0_0.png
-            └── MD_2_2_1655826744.0_0.json
-```
-<br>
 
-## Data
+### Configuration
 
-### background_1.json
-```Json
-{
-    "background_path": "backgrounds/background_1.png",
-    "background_id": "4440b6a6-38da-463b-8d40-dde1b7b79900"
-}
-```
+The script is configured using a YAML or a similar configuration file, typically managed through `omegaconf`. This configuration file should include paths for the NFS storage, local download directory, batch list file, and the report file.
 
-<br>
 
-### pot_1.json
-```Json
-{
-    "pot_path": "pots/MD_1_16_1656440273.0.png",
-    "pot_id": "db9225b1-342f-483c-b350-85014b7bf611"
-}
-```
+### Usage
 
-<br>
+1. **Prepare the Configuration:**
+   - Ensure the configuration file (`config.yaml`) is set up with the correct paths.
 
-### Cutout example
-```Json
-{
-    "blob_home": "data",
-    "data_root": "semifield-cutouts",
-    "batch_id": "MD_2022-06-21",
-    "image_id": "MD_2_2_1655826744.0",
-    "cutout_id": "MD_2_2_1655826744.0_0",
-    "cutout_path": "MD_2022-06-21/MD_2_2_1655826744.0_0.png",
-    "cls": "plant",
-    "cutout_num": 0,
-    "is_primary": false,
-    "datetime": "2022:06:21 23:56:59",
-    "cutout_props": {
-        "area": 6117.0,
-        "area_bbox": 17358.0,
-        "area_convex": 7551.0,
-        "axis_major_length": 270.7782922363416,
-        "axis_minor_length": 31.13171551152259,
-        "centroid0": 124.0601602092529,
-        "centroid1": 193.53997057381068,
-        "eccentricity": 0.9933688209359223,
-        "solidity": 0.8100913786253476,
-        "perimeter": 642.3229432149742
-    },
-    "schema_version": "1.0"
-}
-```
-## Synthetic image
+2. **Prepare the Batch List:**
+   - The batch list should be a text file (e.g., `batch_list.txt`) containing the names of the batches to be downloaded, with each batch name on a new line.
 
-```Json
-{
-    "data_root": "semifield-synth",
-    "synth_path": "images/cccd3d7264624a72a3b11888bf2edde6.png",
-    "synth_maskpath": "masks/cccd3d7264624a72a3b11888bf2edde6.png",
-    "pots": [
-        {
-            "pot_path": "pots/MD_72_2_1655836004.0.png",
-            "pot_id": "ad4676e7-9fcc-4280-80ed-ddd5688c6d10"
-        },
-        {
-            "pot_path": "pots/pot_5.png",
-            "pot_id": "a5166e35-bd08-40ac-a741-d2d11ca30361"
-        }
-    ],
-    "background": [
-        {
-            "background_path": "backgrounds/MD_72_2_1655836004.0_background.png",
-            "background_id": "4e0a75d4-f3ef-4920-b671-a9d94b38f27c"
-        }
-    ],
-    "cutouts": [
-        {
-            
-            "blob_home": "data",
-            "data_root": "semifield-cutouts",
-            "batch_id": "MD_2022-06-28",
-            "image_id": "MD_2_14_1656451343.0",
-            "cutout_num": 53,
-            "datetime": "2022:06:29 05:19:25",
-            "cutout_props": {
-                "area": 35006.0,
-                "area_bbox": 51170.0,
-                "area_convex": 37856.0,
-                "axis_major_length": 281.0165308653915,
-                "axis_minor_length": 164.29763429928514,
-                "centroid0": 554.6574587213621,
-                "centroid1": 354.5368222590413,
-                "eccentricity": 0.8112822486437252,
-                "solidity": 0.9247147083685545,
-                "perimeter": 849.2935059634514
-            },
-            "cutout_path": "MD_2022-06-28/MD_2_14_1656451343.0_53.png",
-            "cutout_id": "MD_2_14_1656451343.0_53",
-            "cls": "dicot",
-            "is_primary": false,
-            "schema_version": "1.0"
-        },
-        {
-            "blob_home": "data",
-            "data_root": "semifield-cutouts",
-            "batch_id": "MD_2022-06-28",
-            "image_id": "MD_3_4_1656430853.0",
-            "cutout_num": 4,
-            "datetime": "2022:06:28 23:37:56",
-            "cutout_props": {
-                "area": 63096.0,
-                "area_bbox": 91780.0,
-                "area_convex": 66771.0,
-                "axis_major_length": 381.4839752304773,
-                "axis_minor_length": 216.45776748452977,
-                "centroid0": 776.4104380626347,
-                "centroid1": 184.30910041841005,
-                "eccentricity": 0.823435519768727,
-                "solidity": 0.9449611358224379,
-                "perimeter": 1087.259018078045
-            },
-            "cutout_path": "MD_2022-06-28/MD_3_4_1656430853.0_4.png",
-            "cutout_id": "MD_3_4_1656430853.0_4",
-            "cls": "dicot",
-            "is_primary": false,
-            "schema_version": "1.0"
-        }
-    ],
-    "synth_id": "a6fd06ab-862f-4fb4-954e-7be34dc82c0c"
-}
-```
+## Synthetic Image Generator
+
+This script is generates "recipe" JSON files that describe how to create synthetic images by combining cutouts (small image segments) with background images. The cutouts are selected based on specific morphological and categorical criteria defined in a configuration file. The script allows you to control the total number of synthetic image recipes created, the number of cutouts per image, and other filtering criteria to ensure the recipes meet your specific requirements.
+
+- **Cutout Configuration:** Use a YAML configuration file to specify filtering criteria for the cutouts, including morphological properties (e.g., area, eccentricity) and categorical attributes (e.g., genus, species).
+- **Criteria:** Define the total number of synthetic images to be created and the range for the number of cutouts per image.
+- **Random Cutout Selection:** The script randomly selects cutouts for each synthetic image, ensuring variety and randomness in the generated images.
+- **Cutout Reuse:** Each cutout is used only once across all synthetic images, preventing duplication (this may be changed in the future).
+
+### Usage
+
+1. **Prepare Your Configuration File:**
+   - Create a cusomt filter configuration file that specifies the paths to your cutout metadata files, background images, and output directory. Define the filtering criteria and the total number of synthetic images you want to generate.
+
+   Default configuration can be found (`conf/cutout_filters/default.yaml`)
+
+3. **Output:**
+   - The script will generate recipe JSON files based on the criteria specified in the configuration file. These recipes describe how to create synthetic images and will be saved in the directory specified by `cfg.paths.recipesdir`.
+
+### Notes
+
+- The script makes sure that each cutout is used only once across all synthetic images.
+- Background images are selected randomly from the specified directory, and the script will reuse background images if the number of synthetic images requested exceeds the number of available background images.
+
+### Troubleshooting
+
+- **No Background Images Found:** Ensure that the `background_images_dir` path in the configuration file points to a directory containing valid image files.
+- **Insufficient Cutouts:** If you have a very small number of cutouts or strict filtering criteria, the script may fail to generate the desired number of synthetic images.
+
+###TODOs:
+- add functionality to use cutout with replacement in the event that many high density synthetic images are created and cutouts need to be reused
+
+## License
+
+This script is provided as-is, with no warranties or guarantees. You are free to modify and distribute it as needed. However, attribution is appreciated if you share it publicly.

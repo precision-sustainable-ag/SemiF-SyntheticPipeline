@@ -1,667 +1,211 @@
-import itertools
 import json
-import math
-import os
-import platform
 import random
-from datetime import datetime
-from math import sqrt
 from pathlib import Path
-from random import randrange
+from typing import List, Tuple
 
 import cv2
 import numpy as np
 import pandas as pd
-import torch
-import torchvision.ops.boxes as bops
-from PIL import Image
-from scipy import ndimage
-from skimage import morphology, segmentation
-from sklearn.cluster import KMeans
-
-######################################################
-################### GENERAL ##########################
-######################################################
 
 
-def read_json(path):
-    # Opening JSON file
-    with open(path) as json_file:
-        data = json.load(json_file)
-    return data
+def filter_area(df, lower, upper):
+    filtered_dfs = []
+    for spec in df.common_name.unique():
+        temp = df[df["common_name"] == spec]
+
+        mean = temp.area.describe()["mean"]
+        min = temp.area.describe()["min"]
+        max = temp.area.describe()["max"]
+        per25 = temp.area.describe()["25%"]
+        per50 = temp.area.describe()["50%"]
+        per75 = temp.area.describe()["75%"]
+
+        if type(lower) is int:
+            lower_area_limit = lower
+        elif lower is None:
+            lower_area_limit = 0
+        elif lower == "mean":
+            lower_area_limit = mean
+        elif lower == "min":
+            lower_area_limit = min
+        elif lower == "max":
+            lower_area_limit = max
+        elif lower == "per25":
+            lower_area_limit = per25
+        elif lower == "per50":
+            lower_area_limit = per50
+        elif lower == "per75":
+            lower_area_limit = per75
+
+        if type(upper) is int:
+            upper_area_limit = upper
+        elif upper == "mean":
+            upper_area_limit = mean
+        elif upper == "min":
+            upper_area_limit = min
+        elif upper == "max":
+            upper_area_limit = max
+        elif upper == "per25":
+            upper_area_limit = per25
+        elif upper == "per50":
+            upper_area_limit = per50
+        elif upper == "per75":
+            upper_area_limit = per75
+
+        temp = temp[
+            (temp["area"] < upper_area_limit) & (lower_area_limit < temp["area"])
+        ]
+        filtered_dfs.append(temp)
+    filtered_df = pd.concat(filtered_dfs)
+    return filtered_df
+
+def get_cutouts(cfg, cutoutids):
+    cutoutmeta = [Path(cfg.paths.cutoutdir, x + ".json") for x in cutoutids]
+    cutouts = []
+    for i in cutoutmeta:
+        with open(str(i), 'r') as file:
+            cut = json.load(file)
+        cutouts.append(cut)
+    return cutouts
+
+def get_random_background(cfg):
+    # Define the directory you want to search
+    backdirectory = Path(cfg.paths.backgrounddir)
+    # Define the extensions you want to search for
+    extensions = ['*.jpg', '*.jpeg', '*.JPEG', '*.JPG']
+
+    # Use list comprehension to gather all files matching the extensions
+    backgroundfiles = [file for ext in extensions for file in backdirectory.glob(ext)]
+
+    # backgroundmeta = list(Path(cfg.data.backgrounddir).glob("*.json"))
+    randombackground = random.choice(backgroundfiles)
+    # randombackground= create_background_dataclass_from_json(randombackground_json)
+    return randombackground
 
 
-######################################################
-################## GET METADATA ######################
-######################################################
-
-
-def get_bbox_info(csv_path):
-
-    df = pd.read_csv(csv_path).drop(columns=['Unnamed: 0'])
-    bbox_dict = df.groupby(
-        by='imgname', sort=True).apply(lambda x: x.to_dict(orient='records'))
-    img_list = list(bbox_dict.keys())
-    return bbox_dict, img_list
-
-
-def get_site_id(imagedir):
-    # Must be in TX_2022-12-31 format
-    imgstem = Path(imagedir).stem
-    siteid = imgstem.split("_")[0]
-    return siteid
-
-
-def creation_date(path_to_file):
-    """
-    Try to get the date that a file was created, falling back to when it was
-    last modified if that isn't possible.
-    See http://stackoverflow.com/a/39501288/1709587 for explanation.
-    """
-    if platform.system() == 'Windows':
-        return os.path.getctime(path_to_file)
-    else:
-        stat = os.stat(path_to_file)
-        try:
-            return stat.st_birthtime
-        except AttributeError:
-            # We're probably on Linux. No easy way to get creation dates here,
-            # so we'll settle for when its content was last modified.
-            return stat.st_mtime
-
-
-def get_upload_datetime(imagedir):
-
-    creation_dt = creation_date(imagedir)
-    creation_dt = datetime.fromtimestamp(creation_dt).strftime(
-        '%Y-%m-%d_%H:%M:%S')
-    return creation_dt
-
-
-def parse_dict(props_tabl):
-    """Used to parse regionprops table dictionary"""
-    ndict = {}
-    for key, val in props_tabl.items():
-        key = key.replace("-", "") if "-" in key else key
-        new_val_entry = []
-        if isinstance(val, np.ndarray) and val.shape[0] > 1:
-            for i, v in enumerate(val):
-                new_val_entry.append({f'{key}_{i+1}': float(v)})
-            ndict[key] = new_val_entry
-        else:
-            ndict[key] = float(val)
-    return ndict
-
-
-def img2RGBA(img):
-    alpha = np.sum(img, axis=-1) > 0
-    alpha = np.uint8(alpha * 255)
-    img = np.dstack((img, alpha))
-    return img
-
-
-######################################################
-############### VEGETATION INDICES ###################
-######################################################
-
-
-def make_exg(img, normalize=False, thresh=0):
-    # rgb_img: np array in [RGB] channel order
-    # exr: single band vegetation index as np array
-    # EXG = 2 * G - R - B
-    img = img.astype(float)
-    r, g, b = img[:, :, 0], img[:, :, 1], img[:, :, 2]
-    if normalize:
-        total = r + g + b
-        exg = 2 * (g / total) - (r / total) - (b / total)
-    else:
-        exg = 2 * g - r - b
-    if thresh is not None and normalize == False:
-        exg = np.where(exg < thresh, 0, exg)
-        return exg.astype("uint8")
-
-
-def make_exr(rgb_img):
-    # rgb_img: np array in [RGB] channel order
-    # exr: single band vegetation index as np array
-    # EXR = 1.4 * R - G
-    img = rgb_img.astype(float)
-
-    blue = img[:, :, 2]
-    green = img[:, :, 1]
-    red = img[:, :, 0]
-
-    exr = 1.4 * red - green
-    exr = np.where(exr < 0, 0, exr)  # Thresholding removes low negative values
-    return exr.astype("uint8")
-
-
-def make_exg_minus_exr(img):
-    img = img.astype(float)  # Rgb image
-    exg = make_exg(img)
-    exr = make_exr(img)
-    exgr = exg - exr
-    exgr = np.where(exgr < 25, 0, exgr)
-    return exgr.astype("uint8")
-
-
-def make_ndi(rgb_img):
-    # rgb_img: np array in [RGB] channel order
-    # exr: single band vegetation index as np array
-    # NDI = 128 * (((G - R) / (G + R)) + 1)
-    img = rgb_img.astype(float)
-
-    blue = img[:, :, 2]
-    green = img[:, :, 1]
-    red = img[:, :, 0]
-    gminr = green - red
-    gplusr = green + red
-    gdivr = np.true_divide(gminr,
-                           gplusr,
-                           out=np.zeros_like(gminr),
-                           where=gplusr != 0)
-    ndi = 128 * (gdivr + 1)
-    # print("Max ndi: ", ndi.max())
-    # print("Min ndi: ", ndi.min())
-
-    return ndi
-
-
-######################################################
-###################### BBOX ##########################
-######################################################
-
-
-def rescale_bbox(box, imgshape):
-    # TODO change
-    """Rescales local bbox coordinates, that were first scaled to "downscaled_photo" size (height=3184, width=4796),
-       to original image size (height=6368, width=9592). Takes in and returns "Box" dataclass.
-
-    Args:
-        box (dataclass): box metedata from bboxes from image metadata
-        imgshape: np.ndarray: dimensions of the image to be scaled to (widt, height)
+def is_clockwise(contour: np.ndarray) -> bool:
+    """Determines if the points in the contour are arranged in clockwise order.
     
-    Returns:
-        box (dataclass): box metadata with scaled/updated bbox
-    """
-    scale = imgshape
-    box.local_coordinates["top_left"] = [
-        c * s for c, s in zip(box.local_coordinates["top_left"], scale)
-    ]
-    box.local_coordinates["top_right"] = [
-        c * s for c, s in zip(box.local_coordinates["top_right"], scale)
-    ]
-    box.local_coordinates["bottom_left"] = [
-        c * s for c, s in zip(box.local_coordinates["bottom_left"], scale)
-    ]
-    box.local_coordinates["bottom_right"] = [
-        c * s for c, s in zip(box.local_coordinates["bottom_right"], scale)
-    ]
-    return box
-
-
-######################################################
-################# MORPHOLOGICAL ######################
-######################################################
-
-
-def clean_mask(mask, kernel_size=3, iterations=1, dilation=True):
-    if int(kernel_size):
-        kernel_size = (kernel_size, kernel_size)
-    mask = morphology.opening(mask, morphology.disk(3))
-    mask = mask.astype("float32")
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, kernel_size)
-    if dilation:
-        mask = cv2.dilate(mask, kernel, iterations=iterations)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, (5, 5))
-    mask = cv2.erode(mask, (5, 5), iterations=2)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, (7, 7))
-    return mask
-
-
-def dilate_erode(mask,
-                 kernel_size=3,
-                 dil_iters=5,
-                 eros_iters=3,
-                 hole_fill=True):
-    mask = mask.astype(np.float32)
-
-    if int(kernel_size):
-        kernel_size = (kernel_size, kernel_size)
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, kernel_size)
-
-    mask = cv2.dilate(mask, kernel, iterations=dil_iters)
-    if hole_fill:
-        mask = ndimage.binary_fill_holes(mask.astype(np.int32))
-    mask = mask.astype("float")
-    mask = cv2.erode(mask, kernel, iterations=eros_iters)
-
-    cleaned_mask = clean_mask(mask)
-    return cleaned_mask
-
-
-def clear_border(mask):
-    mask = segmentation.clear_border(mask)
-    return mask
-
-
-def reduce_holes(mask, min_object_size=1000, min_hole_size=1000):
-
-    mask = mask.astype(np.bool8)
-    # mask = measure.label(mask, connectivity=2)
-    mask = morphology.remove_small_holes(
-        morphology.remove_small_objects(mask, min_hole_size), min_object_size)
-    # mask = morphology.opening(mask, morphology.disk(3))
-    return mask
-
-
-######################################################
-########### CLASSIFIERS AND THRESHOLDING #############
-######################################################
-
-
-def check_kmeans(mask):
-    max_sum = mask.shape[0] * mask.shape[1]
-    ones_sum = np.sum(mask)
-    if ones_sum > max_sum / 2:
-        mask = np.where(mask == 1, 0, 1)
-    return mask
-
-
-def make_kmeans(exg_mask):
-    rows, cols = exg_mask.shape
-    n_classes = 2
-    exg = exg_mask.reshape(rows * cols, 1)
-    kmeans = KMeans(n_clusters=n_classes, random_state=3).fit(exg)
-    mask = kmeans.labels_.reshape(rows, cols)
-    mask = check_kmeans(mask)
-    return mask.astype("uint64")
-
-
-def otsu_thresh(mask, kernel_size=(3, 3)):
-    mask_blur = cv2.GaussianBlur(mask, kernel_size, 0).astype("uint16")
-    ret3, mask_th3 = cv2.threshold(mask_blur, 0, 255,
-                                   cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return mask_th3
-
-
-######################################################
-##################### MASKING ########################
-######################################################
-
-
-def apply_mask(img, mask, mask_color):
-    """Apply white image mask to image, with bitwise AND operator bitwise NOT operator and ADD operator.
-    Inputs:
-    img        = RGB image data
-    mask       = Binary mask image data
-    mask_color = 'white' or 'black'
-    Returns:
-    masked_img = masked image data
-    :param img: numpy.ndarray
-    :param mask: numpy.ndarray
-    :param mask_color: str
-    :return masked_img: numpy.ndarray
-    """
-    if mask_color.upper() == "WHITE":
-        color_val = 255
-    elif mask_color.upper() == "BLACK":
-        color_val = 0
-
-    array_data = img.copy()
-
-    # Mask the array
-    array_data[np.where(mask == 0)] = color_val
-    return array_data
-
-
-######################################################
-#################### CUTOUTS #########################
-######################################################
-
-
-def crop_cutouts(img, add_padding=False):
-    foreground = Image.fromarray(img)
-    pil_crop_frground = foreground.crop(foreground.getbbox())
-    array = np.array(pil_crop_frground)
-    if add_padding:
-        pil_crop_frground = foreground.crop((
-            foreground.getbbox()[0] - 2,
-            foreground.getbbox()[1] - 2,
-            foreground.getbbox()[2] + 2,
-            foreground.getbbox()[3] + 2,
-        ))
-    return array
-
-
-def cutouts_bbox(cutout, cut_tlx, cut_tly):
-    # Get just the bbox of pixels
-    crop_2_extent = crop_cutouts(cutout)
-    # Compare wit
-    og_cut_hw = cutout.shape[:2]
-    cropped_hw = crop_2_extent.shape[:2]  #hw
-
-    h_diff = og_cut_hw[0] - cropped_hw[0]
-    w_diff = og_cut_hw[1] - cropped_hw[1]
-
-    crop_tlx = cut_tlx + int((w_diff / 2))
-    crop_tly = cut_tly + int((h_diff / 2))
-    if crop_tlx < 0:
-        crop_tlx = 0
-    if crop_tly < 0:
-        crop_tly = 0
-
-    w, h = crop_2_extent.shape[1], crop_2_extent.shape[0]
-    return crop_tlx, crop_tly, w, h
-
-    foreground = Image.fromarray(img)
-    pil_crop_frground = foreground.crop((
-        foreground.getbbox()[0] - 2,
-        foreground.getbbox()[1] - 2,
-        foreground.getbbox()[2] + 2,
-        foreground.getbbox()[3] + 2,
-    ))
-    return array
-
-
-########################################################################
-########################################################################
-#------------------- Helper functions --------------------------------
-def rand_pot_grid(img_shape):
-    """Creates a set of grid-like coordinates based on image size.
-       The number of coordinates (pots) is based on randomely choosing
-       the number rows and columns. Coordinates are evenly spaced both 
-       vertically and horizontally based on image shape and number of 
-       rows and columns. Zero coordinates are removed as are the maximum
-       extent of the image (img.shape).
-
     Args:
-        img_shape (tuple): shape of image
+        contour (np.ndarray): An array of contour points.
 
     Returns:
-        coords: list of tuples, evenly spaced coordinates
+        bool: True if contour is clockwise, otherwise False.
     """
+    value = 0
+    num = len(contour)
+    for i in range(num):
+        p1 = contour[i]
+        p2 = contour[(i + 1) % num]  # Circular indexing
+        value += (p2[0][0] - p1[0][0]) * (p2[0][1] + p1[0][1])
+    return value < 0
 
-    imght, imgwid = img_shape[:2]
-
-    rand_wid = random.randint(2, 5)
-    rand_ht = random.choice([2, 3])
-
-    # Create width locations
-    wid = np.linspace(0, imgwid, rand_wid, dtype=int)
-    wid = wid[wid != 0]
-    wid_diff = np.diff(wid)
-
-    if len(wid_diff) >= 2:
-        wid_diff = wid_diff[0]
-    wid = [(x - math.ceil(wid_diff / 2)) if wid_diff != 0 else math.ceil(x / 2)
-           for x in wid]  # Accounts for 0 diff
-
-    # Create height locations
-    ht = np.linspace(0, imght, rand_ht, dtype=int)
-    ht_diff = np.diff(ht)[0]
-    ht = ht[ht != imght]
-    ht = [(x + int(ht_diff / 2)) for x in ht]
-    # Combine height and width to make coordinates
-    coords = list(itertools.product(wid, ht))
-    rand_x = 100 if rand_wid >= 4 else 600
-    rand_y = 100 if (rand_ht == 3) and (rand_wid >= 4) else 700
-    coords = [(x + random.randint(-rand_x, rand_x),
-               y + random.randint(-rand_y, rand_y)) for x, y in coords]
-    return coords
-
-
-def bbox_iou(box1, box2):
-    box1 = torch.tensor([box1], dtype=torch.float)
-    box2 = torch.tensor([box2], dtype=torch.float)
-    iou = bops.box_iou(box1, box2)
-    return iou
-
-
-def get_img_bbox(x, y, imgshape):
-    pot_h, pot_w, _ = imgshape
-    x0, x1, y0, y1 = x, x + pot_w, y, y + pot_h
-    bbox = [x0, y0, x1, y1]  # top right corner, bottom left corner
-    return bbox
-
-
-def center2topleft(y, x, background_imgshape):
-    """ Gets top left coordinates of an image from center point coordinate
-    """
-    back_h, back_w = background_imgshape
-    tpl_y = y - int(back_h / 2)
-    tpl_x = x - int(back_w / 2)
-    return tpl_y, tpl_x
-
-
-def transform_position(pot_position, imgshape):
-    """ Applies random jitter factor to points and transforms them to top left image coordinates. 
-    """
-    x, y = pot_position
-    tpl_y, tpl_x = center2topleft(y, x, imgshape)
-
-    return tpl_y, tpl_x
-
-
-class Point(object):
-
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-
-class Rect(object):
-
-    def __init__(self, p1, p2):
-        '''Store the top, bottom, left and right values for points 
-               p1 and p2 are the (corners) in either order
-        '''
-        self.left = min(p1.x, p2.x)
-        self.right = max(p1.x, p2.x)
-        self.bottom = min(p1.y, p2.y)
-        self.top = max(p1.y, p2.y)
-
-
-def overlap(r1, r2):
-    '''Overlapping rectangles overlap both horizontally & vertically
-    '''
-    return range_overlap(r1.left, r1.right,
-                         r2.left, r2.right) and range_overlap(
-                             r1.bottom, r1.top, r2.bottom, r2.top)
-
-
-def range_overlap(a_min, a_max, b_min, b_max):
-    '''Neither range is completely greater than the other
-    '''
-    return (a_min <= b_max) and (b_min <= a_max)
-
-
-def dict_to_json(dic, path):
-    json_path = Path(path)
-    with open(json_path, 'w') as j:
-        json.dump(dic, j, indent=4, default=str)
-
-
-def clean_data(data):
-    """ Convert absolute pot and background paths to relative.
-        Takes the last two components of a path object for each.
-        
-        Takes in and returns a dictionary of dataclass to be 
-        stored in json and db. 
-    """
-    data["background"][0]["background_path"] = "/".join(
-        Path(data["background"][0]["background_path"]).parts[-2:])
-
-    pots = data["pots"]
-    for pot in pots:
-        pot["pot_path"] = "/".join(Path(pot["pot_path"]).parts[-2:])
-
-    for cutout in data["cutouts"]:
-        cutout["cutout_path"] = "/".join(
-            Path(cutout["cutout_path"]).parts[-2:])
-
-    return data
-
-
-def save_dataclass_json(data_dict, path):
-    json_path = Path(path)
-    with open(json_path, 'w') as j:
-        json.dump(data_dict, j, indent=4, default=str)
-
-
-def get_cutout_meta(path):
-    with open(path) as f:
-        j = json.load(f)
-    return j
-
-
-######################## YOLO LABELS ##############################
-
-
-def meta2yolo_prep(jsonpath, imgpath):
-    """Operates on a single json file. Creates a dictionary that contains the image path, class id, and bounding box coordinates. Used later in another function.
-
+def get_merge_point_idx(contour1: np.ndarray, contour2: np.ndarray) -> Tuple[int, int]:
+    """Finds the indices of the closest points between two contours.
+    
     Args:
-        jsonpath (str): path to json file
-        imgpath (str): path to image
-    """
-    # Create a list of dictionaries with img paths and all bboxes
-    meta = get_cutout_meta(jsonpath)
-    cutouts = meta["cutouts"]
-    cls_ids = []
-    bboxes = []
-    for cutout in cutouts:
-        cls_ids.append(cutout["cls"]["class_id"])
-        bboxes.append(cutout["synth_norm_xywh"])
-
-        # cuts.append(cutout["synth_norm_xywh"])
-    data_dict = {"img_path": imgpath, "bboxes": bboxes, "cls_ids": cls_ids}
-    return data_dict
-
-
-def metadata2yolo_labels(datadir, data):
-    """Creates YoloV... formatted label text files from metadata dictionary. Saves to data directory location.
-
-    Args:
-        datadir (str): path to where labels will be saved
-        data (dict): dictionary that contains image name, class_id, and list of bboxes
-    """
-    savedir = Path(datadir, "yolo_labels")
-    savedir.mkdir(exist_ok=True, parents=True)
-
-    for i in data:
-        txt_path = Path(savedir, Path(i["img_path"]).stem + ".txt")
-        lines = []
-        # cls_id = i["cls_ids"]
-        for cls_id, bounding_box in zip(i["cls_ids"], i["bboxes"]):
-            line = [round(x, 8) for x in bounding_box]
-            line.insert(0, cls_id)
-            s = " ".join(map(str, line))
-            lines.append(s)
-        with open(txt_path, 'w') as f:
-            print(lines)
-            f.writelines([f"{line}\n" for line in lines])
-
-
-######################################################
-################# POT POSITIONS ######################
-######################################################
-
-
-def compare_points(pt1, pts, dist_thresh=400):
-    if len(pts) == 0:
-        return False
-    trues = []
-
-    for pt in pts:
-        dist = math.dist(pt1, pt)
-
-        if dist > dist_thresh:
-            trues.append(True)
-        else:
-            trues.append(False)
-    return all(trues)
-
-
-def rand_multicut_positions(pot_center, num_points, mindist, maxdist):
-    """Altered from https://stackoverflow.com/questions/18670974/how-to-get-a-series-of-random-points-in-a-specific-range-of-distances-from-a-ref
-
-    Args:
-        pot_center (_type_): _description_
-        num_points (_type_): _description_
-        mindist (_type_): _description_
-        maxdist (_type_): _description_
+        contour1 (np.ndarray): First contour.
+        contour2 (np.ndarray): Second contour.
 
     Returns:
-        _type_: _description_
+        Tuple[int, int]: Indices of the closest points in contour1 and contour2 respectively.
     """
-    cutptlist = []  #inizialize a void lists for red point coordinates
+    c1 = contour1.reshape(-1, 2)
+    c2 = contour2.reshape(-1, 2)
+    dist_matrix = np.sum((c1[:, np.newaxis] - c2[np.newaxis, :]) ** 2, axis=2)
+    return np.unravel_index(np.argmin(dist_matrix), dist_matrix.shape)
 
-    maxc = int(
-        sqrt((maxdist**2) / 2)
-    )  #from the euclidean distance formula you can get the max      coordinate
-
-    pointcounter = 0  #initizlize counter for the while loop
-    while True:  #create a potentailly infinite loop! pay attention!
-        if pointcounter < num_points:  #set the number of point you want to add (in this case 20)
-            x_cutPtshift = randrange(-maxc, maxc, 1)  #x shift of a red point
-            y_cutPtshift = randrange(-maxc, maxc, 1)  #y shift of a red point
-            if sqrt(
-                    x_cutPtshift**2 + y_cutPtshift**2
-            ) > mindist:  #if the point create go beyond the minimum distance
-                ptcutx = pot_center[
-                    0] + x_cutPtshift  #x coordinate of a red point
-                ptcuty = pot_center[
-                    1] + y_cutPtshift  #y coordinate of a red point
-                ptcut = [ptcutx, ptcuty]  #list with the x,y,z coordinates
-                if ptcut not in cutptlist:  #avoid to create red point with the same coordinates
-                    cutptlist.append(
-                        ptcut
-                    )  # add to a list with this notation [x1,y1],[x2,y2]
-                    pointcounter += 1  #add one to the counter of how many points you have in your list
-        else:  #when pointcounter reach the number of points you want the while cicle ends
-            break
-
-    return cutptlist
-
-
-def rand_positions(minx, maxx, miny, maxy, num_points, min_distance):
-    """Gets random point positions. Returns a list of positions that are 
-    separated by a certain distance and within a given bounds.
+def merge_contours(contour1: np.ndarray, contour2: np.ndarray, idx1: int, idx2: int) -> np.ndarray:
+    """Merges two contours based on provided indices of closest points.
 
     Args:
-        minx (int): min x for all points
-        maxx (int): max x for all points
-        miny (int): min y for all points
-        maxy (int): max y for all points
-        num_points (int): number of points to return
-        min_distance (int): minimum distance between points (euclidean distance)
+        contour1 (np.ndarray): First contour.
+        contour2 (np.ndarray): Second contour.
+        idx1 (int): Index of the merge point in contour1.
+        idx2 (int): Index of the merge point in contour2.
 
     Returns:
-        ptlist (list): list of all points
+        np.ndarray: The resulting merged contour.
     """
-    pt = [0, 0]
-    ptlist = []  #inizialize a void lists for red point coordinates
+    new_contour = np.concatenate([
+        contour1[:idx1 + 1],
+        contour2[idx2:],
+        contour2[:idx2 + 1],
+        contour1[idx1:]
+    ])
+    return np.array(new_contour)
 
-    pointcounter = 0  #initizlize counter for the while loop
-    while True:  #create a potentailly infinite loop! pay attention!
-        if pointcounter < num_points:  #set the number of point you want to add (in this case 20)
-            x_Ptshift = randrange(minx, maxx, 1)  #x shift of a red point
-            y_Ptshift = randrange(miny, maxy, 1)  #y shift of a red point
-            ptx = pt[0] + x_Ptshift  #x coordinate of a red point
-            pty = pt[1] + y_Ptshift  #y coordinate of a red point
-            pt_pos = [ptx, pty]
-            if len(ptlist) == 0:
-                separated = True
-            else:
-                separated = compare_points(pt_pos,
-                                           ptlist,
-                                           dist_thresh=min_distance)
-            if separated:
-                ptlist.append(
-                    pt_pos)  # add to a list with this notation [x1,y1],[x2,y2]
+def merge_with_parent(contour_parent: np.ndarray, contour: np.ndarray) -> np.ndarray:
+    """Merges a contour with its parent contour.
 
-                pointcounter += 1  #add one to the counter of how many points you have in your list
-        else:  #when pointcounter reach the number of points you want the while cicle ends
-            break
-    return ptlist
+    Args:
+        contour_parent (np.ndarray): The parent contour.
+        contour (np.ndarray): The contour to merge.
+
+    Returns:
+        np.ndarray: The merged contour.
+    """
+    if not is_clockwise(contour_parent):
+        contour_parent = contour_parent[::-1]
+    if is_clockwise(contour):
+        contour = contour[::-1]
+    idx1, idx2 = get_merge_point_idx(contour_parent, contour)
+    new_contour = merge_contours(contour_parent, contour, idx1, idx2)
+    return new_contour
+
+def normalize_coordinates(coordinates: List[List[int]], width: int, height: int, x, y) -> List[List[float]]:
+    """Normalizes coordinates of contours to relative positions based on image dimensions.
+    
+    Args:
+        coordinates (List[List[int]]): List of coordinate lists.
+        width (int): Width of the image.
+        height (int): Height of the image.
+
+    Returns:
+        List[List[float]]: Normalized coordinates as a list of lists.
+    """
+    normalized_coordinates = []
+    for coord_list in coordinates:
+        normalized_list = []
+        for i, coord in enumerate(coord_list):
+            if i % 2 == 0:  # x-coordinate
+                adjsuted_x_coord = coord + x
+                normalized_list.append(adjsuted_x_coord / width)
+            else:           # y-coordinate
+                adjsuted_y_coord = coord + y
+                normalized_list.append(adjsuted_y_coord / height)
+        normalized_coordinates.append(normalized_list)
+    return normalized_coordinates
+
+def mask2polygon_holes(image):
+    contours, hierarchies = cv2.findContours(image.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    if len(contours) == 0:
+        return []
+    contours_parent = [contour if hierarchies[0][i][3] < 0 and len(contour) >= 3 else np.array([])
+                    for i, contour in enumerate(contours)]
+    for i, contour in enumerate(contours):
+        parent_idx = hierarchies[0][i][3]
+        if parent_idx >= 0 and len(contour) >= 3:
+            contour_parent = contours_parent[parent_idx]
+
+            if contour_parent.size > 0:
+                contours_parent[parent_idx] = merge_with_parent(contour_parent, contour)
+    # contours_parent_tmp = [contour for contour in contours_parent if contour]
+    contours_parent_tmp = [contour for contour in contours_parent if contour.size > 0]
+    polygons = [contour.flatten().tolist() for contour in contours_parent_tmp]
+    return polygons
+
+def is_rectangular(mask, threshold_percentage):
+
+    # Calculate the total number of pixels
+    total_pixels = mask.size
+    # Calculate the number of non-zero pixels
+    non_zero_pixels = np.count_nonzero(mask)
+
+    # Calculate the percentage of non-zero pixels
+    filled_percentage = (non_zero_pixels / total_pixels) * 100
+
+    # Check if the filled percentage meets or exceeds the threshold
+    is_filled_enough = filled_percentage >= threshold_percentage
+    
+    return is_filled_enough, filled_percentage
