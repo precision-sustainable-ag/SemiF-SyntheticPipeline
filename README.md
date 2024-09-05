@@ -30,60 +30,65 @@ After installing Conda, you can set up an environment for this project using an 
    ```
    Replace `<env_name>` with the name of the environment specified in the `environment.yaml` file.
 
-## Transfer data
-The **transfer data script** manages downloading and reporting of cutouts from NCSU's locker storage to a local directory. 
+
+## Scripts:
 
 
-- **Batch Downloading:** Automatically downloads image cutouts from a specified NFS directory to a local directory, with checks to skip batches that have already been fully downloaded.
-- **Concurrency:** Utilizes multithreading with a configurable number of workers to speed up the download process.
-- **Comprehensive Reporting:** Generates and updates a CSV report that tracks the number of unique cutouts per batch and folder size in MiB of batches that have been downloaded.
-- **Logging:** Includes detailed logging to track the progress and status of the downloading and reporting processes.
+### Json to Mongo
+
+This script loads JSON data from batch directories in an NFS storage system into a MongoDB database. It reads the batch names from a YAML configuration file, checks both primary and secondary NFS storage locations for the corresponding JSON metadata files, and inserts the data into a specified MongoDB collection.
+
+#### Key Features
+- **MongoDB Integration**: Connects to MongoDB to insert JSON data.
+- **Batch Processing**: Reads batch names from a YAML configuration and processes the corresponding directories in the NFS storage locker.
+- **Primary and Secondary Storage**: Automatically checks both primary and secondary NFS storage paths for the presence of batch directories.
+
+#### Output
+- **Data Insertion**: Inserts JSON data from batch directories into the specified MongoDB collection. 
+
+### **Create Recipes**
+
+This script is responsible for creating synthetic image recipes by selecting cutout images based on specific criteria and associating them with background images. The recipes are then saved in JSON format for use in synthetic dataset generation.
+
+#### Key Features
+- **MongoDB Integration**: Retrieves cutout metadata from a MongoDB collection based on specific filter criteria defined in the configuration.
+- **Randomized Synthetic Image Generation**: Associates cutouts with randomly selected background images and creates synthetic images with varying numbers of cutouts.
+- **Flexible Cutout Usage**: Configurable to either reuse cutouts across multiple synthetic images or ensure each cutout is used only once.
+- **JSON Output**: Saves the generated synthetic image recipes to a JSON file for further processing.
+
+#### Output
+- **Synthetic Image Recipes**: A JSON file containing a list of synthetic images, each with a unique ID, background image, and associated cutouts. The file is saved in the `recipes` directory under the project directory.
 
 
-### Configuration
+### **Move Cutouts**
 
-The script is configured using a YAML or a similar configuration file, typically managed through `omegaconf`. This configuration file should include paths for the NFS storage, local download directory, batch list file, and the report file.
+This script is responsible for downloading plant cutout images from long-term storage to a local directory. It can handle both sequential and concurrent data transfer. The downloaded cutouts are stored locally for further use in synthetic image generation.
+
+#### Key Features
+- **Sequential and Parallel Processing**: The script can download cutouts in a sequential manner or use multithreading.
+- **Dual Storage Locations**: Looks in both primary and secondary long-term storage locations.
+
+#### Output
+- **Downloaded Images**: The script downloads `.png` cutout images to the specified local directory.
 
 
-### Usage
+### **Synthesize**
 
-1. **Prepare the Configuration:**
-   - Ensure the configuration file (`config.yaml`) is set up with the correct paths.
+This script is designed to generate synthetic images by overlaying plant cutout images onto various backgrounds using a copy-and-paste method. The script provides CPU parallelism.
 
-2. **Prepare the Batch List:**
-   - The batch list should be a text file (e.g., `batch_list.txt`) containing the names of the batches to be downloaded, with each batch name on a new line.
+- **Parallelism**: Utilizes Python's `concurrent.futures.ProcessPoolExecutor` to enable concurrent processing of multiple image recipes, leveraging multi-core CPUs.
+- **Transformations**: Applies a variety of image transformations (e.g., rotation, flipping) using the Albumentations library.
+- **Dynamic Shadow Generation**: Simulates dynamic shadows for the cutouts based on their size and position relative to the light source.
+- **Cutout Distribution**: Supports random placement of cutouts on background images, creating diverse compositions.
+- **Output Flexibility**: Saves images, semantic masks, instance masks, and YOLO format segmentation labels.
 
-## Synthetic Image Generator
+#### Output
+- **Images**: Generated synthetic images in `.jpg` format.
+- **Semantic Masks**: Corresponding masks with class annotations in `.png` format.
+- **Instance Masks**: Optional masks for instance annotations.
+- **YOLO Labels**: Segmentation contours in YOLO format.
 
-This script is generates "recipe" JSON files that describe how to create synthetic images by combining cutouts (small image segments) with background images. The cutouts are selected based on specific morphological and categorical criteria defined in a configuration file. The script allows you to control the total number of synthetic image recipes created, the number of cutouts per image, and other filtering criteria to ensure the recipes meet your specific requirements.
 
-- **Cutout Configuration:** Use a YAML configuration file to specify filtering criteria for the cutouts, including morphological properties (e.g., area, eccentricity) and categorical attributes (e.g., genus, species).
-- **Criteria:** Define the total number of synthetic images to be created and the range for the number of cutouts per image.
-- **Random Cutout Selection:** The script randomly selects cutouts for each synthetic image, ensuring variety and randomness in the generated images.
-- **Cutout Reuse:** Each cutout is used only once across all synthetic images, preventing duplication (this may be changed in the future).
-
-### Usage
-
-1. **Prepare Your Configuration File:**
-   - Create a cusomt filter configuration file that specifies the paths to your cutout metadata files, background images, and output directory. Define the filtering criteria and the total number of synthetic images you want to generate.
-
-   Default configuration can be found (`conf/cutout_filters/default.yaml`)
-
-3. **Output:**
-   - The script will generate recipe JSON files based on the criteria specified in the configuration file. These recipes describe how to create synthetic images and will be saved in the directory specified by `cfg.paths.recipesdir`.
-
-### Notes
-
-- The script makes sure that each cutout is used only once across all synthetic images.
-- Background images are selected randomly from the specified directory, and the script will reuse background images if the number of synthetic images requested exceeds the number of available background images.
-
-### Troubleshooting
-
-- **No Background Images Found:** Ensure that the `background_images_dir` path in the configuration file points to a directory containing valid image files.
-- **Insufficient Cutouts:** If you have a very small number of cutouts or strict filtering criteria, the script may fail to generate the desired number of synthetic images.
-
-###TODOs:
-- add functionality to use cutout with replacement in the event that many high density synthetic images are created and cutouts need to be reused
 
 ## License
 

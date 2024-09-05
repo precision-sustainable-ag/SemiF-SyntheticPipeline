@@ -1,5 +1,5 @@
 """
-This script is designed to process large batches of image data for synthetic image generation with a focus on CPU/GPU parallelism.
+This script is designed to process large batches of image data for synthetic image generation with a focus on CPU parallelism.
 The image composition tasks involve loading, transforming, and distributing cutout images onto backgrounds, generating synthetic datasets for training.
 
 Key Features:
