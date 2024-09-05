@@ -1,30 +1,32 @@
 # Settings
 
-total_images: 2
+total_images: 100
 
 cuts_n_image: # Number of cutouts per image
-  min: 1
-  max: 3
+  min: 100
+  max: 400
+
+reuse_cutouts: true  # Whether to allow reusing cutouts in multiple images
 
 cut_distance: # Distance between cutouts in pixels
   min: 0
-  max: 10000
+  max: 1000
 
 morphological:
   # Filter settings for morphological properties under "cutout_props"
   area:  # Area range in pixels
-    min: 10
-    max: 100000
+    min: 100
+    max: 1000000
   blur_effect:  # Blur effect threshold
     min: 
     max: 
   eccentricity:  # Eccentricity range
     min: 
     max: 
-  extends_border: true  # Only include cutouts that extend the border
+  extends_border: false  # Only include cutouts that extend the border
   num_components: # Number of components range
-    min: 1
-    max: 10
+    min:
+    max:
   solidity:  # Solidity threshold
     min: 
     max: 
@@ -42,7 +44,11 @@ category:
   genus:   # Exact genus
   group:   # Exact group
   duration: #["annual", "biennial"]  # Include either annual or biennial plants
-  growth_habit:   # Growth habit
+  growth_habit: #["graminoid", "forb/herb"]  # Growth habit
   species:   # Exact species
   subclass:   # Exact subclass
   common_name:  # Filter by common name (optional, leave empty for no filter)
+
+shadow_offset:  # Shadow offset range
+  min: 0
+  max: 100

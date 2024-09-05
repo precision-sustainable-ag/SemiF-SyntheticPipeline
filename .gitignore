@@ -3,7 +3,8 @@
 
 #--------- Project Ignore ---------
 
-
+notebooks
+projects
 # Log files
 *.log
 
