@@ -3,7 +3,8 @@
 
 #--------- Project Ignore ---------
 
-
+notebooks
+projects
 # Log files
 *.log
 
@@ -24,7 +25,7 @@
 **.pytest_cache
 
 # Pycache
-**__pycache __
+__pycache__
 *.pyc
 
 # VsCode settings file
