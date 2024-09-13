@@ -3,7 +3,7 @@ workdir: ${hydra:runtime.cwd}  # where the code is executed
 projectdir: ${paths.workdir}/projects/${general.project_name}/${general.sub_project_name} # TODO: change this so that projects is it's own directory separate from data
 datadir: ${paths.workdir}/data
 cutoutdir: ${paths.datadir}/cutouts
-backgrounddir: ${paths.datadir}/soil_images
+backgrounddir: ${paths.datadir}/backgrounds
 recipesdir: ${paths.datadir}/recipes
 resultsdir: ${paths.datadir}/results
 species_info: /home/psa_images/SemiF-AnnotationPipeline/data/semifield-utils/species_information/species_info.json
