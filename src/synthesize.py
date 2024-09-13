@@ -14,7 +14,7 @@ import random
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 
 import albumentations as A
 import cv2
@@ -62,6 +62,9 @@ class ImageProcessor:
             # A.RandomBrightnessContrast(p=0.2),
             # A.RandomScale(scale_limit=self.scale_limit, p=0.5),  # Dynamically set scale_limit
         ])
+
+        self.create_contours = cfg.synthesize.yolo_contour_labels
+        self.create_bbox = cfg.synthesize.yolo_bbox_labels
     
     def calculate_dynamic_scale_limit(self) -> Tuple[float, float]:
         """
@@ -130,6 +133,7 @@ class ImageProcessor:
         background_semantic_mask = np.zeros((bg_height, bg_width), dtype=np.uint8)
         background_instance_mask = np.zeros((bg_height, bg_width), dtype=np.uint16)
 
+        yolo_bboxes = []
         coord_results = []
         instance_id = 1
         for _, (img, cutout_metadata) in enumerate(zip(images, cutout_paths)):
@@ -146,16 +150,17 @@ class ImageProcessor:
                     "Unsupported cutout distribution mode. Use 'random'."
                 )
 
-            norm_coords = self.overlay_with_alpha(
+            norm_coords, yolo_bbox = self.overlay_with_alpha(
                 background, background_semantic_mask, background_instance_mask,
                 img[img_y_start:img_y_end, img_x_start:img_x_end],
                 roi_x_start, roi_y_start, class_id, instance_id
             )
             coord_results.append({class_id: norm_coords})
+            yolo_bboxes.append(yolo_bbox)
             
             instance_id += 1
 
-        return background, background_semantic_mask, background_instance_mask, coord_results
+        return background, background_semantic_mask, background_instance_mask, coord_results, yolo_bboxes
 
     @staticmethod
     def calculate_coordinates(
@@ -252,6 +257,7 @@ class ImageProcessor:
         img_x_end = img_width - max(0, (x + img_width) - background.shape[1])
         img_y_end = img_height - max(0, (y + img_height) - background.shape[0])
 
+        
         cutout_rgb = rgb_image[img_y_start:img_y_end, img_x_start:img_x_end]
         cutout_alpha = alpha_channel[img_y_start:img_y_end, img_x_start:img_x_end]
         roi_background = background[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
@@ -272,89 +278,54 @@ class ImageProcessor:
             background_semantic_mask[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
         )
 
+        
+
         if self.cfg.synthesize.instance_masks:
             background_instance_mask[roi_y_start:roi_y_end, roi_x_start:roi_x_end] = np.where(
                 cutout_alpha > 0,
                 instance_id,
                 background_instance_mask[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
             )
+        
+        yolo_bbox = []
+        # Calculate YOLO format bounding box if enabled
+        if self.create_bbox:
+            yolo_bbox = self.calculate_yolo_bbox(roi_x_start, roi_y_start, roi_x_end, roi_y_end, background, class_id)
 
         # Return normalized coordinates for YOLO labeling
-        norm_coords = normalize_coordinates(
-            mask2polygon_holes((cutout_alpha > 0).astype(np.uint8) * 255),
-            background.shape[1], background.shape[0], x, y
-        )
-
-        return norm_coords
-    def overlay_with_alpha_old(
-        self, background: np.ndarray, background_semantic_mask: np.ndarray,
-        background_instance_mask: np.ndarray, image: np.ndarray, x: int, y: int,
-        class_id: int, instance_id: int
-    ) -> List[List[float]]:
-        """
-        Overlay an image with alpha transparency onto the background, updating masks with class and instance IDs.
-
-        Args:
-            background (np.ndarray): The background image.
-            background_semantic_mask (np.ndarray): The semantic mask for the background.
-            background_instance_mask (np.ndarray): The instance mask for the background.
-            image (np.ndarray): The image to overlay.
-            x (int): X-coordinate for overlay placement.
-            y (int): Y-coordinate for overlay placement.
-            class_id (int): The class ID for the overlay.
-            instance_id (int): The instance ID for the overlay.
-
-        Returns:
-            List[List[float]]: Normalized coordinates of the overlay.
-        """
-        img_height, img_width = image.shape[:2]
-        image_mask = image[:, :, -1] > 0  # This is a 2D array (height, width)
-
-        expanded_mask = image_mask[:, :, np.newaxis]  # Expand dimensions for RGB operations
-
-        # Define the region of interest (ROI) in the background
-        roi_x_start = max(x, 0)
-        roi_y_start = max(y, 0)
-        roi_x_end = min(x + img_width, background.shape[1])
-        roi_y_end = min(y + img_height, background.shape[0])
-
-        # Crop the cutout to match the ROI (in case it goes beyond the background bounds)
-        img_x_start = max(0, -x)
-        img_y_start = max(0, -y)
-        img_x_end = img_width - max(0, (x + img_width) - background.shape[1])
-        img_y_end = img_height - max(0, (y + img_height) - background.shape[0])
-
-
-        log.debug("Overlaying image on the background.")
-        background[y: y + img_height, x: x + img_width] = np.where(
-            expanded_mask,  # Use expanded mask for RGB channels
-            image[:, :, :3],  # RGB values of the image
-            background[y: y + img_height, x: x + img_width],  # Existing background
-        )
-
-        background_semantic_mask[y: y + img_height, x: x + img_width] = np.where(
-            image_mask,  # Use original 2D mask for single channel mask update
-            class_id,  # Class ID for this overlay
-            background_semantic_mask[y: y + img_height, x: x + img_width],  # Existing mask values
-        )
-        
-        norm_coords = None
-        
-        if self.cfg.synthesize.instance_masks:
-            background_instance_mask[y: y + img_height, x: x + img_width] = np.where(
-            image_mask,  # Use original 2D mask for single channel mask update
-            instance_id,  # Unique instance ID
-            background_instance_mask[y: y + img_height, x: x + img_width],  # Existing mask values
-        )
-            log.debug("Creating contours for the overlay.")
-            contours = mask2polygon_holes(image_mask.astype(np.uint8) * 255)
-            background_height, background_width = background.shape[:2]
+        norm_coords = []
+        if self.create_contours:
             norm_coords = normalize_coordinates(
-                contours, background_width, background_height, x, y
+                mask2polygon_holes((cutout_alpha > 0).astype(np.uint8) * 255),
+                background.shape[1], background.shape[0], x, y
             )
 
-        return norm_coords
+        return norm_coords, yolo_bbox
 
+    def calculate_yolo_bbox(self, roi_x_start: int, roi_y_start: int, roi_x_end: int, roi_y_end: int, background: np.ndarray, class_id: int) -> List[float]:
+            """
+            Calculate YOLO format bounding box (center_x, center_y, width, height) using the ROI.
+
+            Args:
+                roi_x_start (int): The starting x-coordinate of the ROI.
+                roi_y_start (int): The starting y-coordinate of the ROI.
+                roi_x_end (int): The ending x-coordinate of the ROI.
+                roi_y_end (int): The ending y-coordinate of the ROI.
+                background (np.ndarray): The background image.
+                class_id (int): The class ID for the bounding box.
+
+            Returns:
+                List[float]: The YOLO format bounding box.
+            """
+            bbox_x_start = roi_x_start / background.shape[1]
+            bbox_y_start = roi_y_start / background.shape[0]
+            bbox_width = (roi_x_end - roi_x_start) / background.shape[1]
+            bbox_height = (roi_y_end - roi_y_start) / background.shape[0]
+
+            center_x = bbox_x_start + bbox_width / 2
+            center_y = bbox_y_start + bbox_height / 2
+
+            return [class_id, center_x, center_y, bbox_width, bbox_height]
 
 class ImageCompositor:
     """
@@ -386,13 +357,28 @@ class ImageCompositor:
         self.image_savedir = Path(self.savedir, "images")
         self.semantic_savedir = Path(self.savedir, "semantic_masks")
         self.instance_savedir = Path(self.savedir, "instance_masks")
-        self.yololabel_savedir = Path(self.savedir, "yolo_labels")
+        self.yolo_cont_label_savedir = Path(self.savedir, "yolo_contour_labels")
+        self.yolo_bbox_label_savedir = Path(self.savedir, "yolo_bbox_labels")
 
         for directory in [
             self.image_savedir, self.semantic_savedir,
-            self.instance_savedir, self.yololabel_savedir
+            self.instance_savedir, self.yolo_cont_label_savedir, 
+            self.yolo_bbox_label_savedir
         ]:
             directory.mkdir(exist_ok=True, parents=True)
+
+    def save_bboxes(self, txtpath: Path, yolo_bboxes: List[List[Union[str, float]]]) -> None:
+        """
+        Save the YOLO formatted bounding boxes to a text file.
+
+        Args:
+            txtpath (Path): Path to the output text file.
+            yolo_bboxes (List[List[Union[str, float]]]): List of YOLO formatted bounding boxes.
+        """
+        with open(txtpath, "w") as file:
+            for bbox in yolo_bboxes:
+                line = " ".join(str(num) for num in bbox)
+                file.write(line + "\n")
 
     def save_contour(self, txtpath: Path, coord_results: List[Dict[int, List[List[float]]]]) -> None:
         """
@@ -412,6 +398,7 @@ class ImageCompositor:
     def save_data(
         self, image: np.ndarray, semantic_mask: np.ndarray,
         instance_mask: np.ndarray, coord_results: List[Dict[int, List[List[float]]]],
+        yolo_bboxes: List[List[Union[str, float]]],
         synthetic_image_id: str  # Add synthetic_image_id as an argument
     ) -> None:
         """
@@ -422,6 +409,7 @@ class ImageCompositor:
             semantic_mask (np.ndarray): The semantic mask of the composed image.
             instance_mask (np.ndarray): The instance mask of the composed image.
             coord_results (List[Dict[int, List[List[float]]]]): Coordinates of the placed cutouts.
+            yolo_bboxes (List[List[Union[str, float]]]): Yolo formatted bounding boxes of the placed cutouts.
             synthetic_image_id (str): Unique identifier for the synthetic image.
         """
         # Use synthetic_image_id for unique file naming
@@ -434,9 +422,13 @@ class ImageCompositor:
         if self.cfg.synthesize.instance_masks:
             instancesavepath = Path(self.instance_savedir, f"{synthetic_image_id}.png")
             cv2.imwrite(str(instancesavepath), instance_mask, [cv2.IMWRITE_PNG_COMPRESSION, 0])
-        if self.cfg.synthesize.yolo_labels:
-            yololabelpath = Path(self.yololabel_savedir, f"{synthetic_image_id}.txt")
+        if self.cfg.synthesize.yolo_contour_labels:
+            yololabelpath = Path(self.yolo_cont_label_savedir, f"{synthetic_image_id}.txt")
             self.save_contour(yololabelpath, coord_results)
+
+        if self.cfg.synthesize.yolo_bbox_labels:
+            yolo_bbox_labelpath = Path(self.yolo_bbox_label_savedir, f"{synthetic_image_id}.txt")
+            self.save_bboxes(yolo_bbox_labelpath, yolo_bboxes)
 
         log.info(f"Image processed and saved successfully as {synthetic_image_id}.")
 
@@ -502,13 +494,13 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         processor = ImageProcessor(cfg, num_cutouts=len(images))
         
         # Distribute the cutout images on the background
-        result, result_semantic_mask, result_instance_mask, coord_results = processor.distribute_images(
+        result, result_semantic_mask, result_instance_mask, coord_results, yolo_bboxes = processor.distribute_images(
             background, images, recipe['cutouts'], mode="random"
         )
         
         # Save the results
         compositor = ImageCompositor(cfg, recipe)
-        compositor.save_data(result, result_semantic_mask, result_instance_mask, coord_results, recipe['synthetic_image_id'])
+        compositor.save_data(result, result_semantic_mask, result_instance_mask, coord_results, yolo_bboxes, recipe['synthetic_image_id'])
         log.info(f"Synthetic image {recipe['synthetic_image_id']} processed successfully.")
     
     except Exception as exc:

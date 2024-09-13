@@ -27,7 +27,8 @@ synthesize:
   parallel: false
   parallel_workers: 4
   instance_masks: False
-  yolo_labels: False
+  yolo_contour_labels: False
+  yolo_bbox_labels: True
 
 
 
