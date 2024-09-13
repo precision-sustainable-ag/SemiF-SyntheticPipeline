@@ -30,6 +30,62 @@ After installing Conda, you can set up an environment for this project using an 
    ```
    Replace `<env_name>` with the name of the environment specified in the `environment.yaml` file.
 
+### Setting Up MongoDB and Mongosh
+
+#### Step 1: Download and Install MongoDB
+1. **SSH into your server**.
+2. **Create a directory** for MongoDB:
+   ```bash
+   mkdir -p ~/mongodb && cd ~/mongodb
+   ```
+3. **Download MongoDB binaries** from the [MongoDB Download Center](https://www.mongodb.com/try/download/community) or use `wget`:
+   ```bash
+   wget https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-<version>.tgz
+   ```
+4. **Extract the binaries**:
+   ```bash
+   tar -zxvf mongodb-linux-x86_64-<version>.tgz
+   mv mongodb-linux-x86_64-<version> mongo
+   ```
+
+#### Step 2: Configure MongoDB
+1. **Add MongoDB to your PATH**:
+   ```bash
+   echo 'export PATH=~/mongodb/mongo/bin:$PATH' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+2. **Create directories** for MongoDB data and logs:
+   ```bash
+   mkdir -p ~/mongodb/data ~/mongodb/logs
+   ```
+
+#### Step 3: Install Mongosh
+1. **Download Mongosh** from the [MongoDB Shell download page](https://www.mongodb.com/try/download/shell) or use `wget`:
+   ```bash
+   wget https://downloads.mongodb.com/compass/mongosh-<version>-linux-x64.tgz
+   ```
+2. **Extract and install Mongosh**:
+   ```bash
+   mkdir ~/bin
+   tar -xzvf mongosh-<version>-linux-x64.tgz -C ~/bin/
+   ```
+3. **Update PATH for Mongosh**:
+   ```bash
+   echo 'export PATH="$HOME/bin/mongosh-<version>-linux-x64/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+#### Step 4: Running MongoDB
+1. **Start MongoDB**:
+   ```bash
+   mongod --dbpath ~/mongodb/data/db --bind_ip_all --logpath ~/mongodb/logs/mongod.log --fork
+   ```
+2. **Verify MongoDB is running**:
+   ```bash
+   ps -aux | grep mongod
+   ```
+
+Parts that need access to the mongodb can now access it.
 
 ## Scripts:
 
