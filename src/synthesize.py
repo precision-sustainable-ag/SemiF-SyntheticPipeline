@@ -91,66 +91,6 @@ class ImageProcessor:
         random.shuffle(num_possible_instances)
         return num_possible_instances
 
-    def create_shadow_from_cutout(self, background: np.ndarray, mask: np.ndarray, cutout_position: Tuple[int, int], shadow_offset: Tuple[int, int], padding_ratio: float = 0.1, shadow_intensity: float = 0.5) -> np.ndarray:
-        """
-        Create a shadow based on the cutout mask and apply it to the background.
-        The shadow will be padded dynamically based on the size of the cutout, considering the position of the cutout.
-
-        Args:
-            background (np.ndarray): The background image where the shadow will be applied.
-            mask (np.ndarray): The binary mask of the cutout (1 where cutout is present, 0 elsewhere).
-            cutout_position (Tuple[int, int]): The (x, y) position of the cutout on the background.
-            shadow_offset (Tuple[int, int]): The (x, y) offset for the shadow direction.
-            padding_ratio (float): The fraction of the cutout size to use for padding (e.g., 0.1 for 10% of cutout size).
-            shadow_intensity (float): The intensity of the shadow, between 0 (no shadow) and 1 (completely black).
-
-        Returns:
-            np.ndarray: The background with the shadow applied.
-        """
-        img_height, img_width = background.shape[:2]
-        mask_height, mask_width = mask.shape[:2]
-        cutout_x, cutout_y = cutout_position
-
-        # Calculate dynamic padding based on the size of the cutout
-        padding_x = int(mask_width * padding_ratio)
-        padding_y = int(mask_height * padding_ratio)
-
-        # Calculate the boundaries for the padded region, ensuring they stay within the background
-        x_start = max(cutout_x - padding_x, 0)
-        y_start = max(cutout_y - padding_y, 0)
-        x_end = min(cutout_x + mask_width + padding_x, img_width)
-        y_end = min(cutout_y + mask_height + padding_y, img_height)
-
-        # Create a new mask with padding added, ensuring it fits within the background
-        padded_mask = np.zeros((y_end - y_start, x_end - x_start), dtype=np.uint8)
-
-        # Place the original mask inside the padded mask, ensuring no out-of-bounds issues
-        mask_x_start = max(padding_x - cutout_x, 0)
-        mask_y_start = max(padding_y - cutout_y, 0)
-
-        # Calculate how much of the mask can fit into the padded area
-        valid_mask_height = min(mask_height, padded_mask.shape[0] - mask_y_start)
-        valid_mask_width = min(mask_width, padded_mask.shape[1] - mask_x_start)
-
-        # Copy the valid portion of the mask into the padded mask
-        padded_mask[mask_y_start:mask_y_start + valid_mask_height, mask_x_start:mask_x_start + valid_mask_width] = mask[:valid_mask_height, :valid_mask_width]
-
-        # Roll the expanded mask to simulate the shadow offset
-        shadow_mask = np.roll(padded_mask, shift=shadow_offset, axis=(0, 1))
-
-        # Apply Gaussian blur to soften the shadow edges
-        shadow_mask_blurred = cv2.GaussianBlur(shadow_mask.astype(np.float32), (31, 31), 0)
-
-        # Multiply the shadow mask by the shadow intensity to control darkness
-        shadow_mask_blurred = shadow_mask_blurred * shadow_intensity
-
-        # Ensure shadow_mask_blurred has the correct number of channels for RGB application
-        shadow_mask_expanded = shadow_mask_blurred[:, :, np.newaxis]
-
-        # Apply the shadow by darkening the region of the background
-        background[y_start:y_end, x_start:x_end] = background[y_start:y_end, x_start:x_end] * (1 - shadow_mask_expanded)
-
-        return background
     
     def apply_random_transform(self, img: np.ndarray) -> np.ndarray:
         """
@@ -318,12 +258,6 @@ class ImageProcessor:
 
          # Create the binary mask for the cutout
         cutout_mask = (cutout_alpha > 0).astype(np.uint8)
-        # Apply shadow before placing the cutout
-        # TODO randomize shadow intensity and direction(offset) on image (not cutout) level
-        background = self.create_shadow_from_cutout(
-            background, cutout_mask, cutout_position=(x, y), 
-            shadow_offset=(20, 20), padding_ratio=0.9, shadow_intensity=0.5
-        )
 
         # Blend the cutout with the background using the alpha mask
         cutout_alpha_expanded = cutout_alpha[:, :, np.newaxis]  # Expand alpha to match the 3-channel RGB
