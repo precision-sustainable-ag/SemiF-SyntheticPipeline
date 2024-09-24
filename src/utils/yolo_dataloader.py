@@ -8,8 +8,8 @@ from torchvision import transforms
 import cv2
 from PIL import Image
 
-image_dir = os.path.join(os.path.dirname(__file__),'../projects/test_cutouts/TEST_small/results/images')
-label_dir = os.path.join(os.path.dirname(__file__),'../projects/test_cutouts/TEST_small/results/yolo_bbox_labels')
+image_dir = os.path.join(os.path.dirname(__file__),'../../projects/test_cutouts/TEST_small/results/images')
+label_dir = os.path.join(os.path.dirname(__file__),'../../projects/test_cutouts/TEST_small/results/yolo_bbox_labels')
 
 image_dir = os.path.abspath(image_dir)
 label_dir = os.path.abspath(label_dir)
@@ -95,13 +95,9 @@ class YOLOv8Dataset(Dataset):
         return torch.tensor(processed_labels)
 
 # Create dataloaders for training, validation, and testing
-def create_dataloader(batch_size=16):
+def dataloader(batch_size=16):
     train_loader = DataLoader(YOLOv8Dataset(split='train'), batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(YOLOv8Dataset(split='val'), batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(YOLOv8Dataset(split='test'), batch_size=batch_size, shuffle=False)
     
     return train_loader, val_loader, test_loader
-
-# Example usage
-if __name__ == "__main__":
-    train_loader, val_loader, test_loader = create_dataloader(batch_size=8)
