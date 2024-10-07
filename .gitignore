@@ -29,3 +29,6 @@ __pycache__
 
 # VsCode settings file
 *.vscode
+
+# IntelliJ stuff
+**/.idea
