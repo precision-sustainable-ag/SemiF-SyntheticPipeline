@@ -21,10 +21,123 @@ import cv2
 import numpy as np
 from omegaconf import DictConfig
 
-from utils.utils import mask2polygon_holes, normalize_coordinates
+# from utils.utils import mask2polygon_holes, normalize_coordinates
 
 log = logging.getLogger(__name__)
+
+def normalize_coordinates(coordinates: List[List[int]], width: int, height: int, x, y) -> List[List[float]]:
+    """Normalizes coordinates of contours to relative positions based on image dimensions.
     
+    Args:
+        coordinates (List[List[int]]): List of coordinate lists.
+        width (int): Width of the image.
+        height (int): Height of the image.
+
+    Returns:
+        List[List[float]]: Normalized coordinates as a list of lists.
+    """
+    normalized_coordinates = []
+    for coord_list in coordinates:
+        normalized_list = []
+        for i, coord in enumerate(coord_list):
+            if i % 2 == 0:  # x-coordinate
+                adjsuted_x_coord = coord + x
+                normalized_list.append(adjsuted_x_coord / width)
+            else:           # y-coordinate
+                adjsuted_y_coord = coord + y
+                normalized_list.append(adjsuted_y_coord / height)
+        normalized_coordinates.append(normalized_list)
+    return normalized_coordinates
+
+def is_clockwise(contour: np.ndarray) -> bool:
+    """Determines if the points in the contour are arranged in clockwise order.
+    
+    Args:
+        contour (np.ndarray): An array of contour points.
+
+    Returns:
+        bool: True if contour is clockwise, otherwise False.
+    """
+    value = 0
+    num = len(contour)
+    for i in range(num):
+        p1 = contour[i]
+        p2 = contour[(i + 1) % num]  # Circular indexing
+        value += (p2[0][0] - p1[0][0]) * (p2[0][1] + p1[0][1])
+    return value < 0
+
+def get_merge_point_idx(contour1: np.ndarray, contour2: np.ndarray) -> Tuple[int, int]:
+    """Finds the indices of the closest points between two contours.
+    
+    Args:
+        contour1 (np.ndarray): First contour.
+        contour2 (np.ndarray): Second contour.
+
+    Returns:
+        Tuple[int, int]: Indices of the closest points in contour1 and contour2 respectively.
+    """
+    c1 = contour1.reshape(-1, 2)
+    c2 = contour2.reshape(-1, 2)
+    dist_matrix = np.sum((c1[:, np.newaxis] - c2[np.newaxis, :]) ** 2, axis=2)
+    return np.unravel_index(np.argmin(dist_matrix), dist_matrix.shape)
+
+def merge_contours(contour1: np.ndarray, contour2: np.ndarray, idx1: int, idx2: int) -> np.ndarray:
+    """Merges two contours based on provided indices of closest points.
+
+    Args:
+        contour1 (np.ndarray): First contour.
+        contour2 (np.ndarray): Second contour.
+        idx1 (int): Index of the merge point in contour1.
+        idx2 (int): Index of the merge point in contour2.
+
+    Returns:
+        np.ndarray: The resulting merged contour.
+    """
+    new_contour = np.concatenate([
+        contour1[:idx1 + 1],
+        contour2[idx2:],
+        contour2[:idx2 + 1],
+        contour1[idx1:]
+    ])
+    return np.array(new_contour)
+
+def merge_with_parent(contour_parent: np.ndarray, contour: np.ndarray) -> np.ndarray:
+    """Merges a contour with its parent contour.
+
+    Args:
+        contour_parent (np.ndarray): The parent contour.
+        contour (np.ndarray): The contour to merge.
+
+    Returns:
+        np.ndarray: The merged contour.
+    """
+    if not is_clockwise(contour_parent):
+        contour_parent = contour_parent[::-1]
+    if is_clockwise(contour):
+        contour = contour[::-1]
+    idx1, idx2 = get_merge_point_idx(contour_parent, contour)
+    new_contour = merge_contours(contour_parent, contour, idx1, idx2)
+    return new_contour
+
+
+def mask2polygon_holes(image):
+    contours, hierarchies = cv2.findContours(image.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    if len(contours) == 0:
+        return []
+    contours_parent = [contour if hierarchies[0][i][3] < 0 and len(contour) >= 3 else np.array([])
+                    for i, contour in enumerate(contours)]
+    for i, contour in enumerate(contours):
+        parent_idx = hierarchies[0][i][3]
+        if parent_idx >= 0 and len(contour) >= 3:
+            contour_parent = contours_parent[parent_idx]
+
+            if contour_parent.size > 0:
+                contours_parent[parent_idx] = merge_with_parent(contour_parent, contour)
+    # contours_parent_tmp = [contour for contour in contours_parent if contour]
+    contours_parent_tmp = [contour for contour in contours_parent if contour.size > 0]
+    polygons = [contour.flatten().tolist() for contour in contours_parent_tmp]
+    return polygons
+
 class ImageProcessor:
     """
     A class to handle image processing tasks such as loading images, applying transformations, 
@@ -115,7 +228,7 @@ class ImageProcessor:
 
     def distribute_images(
         self, background: np.ndarray, images: List[np.ndarray],
-        cutout_paths: List[str], mode: str = "random"
+        cutout_paths: List[str], mode: str = "random", min_visibility: float = 0.3
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict[int, List[List[float]]]]]:
         """
         Distribute images on a background either randomly or in a semi-even grid pattern.
@@ -136,6 +249,8 @@ class ImageProcessor:
         yolo_bboxes = []
         coord_results = []
         instance_id = 1
+        placed_regions = []  # List to store the coordinates of already placed cutouts
+
         for _, (img, cutout_metadata) in enumerate(zip(images, cutout_paths)):
             class_id = cutout_metadata['category']['class_id']
 
@@ -149,18 +264,76 @@ class ImageProcessor:
                 raise ValueError(
                     "Unsupported cutout distribution mode. Use 'random'."
                 )
+            
 
             norm_coords, yolo_bbox = self.overlay_with_alpha(
                 background, background_semantic_mask, background_instance_mask,
                 img[img_y_start:img_y_end, img_x_start:img_x_end],
                 roi_x_start, roi_y_start, class_id, instance_id
             )
+            
+            # Calculate the true bounding box after applying `overlay_with_alpha`
+            true_x_start = max(roi_x_start, 0)
+            true_y_start = max(roi_y_start, 0)
+            true_x_end = min(roi_x_start + (img_x_end - img_x_start), bg_width)
+            true_y_end = min(roi_y_start + (img_y_end - img_y_start), bg_height)
+
+            cutout_bbox = (true_x_start, true_y_start, true_x_end, true_y_end)
+            # Check for occlusion with already placed cutouts
+            while any(self.is_fully_occluded(cutout_bbox, region, min_visibility) for region in placed_regions):
+                # Get new random coordinates and repeat the placement and check
+                roi_x_start, roi_y_start, img_x_start, img_y_start, img_x_end, img_y_end = (
+                    self.random_coordinates(bg_height, bg_width, img)
+                )
+                norm_coords, yolo_bbox = self.overlay_with_alpha(
+                    background, background_semantic_mask, background_instance_mask,
+                    img[img_y_start:img_y_end, img_x_start:img_x_end],
+                    roi_x_start, roi_y_start, class_id, instance_id
+                )
+                true_x_start = max(roi_x_start, 0)
+                true_y_start = max(roi_y_start, 0)
+                true_x_end = min(roi_x_start + (img_x_end - img_x_start), bg_width)
+                true_y_end = min(roi_y_start + (img_y_end - img_y_start), bg_height)
+
+                cutout_bbox = (true_x_start, true_y_start, true_x_end, true_y_end)
+
+
             coord_results.append({class_id: norm_coords})
             yolo_bboxes.append(yolo_bbox)
+            placed_regions.append(cutout_bbox)
             
             instance_id += 1
 
         return background, background_semantic_mask, background_instance_mask, coord_results, yolo_bboxes
+    
+    def is_fully_occluded(self, new_bbox: Tuple[int, int, int, int], placed_bbox: Tuple[int, int, int, int], min_visibility: float) -> bool:
+        """
+        Check if the new bounding box is fully occluded by an already placed bounding box.
+
+        Args:
+            new_bbox (Tuple[int, int, int, int]): The bounding box of the new cutout.
+            placed_bbox (Tuple[int, int, int, int]): The bounding box of an already placed cutout.
+            min_visibility (float): Minimum visibility ratio required for the new cutout.
+
+        Returns:
+            bool: True if the new cutout is fully occluded, False otherwise.
+        """
+        xA = max(new_bbox[0], placed_bbox[0])
+        yA = max(new_bbox[1], placed_bbox[1])
+        xB = min(new_bbox[2], placed_bbox[2])
+        yB = min(new_bbox[3], placed_bbox[3])
+
+        # Compute the area of overlap
+        overlap_area = max(0, xB - xA) * max(0, yB - yA)
+
+        # Compute the area of the new cutout
+        new_area = (new_bbox[2] - new_bbox[0]) * (new_bbox[3] - new_bbox[1])
+
+        # Calculate the overlap ratio
+        overlap_ratio = overlap_area / new_area
+
+        # Return True if the overlap ratio exceeds the allowed visibility threshold
+        return overlap_ratio > (1 - min_visibility)
 
     @staticmethod
     def calculate_coordinates(
