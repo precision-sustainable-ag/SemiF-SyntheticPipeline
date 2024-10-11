@@ -13,9 +13,9 @@ general:
   sub_project_name: TEST_small
 
 tasks:
-  # - json_to_mongo # you should only have to do this once
-  # - create_recipes
-  # - move_cutouts
+  - json_to_mongo # you should only have to do this once
+  - create_recipes
+  - move_cutouts
   - synthesize
 
 move_cutouts:
@@ -23,7 +23,7 @@ move_cutouts:
   parallel_workers: 5
 
 synthesize:
-  resize_factor: 0.15 # Resize factor for the cutouts. Anything lower than 0.15 may give issues related to RandomScale transformation
+  resize_factor: 0.8 # Resize factor for the cutouts. Anything lower than 0.15 may give issues related to RandomScale transformation
   parallel: false
   parallel_workers: 4
   instance_masks: False
@@ -31,16 +31,19 @@ synthesize:
   yolo_bbox_labels: True
 
 aws:
-  s3_bucket: psi-hackathon-test
+  s3_bucket: psi-hackathon
 
 mongodb:
-  host: localhost
+  host: 40.76.253.124
   port: 27017
   db: hackathon_db
   collection: cutouts
   
 
 batches:
+    - MD_2022-06-24
+    - MD_2022-06-27
+    - MD_2022-06-28
   # - MD_2022-08-03
   # - MD_2022-08-04
   # - MD_2022-08-05

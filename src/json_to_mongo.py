@@ -24,10 +24,14 @@ class MongoDBDataLoader:
         """
         self.cfg = cfg
         self.client = MongoClient(
-            f'mongodb://{cfg.mongodb.host}:{cfg.mongodb.port}/')
+            f'mongodb://admin:psa2023@{cfg.mongodb.host}:{cfg.mongodb.port}/'
+        )
+        # f'mongodb://{cfg.mongodb.host}:{cfg.mongodb.port}/')
         self.db = self.client[cfg.mongodb.db]
         self.collection = self.db[cfg.mongodb.collection]
-
+        # Find unique batch_id values
+        unique_batch_ids = self.collection.distinct("batch_id")
+        print(unique_batch_ids)
         # Root directory of the NFS storage locker
         self.primary_s3_root = Path(cfg.paths.primary_longterm_storage)
         self.secondary_s3_root = Path(cfg.paths.secondary_longterm_storage)
@@ -85,10 +89,10 @@ class MongoDBDataLoader:
                         if obj.key.endswith('.json'):
                             json_files.append(obj.key)
                     log.info(
-                        f"Processing batch '{batch_name}' in alternative storage with {len(json_files)} JSON files.")
+                        f"Processing batch '{batch_dir}' in alternative storage with {len(json_files)} JSON files.")
                 else:
                     log.warning(
-                        f"Batch directory '{batch_name}' not found in either primary or alternative storage.")
+                        f"Batch directory '{batch_dir}' not found in either primary or alternative storage.")
                     continue
 
             for json_file_path in tqdm(json_files):

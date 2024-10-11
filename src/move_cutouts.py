@@ -142,6 +142,15 @@ class CutoutDownloader:
                 batch_id = cutout["batch_id"]
                 if cutout_id not in unique_cutouts:
                     unique_cutouts[cutout_id] = batch_id
+        duplicate_cutouts = []
+        for cutout_id, batch_id in unique_cutouts.items():
+            image_filename = f"{cutout_id}.png"
+            # Construct the local path to save the image
+            local_image_path = Path(self.local_download_folder, image_filename)
+            if local_image_path.exists():
+                duplicate_cutouts.append(cutout_id)
+        for dup in duplicate_cutouts:
+            unique_cutouts.pop(dup)
         return unique_cutouts
 
     def process_cutouts_sequentially(self) -> None:
