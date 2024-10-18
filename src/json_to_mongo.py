@@ -2,13 +2,13 @@ import json
 import os
 from pymongo import MongoClient
 from pathlib import Path
-from typing import Union, List
+from typing import Union, List, Any
 from omegaconf import DictConfig
 from tqdm import tqdm
 import logging
 import boto3
 from botocore.handlers import disable_signing
-
+from pymongo.errors import DuplicateKeyError
 log = logging.getLogger(__name__)
 
 
@@ -36,6 +36,8 @@ class MongoDBDataLoader:
         self.s3_resource.meta.client.meta.events.register('choose-signer.s3.*',
                                                           disable_signing)
         self.s3_bucket = self.s3_resource.Bucket(cfg.aws.s3_bucket)
+        self.create_id_index("cutouts")
+
 
     def s3_folder_exists(self, folder_key):
         if not folder_key.endswith('/'):
@@ -43,6 +45,18 @@ class MongoDBDataLoader:
         resp = self.s3_bucket.objects.filter(Prefix=folder_key).limit(1)
         return any(resp)
 
+    def load_json(self, json_path: str) -> Any:
+        try:
+            with open(json_path, 'r') as f:
+                data = json.load(f)
+            return data
+        except FileNotFoundError as e:
+            log.exception(f"Error: File not found - {e}")
+            raise
+        except json.JSONDecodeError as e:
+            log.exception(f"Error: Failed to decode JSON - {e}")
+            raise
+        
     def load_batches_from_yaml(self) -> List[str]:
         """
         Load batch names from a YAML configuration file.
@@ -85,14 +99,24 @@ class MongoDBDataLoader:
                         if obj.key.endswith('.json'):
                             json_files.append(obj.key)
                     log.info(
-                        f"Processing batch '{batch_name}' in alternative storage with {len(json_files)} JSON files.")
+                        f"Processing batch '{batch_dir}' in alternative storage with {len(json_files)} JSON files.")
                 else:
                     log.warning(
-                        f"Batch directory '{batch_name}' not found in either primary or alternative storage.")
+                        f"Batch directory '{batch_dir}' not found in either primary or alternative storage.")
                     continue
 
             for json_file_path in tqdm(json_files):
                 self.insert_data_from_file(json_file_path)
+
+    def create_id_index(self, data_type: str) -> None:
+        """Create a unique index on the 'cutout_id' field to enforce uniqueness and improve lookup performance."""
+        try:
+            index_value = "cutout_id" if data_type == 'cutouts' else "image_id"
+            self.collection.create_index(index_value, unique=True)
+            log.info(f"Unique index on '{index_value}' created successfully.")
+        except Exception as e:
+            log.exception(f"Failed to create index on '{index_value}': {e}")
+            exit()
 
     def insert_data_from_file(self, json_file_path: Union[str, Path]) -> None:
         """
@@ -107,18 +131,21 @@ class MongoDBDataLoader:
             data = self.s3_bucket.Object(json_file_path).get()['Body'].read()
             data = json.loads(data.decode('utf-8'))
 
-            # Check if the data is a list or a dictionary and insert accordingly
+            # Insert data and handle duplicates
             if isinstance(data, list):
-                self.collection.insert_many(data,
-                                            bypass_document_validation=False)
+                for item in data:
+                    try:
+                        self.collection.insert_one(item, bypass_document_validation=False)
+                    except DuplicateKeyError as e:
+                        log.warning(f"Duplicate entry skipped for {item.get('cutout_id', 'unknown')}: {e}")
             else:
-                self.collection.insert_one(data,
-                                           bypass_document_validation=False)
-
-            # log.info(f"Data from {json_file_path} inserted successfully!")
+                try:
+                    self.collection.insert_one(data, bypass_document_validation=False)
+                except DuplicateKeyError as e:
+                    log.warning(f"Duplicate entry skipped for {data.get('cutout_id', 'unknown')}: {e}")
 
         except Exception as e:
-            log.error(f"Failed to insert data from {json_file_path}: {e}")
+            log.exception(f"Failed to insert data from {json_file_path}: {e}")
 
 
 # Example usage:

@@ -9,21 +9,20 @@ hydra:
   output_subdir: ${paths.workdir}/projects/${general.project_name}/${general.sub_project_name}
 
 general:
-  project_name: test_cutouts
-  sub_project_name: TEST_small
+  project_name: test
+  sub_project_name: sub_test
 
 tasks:
-  # - json_to_mongo # you should only have to do this once
-  # - create_recipes
-  # - move_cutouts
+  - create_recipes
+  - move_cutouts
   - synthesize
 
 move_cutouts:
-  parallel: False
-  parallel_workers: 5
+  parallel: True
+  parallel_workers: 20
 
 synthesize:
-  resize_factor: 0.15 # Resize factor for the cutouts. Anything lower than 0.15 may give issues related to RandomScale transformation
+  resize_factor: 0.35 # Resize factor for the cutouts. Anything lower than 0.15 may give issues related to RandomScale transformation
   parallel: false
   parallel_workers: 4
   instance_masks: False
@@ -31,22 +30,10 @@ synthesize:
   yolo_bbox_labels: True
 
 aws:
-  s3_bucket: psi-hackathon-test
+  s3_bucket: psi-hackathon
 
 mongodb:
-  host: localhost
+  host: 40.76.253.124
   port: 27017
   db: hackathon_db
   collection: cutouts
-  
-
-batches:
-  # - MD_2022-08-03
-  # - MD_2022-08-04
-  # - MD_2022-08-05
-  # - MD_2022-08-24
-  # - MD_2022-08-26
-  # - MD_2022-08-29
-  # - MD_2022-08-31
-  # - MD_2022-09-09
-  # - MD_2022-09-12

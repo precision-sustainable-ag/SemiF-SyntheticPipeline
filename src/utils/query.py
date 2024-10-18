@@ -92,7 +92,7 @@ class MongoDBQueryHandler:
                 if isinstance(value, ListConfig):
                     value = list(value)
 
-                if isinstance(category[field], list):
+                if isinstance(value, list):
                     self.query[f'category.{field}'] = {'$in': value}
                 else:
                     self.query[f'category.{field}'] = value

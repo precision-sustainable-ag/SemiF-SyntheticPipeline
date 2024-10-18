@@ -4,6 +4,7 @@ import random
 import uuid
 from pathlib import Path
 from typing import Dict, List, Any
+from collections import defaultdict
 
 from pymongo import MongoClient
 from omegaconf import DictConfig
@@ -109,6 +110,34 @@ class MongoDBRecipeManager:
         self.recipe_creator = RecipeCreator(cfg)
         self.output_dir = Path(cfg.paths.projectdir, "recipes")  # Output directory for synthetic image recipes
         self.output_dir.mkdir(parents=True, exist_ok=True)
+    
+    def weighted_sampling(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Perform weighted sampling based on the class weights defined in the config.
+
+        Args:
+            documents (List[Dict[str, Any]]): List of available cutouts.
+
+        Returns:
+            List[Dict[str, Any]]: List of sampled cutouts based on weights.
+        """
+        # Extract weights from config
+        weights = self.cfg.cutout_filters.common_name_weights
+
+        # Group documents by species/class
+        class_groups = defaultdict(list)
+        for doc in documents:
+            # print(doc)
+            # exit()
+            class_groups[doc['category']['common_name']].append(doc)
+
+        # Create a weighted population based on class weights
+        weighted_population = []
+        for class_name, group in class_groups.items():
+            weight = weights.get(class_name, 1.0)  # Default weight of 1 if not in config
+            weighted_population.extend(group * int(weight * 10))  # Adjust multiplier as needed
+
+        return weighted_population
 
     def process_cutouts(self, documents: List[Dict[str, Any]]) -> None:
         """
@@ -129,7 +158,11 @@ class MongoDBRecipeManager:
         if len(documents) < required_cutouts and not self.cfg.cutout_filters.reuse_cutouts:
             log.warning("Not enough documents to fulfill the required cutouts without reuse.")
 
-        available_cutouts = documents.copy()  # Copy documents to avoid modifying the original list
+        # Use weighted sampling to create a pool of cutouts
+        if self.cfg.cutout_filters.common_name_weights:
+            available_cutouts = self.weighted_sampling(documents)
+        else:
+            available_cutouts = documents.copy()  # Copy documents to avoid modifying the original list
 
         for image_index in range(total_images):
             # Stop processing if no more available cutouts
@@ -148,6 +181,10 @@ class MongoDBRecipeManager:
             if len(available_cutouts) < num_cutouts_for_image and not self.cfg.cutout_filters.reuse_cutouts:
                 log.warning(f"Not enough cutouts for image {image_index + 1}, using {len(available_cutouts)} instead.")
                 sampled_cutouts = available_cutouts  # Use all available cutouts
+            elif len(available_cutouts) < num_cutouts_for_image:
+                log.warning(f"Not enough cutouts for image {image_index + 1}, reusing cutouts.")
+                sampled_cutouts = available_cutouts  # Use all available cutouts
+                sampled_cutouts = random.choices(available_cutouts, k=num_cutouts_for_image)
             else:
                 sampled_cutouts = random.sample(available_cutouts, num_cutouts_for_image)  # Randomly sample the required number of cutouts
 

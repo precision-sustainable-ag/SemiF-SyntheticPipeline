@@ -1320,6 +1320,34 @@
                 134,
                 51
             ]
+        },
+        "LOPEM2": {
+            "class_id": 47,
+            "USDA_symbol": "LOPEM2",
+            "EPPO": " LOLMU",
+            "group": "Monocot",
+            "class": "Liliopsida",
+            "subclass": "Commelinidae",
+            "order": "Cyperales",
+            "family": "Poaceae",
+            "genus": "Lolium",
+            "species": "perenne L. ssp. multiflorum",
+            "common_name": "italian ryegrass",
+            "authority": "(Lam) Husnot",
+            "growth_habit": "graminoid",
+            "duration": "annual/perennial",
+            "collection_location": "NC",
+            "category": "winter annual",
+            "collection_timing": "winter",
+            "multi_species_USDA_symbol": null,
+            "link": "https://plants.usda.gov/home/plantProfile?symbol=LOPEM2",
+            "note": null,
+            "hex": "#34649f",
+            "rgb": [
+                52,
+                100,
+                159
+            ]
         }
     },
     "Notes": {

@@ -1,19 +1,22 @@
-name: semif_synthetic
+name: synth
 channels:
   - conda-forge
-  - conda-forge/label/dev
+  - defaults
 dependencies:
-  - python==3.9
+  - python==3.11
   - pip
+  - hydra-core
+  - omegaconf
+  - opencv  # Use 'opencv' instead of 'opencv-python'
+  - pandas
+  - pyyaml
+  - scikit-image
+  - scikit-learn
+  - scipy
+  - pymongo
+  - tqdm
+  - albumentations
+  - boto3
   - pip:
-    - hydra-core==1.2
-    - omegaconf==2.2.1
-    - opencv-python
-    - pandas
-    - pyyaml
-    - scikit-image
-    - scikit-learn
-    - scipy
-    - pymongo
-    - tqdm
-    - albumentations
+      In case any specific packages need to be installed via pip
+      - opencv-python-headless  # Optional: for headless systems without GUI

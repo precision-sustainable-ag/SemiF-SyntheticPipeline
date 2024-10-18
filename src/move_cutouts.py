@@ -100,6 +100,9 @@ class CutoutDownloader:
         # Construct the local path to save the image
         local_image_path = os.path.join(self.local_download_folder,
                                         image_filename)
+        if Path(local_image_path).exists():
+            log.debug(f"Image already exists locally: {cutout_id}")
+            return
 
         # Check if the file exists in the primary storage
         if self.s3_file_exists(primary_image_path):
@@ -139,6 +142,10 @@ class CutoutDownloader:
         for synthetic_image in synthetic_images:
             for cutout in synthetic_image["cutouts"]:
                 cutout_id = cutout["cutout_id"]
+                local_image_path = os.path.join(self.local_download_folder, f"{cutout_id}.png")
+                if Path(local_image_path).exists():
+                    log.debug(f"Image already exists locally: {cutout_id}")
+                    continue
                 batch_id = cutout["batch_id"]
                 if cutout_id not in unique_cutouts:
                     unique_cutouts[cutout_id] = batch_id
@@ -164,6 +171,8 @@ class CutoutDownloader:
         This method uses multithreading to parallelize the download process.
         """
         synthetic_images = self.load_json()
+        unique_cutouts = self.get_unique_cutouts(synthetic_images)
+        log.info(f"Found {len(unique_cutouts)} unique cutouts to download.")
 
         # List of tasks to be submitted to the thread pool
         tasks = []

@@ -8,7 +8,5 @@ recipesdir: ${paths.datadir}/recipes
 resultsdir: ${paths.datadir}/results
 species_info: /home/psa_images/SemiF-AnnotationPipeline/data/semifield-utils/species_information/species_info.json
 
-#primary_longterm_storage: /mnt/research-projects/s/screberg/longterm_images/semifield-cutouts
-#secondary_longterm_storage: /mnt/research-projects/s/screberg/GROW_DATA/semifield-cutouts
-primary_longterm_storage: longterm_images
+primary_longterm_storage: advanced_track/longterm_storage
 secondary_longterm_storage: GROW_DATA

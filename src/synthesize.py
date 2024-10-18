@@ -154,13 +154,7 @@ class ImageProcessor:
         self.cfg = cfg
         self.num_cutouts = num_cutouts
         self.resize_scale = cfg.synthesize.resize_factor  # Added scaling factor
-        self.instance_ids = self.num_instances()
 
-        # Calculate the adjusted scale_limit based on resize_scale
-        self.scale_limit = self.calculate_dynamic_scale_limit()
-        # TODO apply more/sophisticated albumentations transformations (e.g shadows, blur, etc.)
-        # TODO set transformations based on config settings
-        # Define the Albumentations transformations
         # Non destructive transformations
         self.transform = A.Compose([
             # A.GaussNoise(p=0.2), 
@@ -171,7 +165,6 @@ class ImageProcessor:
             # Weather augmentations
             # A.RandomSunFlare(flare_roi=(0.1, 0.1, 0.9, 0.9),src_radius=50, p=0.2),
             # A.RandomShadow(num_shadows_lower=1, num_shadows_upper=1, shadow_dimension=5, shadow_roi=(0, 0.5, 1, 1), p=1),
-
             # A.RandomBrightnessContrast(p=0.2),
             # A.RandomScale(scale_limit=self.scale_limit, p=0.5),  # Dynamically set scale_limit
         ])
@@ -179,34 +172,6 @@ class ImageProcessor:
         self.create_contours = cfg.synthesize.yolo_contour_labels
         self.create_bbox = cfg.synthesize.yolo_bbox_labels
     
-    def calculate_dynamic_scale_limit(self) -> Tuple[float, float]:
-        """
-        Calculate a dynamic scale limit for Albumentations RandomScale transformation
-        based on the resize_scale value. This ensures the RandomScale does not shrink
-        the cutout images excessively.
-
-        Returns:
-            Tuple[float, float]: The lower and upper scale limits for RandomScale.
-        """
-        # If the resize_scale is too small, limit the shrinking factor.
-        min_scale_limit = max(-0.5, -1.0 + self.resize_scale)  # Minimum allowed scaling
-        # TODO incorporate this into the config settings
-        max_scale_limit = 0.0  # Keep the upper limit at 0.0 (no further enlargement) 
-
-        log.debug(f"Calculated dynamic scale limits: {min_scale_limit}, {max_scale_limit}")
-        return (min_scale_limit, max_scale_limit)
-    
-    def num_instances(self) -> List[int]:
-        """
-        Generate a shuffled list of possible instance IDs based on the number of cutouts.
-
-        Returns:
-            List[int]: A list of shuffled instance IDs.
-        """
-        num_possible_instances = list(range(1, self.num_cutouts + 1))
-        random.shuffle(num_possible_instances)
-        return num_possible_instances
-
     
     def apply_random_transform(self, img: np.ndarray) -> np.ndarray:
         """
@@ -228,7 +193,8 @@ class ImageProcessor:
 
     def distribute_images(
         self, background: np.ndarray, images: List[np.ndarray],
-        cutout_paths: List[str], mode: str = "random", min_visibility: float = 0.3
+        cutout_paths: List[str], mode: str = "random", min_visibility: float = 0.9,
+        max_retries: int = 10
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict[int, List[List[float]]]]]:
         """
         Distribute images on a background either randomly or in a semi-even grid pattern.
@@ -253,56 +219,41 @@ class ImageProcessor:
 
         for _, (img, cutout_metadata) in enumerate(zip(images, cutout_paths)):
             class_id = cutout_metadata['category']['class_id']
+            cutout_id = cutout_metadata['cutout_id']
 
-            img = self.apply_random_transform(img)
-
-            if mode == "random":
-                roi_x_start, roi_y_start, img_x_start, img_y_start, img_x_end, img_y_end = (
-                    self.random_coordinates(bg_height, bg_width, img)
+            # Apply transformations to the cutout
+            transformed_img = self.apply_random_transform(img)
+            cutout_placed = False
+            for _ in range(max_retries):
+                # Get random coordinates for placement
+                roi_x, roi_y, img_x_start, img_y_start, img_x_end, img_y_end = (
+                    self.random_coordinates(bg_height, bg_width, transformed_img)
                 )
-            else:
-                raise ValueError(
-                    "Unsupported cutout distribution mode. Use 'random'."
+                # Calculate the bounding box for this placement
+                cutout_bbox = (
+                    roi_x, roi_y, 
+                    min(roi_x + (img_x_end - img_x_start), bg_width), 
+                    min(roi_y + (img_y_end - img_y_start), bg_height)
                 )
-            
 
-            norm_coords, yolo_bbox = self.overlay_with_alpha(
-                background, background_semantic_mask, background_instance_mask,
-                img[img_y_start:img_y_end, img_x_start:img_x_end],
-                roi_x_start, roi_y_start, class_id, instance_id
-            )
-            
-            # Calculate the true bounding box after applying `overlay_with_alpha`
-            true_x_start = max(roi_x_start, 0)
-            true_y_start = max(roi_y_start, 0)
-            true_x_end = min(roi_x_start + (img_x_end - img_x_start), bg_width)
-            true_y_end = min(roi_y_start + (img_y_end - img_y_start), bg_height)
+                # Check for overlap with previously placed regions
+                if not any(self.is_fully_occluded(cutout_bbox, region, min_visibility) for region in placed_regions):
+                    # Place the cutout if no excessive overlap is found
+                    norm_coords, yolo_bbox = self.overlay_with_alpha(
+                        background, background_semantic_mask, background_instance_mask,
+                        transformed_img[img_y_start:img_y_end, img_x_start:img_x_end],
+                        roi_x, roi_y, class_id, instance_id
+                    )
 
-            cutout_bbox = (true_x_start, true_y_start, true_x_end, true_y_end)
-            # Check for occlusion with already placed cutouts
-            while any(self.is_fully_occluded(cutout_bbox, region, min_visibility) for region in placed_regions):
-                # Get new random coordinates and repeat the placement and check
-                roi_x_start, roi_y_start, img_x_start, img_y_start, img_x_end, img_y_end = (
-                    self.random_coordinates(bg_height, bg_width, img)
-                )
-                norm_coords, yolo_bbox = self.overlay_with_alpha(
-                    background, background_semantic_mask, background_instance_mask,
-                    img[img_y_start:img_y_end, img_x_start:img_x_end],
-                    roi_x_start, roi_y_start, class_id, instance_id
-                )
-                true_x_start = max(roi_x_start, 0)
-                true_y_start = max(roi_y_start, 0)
-                true_x_end = min(roi_x_start + (img_x_end - img_x_start), bg_width)
-                true_y_end = min(roi_y_start + (img_y_end - img_y_start), bg_height)
+                    coord_results.append({class_id: norm_coords})
+                    yolo_bboxes.append(yolo_bbox)
+                    placed_regions.append(cutout_bbox)
+                    instance_id += 1
+                    cutout_placed = True
+                    break
+            if not cutout_placed:
+                log.warning(f"Could not place cutout {cutout_id} after {max_retries} attempts.")
 
-                cutout_bbox = (true_x_start, true_y_start, true_x_end, true_y_end)
-
-
-            coord_results.append({class_id: norm_coords})
-            yolo_bboxes.append(yolo_bbox)
-            placed_regions.append(cutout_bbox)
-            
-            instance_id += 1
 
         return background, background_semantic_mask, background_instance_mask, coord_results, yolo_bboxes
     
