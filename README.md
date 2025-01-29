@@ -30,6 +30,11 @@ After installing Conda, you can set up an environment for this project using an 
    ```
    Replace `<env_name>` with the name of the environment specified in the `environment.yaml` file.
 
+6. (Optional): To update your environment after making changes to the environment.yaml file, run: 
+    ```bash
+    conda env update --file environment.yml
+    ```
+
 ### Setting Up MongoDB and Mongosh
 
 #### Step 1: Download and Install MongoDB

@@ -7,16 +7,15 @@ dependencies:
   - pip
   - hydra-core
   - omegaconf
-  - opencv  # Use 'opencv' instead of 'opencv-python'
-  - pandas
-  - pyyaml
-  - scikit-image
-  - scikit-learn
-  - scipy
+  # - opencv  # Use 'opencv' instead of 'opencv-python'
+  # - pandas
+  # - pyyaml
+  # - scikit-image
+  # - scikit-learn
+  # - scipy
   - pymongo
   - tqdm
   - albumentations
-  - boto3
   - pip:
-      In case any specific packages need to be installed via pip
-      - opencv-python-headless  # Optional: for headless systems without GUI
+      # In case any specific packages need to be installed via pip
+      # - opencv-python-headless  # Optional: for headless systems without GUI
