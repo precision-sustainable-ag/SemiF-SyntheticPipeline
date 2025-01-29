@@ -10,9 +10,10 @@ hydra:
 
 general:
   project_name: test
-  sub_project_name: sub_test
+  sub_project_name: new_db
 
 tasks:
+  # - json_to_mongo
   - create_recipes
   - move_cutouts
   - synthesize
@@ -33,7 +34,7 @@ aws:
   s3_bucket: psi-hackathon
 
 mongodb:
-  host: 40.76.253.124
+  host: localhost
   port: 27017
-  db: hackathon_db
+  db: agir_synth
   collection: cutouts
