@@ -9,10 +9,6 @@ from omegaconf import DictConfig
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import boto3
-from botocore.handlers import disable_signing
-from botocore.exceptions import ClientError
-
 log = logging.getLogger(__name__)
 
 
@@ -32,15 +28,16 @@ class CutoutDownloader:
         self.json_file_path = Path(cfg.paths.projectdir, "recipes",
                                    f"{cfg.general.project_name}_{cfg.general.sub_project_name}.json")
 
-        self.primary_storage_base = Path(cfg.paths.primary_longterm_storage)
-        self.secondary_storage_base = Path(cfg.paths.secondary_longterm_storage)
+        self.primary_storage_base = Path(cfg.paths.primary_longterm_storage, "semifield-cutouts")
+        self.secondary_storage_base = Path(cfg.paths.secondary_longterm_storage, "semifield-cutouts")
         self.local_download_folder = Path(cfg.paths.cutoutdir)
         self.max_workers = cfg.move_cutouts.parallel_workers
 
-        self.s3_resource = boto3.resource('s3')
-        self.s3_resource.meta.client.meta.events.register('choose-signer.s3.*',
-                                                          disable_signing)
-        self.s3_bucket = self.s3_resource.Bucket(cfg.aws.s3_bucket)
+        # self.s3_resource = boto3.resource('s3')
+        # self.s3_resource.meta.client.meta.events.register('choose-signer.s3.*',
+        #                                                   disable_signing)
+        # self.s3_bucket = self.s3_resource.Bucket(cfg.aws.s3_bucket)
+        
 
         # Create the local download folder if it doesn't exist
         if not self.local_download_folder.exists():
@@ -48,15 +45,15 @@ class CutoutDownloader:
             log.info(
                 f"Created local download folder: {self.local_download_folder}")
 
-    def s3_file_exists(self, file_key):
-        try:
-            self.s3_bucket.Object(file_key).load()
-            return True
-        except ClientError as e:
-            if e.response['Error']['Code'] == '404':
-                return False
-            else:
-                raise
+    # def s3_file_exists(self, file_key):
+    #     try:
+    #         self.s3_bucket.Object(file_key).load()
+    #         return True
+    #     except ClientError as e:
+    #         if e.response['Error']['Code'] == '404':
+    #             return False
+    #         else:
+    #             raise
 
     def load_json(self) -> List[Dict]:
         """
@@ -91,24 +88,26 @@ class CutoutDownloader:
         #     'longterm_images/MD_2022-08-04/MD_1659617815_55.png', 'tmp')
         #
 
-        primary_image_path = os.path.join(self.primary_storage_base, batch_id,
+        primary_image_path = Path(self.primary_storage_base, batch_id,
                                           image_filename)
-        secondary_image_path = os.path.join(self.secondary_storage_base,
+        secondary_image_path = Path(self.secondary_storage_base,
                                             batch_id,
                                             image_filename)
 
         # Construct the local path to save the image
-        local_image_path = os.path.join(self.local_download_folder,
+        local_image_path = Path(self.local_download_folder,
                                         image_filename)
         if Path(local_image_path).exists():
             log.debug(f"Image already exists locally: {cutout_id}")
             return
 
         # Check if the file exists in the primary storage
-        if self.s3_file_exists(primary_image_path):
+        # if self.s3_file_exists(primary_image_path):
+        if primary_image_path.exists():
             try:
-                self.s3_bucket.download_file(primary_image_path,
-                                             local_image_path)
+                # self.s3_bucket.download_file(primary_image_path,
+                                            #  local_image_path)
+                shutil.copy(primary_image_path, local_image_path)
                 log.debug(
                     f"Downloaded from primary: {cutout_id} to {local_image_path}")
             except IOError as e:
@@ -116,10 +115,12 @@ class CutoutDownloader:
                     f"Error copying file from primary: {primary_image_path} to {local_image_path} - {e}")
 
         # If the file does not exist in primary, try the secondary storage
-        elif self.s3_file_exists(secondary_image_path):
+        # elif self.s3_file_exists(secondary_image_path):
+        elif secondary_image_path.exists():
             try:
-                self.s3_bucket.download_file(secondary_image_path,
-                                             local_image_path)
+                # self.s3_bucket.download_file(secondary_image_path,
+                #                              local_image_path)
+                shutil.copy(secondary_image_path, local_image_path)
                 log.debug(
                     f"Downloaded from secondary: {cutout_id} to {local_image_path}")
             except IOError as e:
@@ -128,7 +129,7 @@ class CutoutDownloader:
 
         else:
             log.error(
-                f"Image not found in both primary and secondary storage: {cutout_id}")
+                f"Image not found in both primary ({primary_image_path}) or secondary ({secondary_image_path}) storage: {cutout_id}")
 
     def get_unique_cutouts(self, synthetic_images: List[Dict]) -> Dict[
         str, str]:

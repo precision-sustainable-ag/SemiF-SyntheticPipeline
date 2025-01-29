@@ -36,6 +36,7 @@ class MongoDBQueryHandler:
         """
         self._add_morphological_filters()
         self._add_category_filters()
+        self._add_non_target_weed_filters()  # New function to add non_target_weed filters
 
     def _add_morphological_filters(self) -> None:
         """
@@ -44,26 +45,11 @@ class MongoDBQueryHandler:
         morphological = self.cfg.cutout_filters.morphological
 
         # Handle area filter
-        if 'area' in morphological and morphological['area']:
-            self.query['cutout_props.area'] = {
-                '$gte': morphological['area'].get('min', 0),
-                '$lte': morphological['area'].get('max', float('inf'))
+        if 'bbox_area_cm2' in morphological and morphological['bbox_area_cm2']:
+            self.query['cutout_props.bbox_area_cm2'] = {
+                '$gte': morphological['bbox_area_cm2'].get('min', 0),
+                '$lte': morphological['bbox_area_cm2'].get('max', float('inf'))
             }
-
-        # Handle blur_effect filter
-        self._add_range_filter(morphological, 'blur_effect', 'cutout_props.blur_effect')
-
-        # Handle eccentricity filter
-        self._add_range_filter(morphological, 'eccentricity', 'cutout_props.eccentricity')
-
-        # Handle num_components filter
-        self._add_range_filter(morphological, 'num_components', 'cutout_props.num_components')
-
-        # Handle solidity filter
-        self._add_range_filter(morphological, 'solidity', 'cutout_props.solidity')
-
-        # Handle green_sum filter
-        self._add_range_filter(morphological, 'green_sum', 'cutout_props.green_sum')
 
         # Handle extends_border filter
         if morphological.get('extends_border') is not None:
@@ -73,8 +59,11 @@ class MongoDBQueryHandler:
         if morphological.get('is_primary') is not None:
             self.query['cutout_props.is_primary'] = morphological['is_primary']
 
-        # Handle perimeter filter
-        self._add_range_filter(morphological, 'perimeter', 'cutout_props.perimeter')
+        # Handle blur_effect filter
+        self._add_range_filter(morphological, 'blur_effect', 'cutout_props.blur_effect')
+
+        # Handle num_components filter
+        self._add_range_filter(morphological, 'num_components', 'cutout_props.num_components')
 
     def _add_category_filters(self) -> None:
         """
@@ -91,11 +80,37 @@ class MongoDBQueryHandler:
                 # Convert ListConfig to a standard list if necessary
                 if isinstance(value, ListConfig):
                     value = list(value)
-
-                if isinstance(value, list):
-                    self.query[f'category.{field}'] = {'$in': value}
+                
+                if field == 'common_name':
+                    # Special handling for case-insensitive common_name
+                    if isinstance(value, list):
+                        # Build case-insensitive regex for each common_name
+                        regex_list = [{'category.common_name': {'$regex': f'^{name}$', '$options': 'i'}} for name in value]
+                        self.query['$or'] = regex_list
+                    else:
+                        # Case-insensitive regex for a single common_name
+                        self.query[f'category.{field}'] = {'$regex': f'^{value}$', '$options': 'i'}
                 else:
-                    self.query[f'category.{field}'] = value
+                    # Standard handling for other fields
+                    if isinstance(value, list):
+                        self.query[f'category.{field}'] = {'$in': value}
+                    else:
+                        self.query[f'category.{field}'] = value
+
+    def _add_non_target_weed_filters(self) -> None:
+        """
+        Add filters for non_target_weed and non_target_weed_pred_conf based on configuration.
+        """
+        non_target_weed = self.cfg.cutout_filters.get('non_target_weed', None)
+        non_target_weed_pred_conf = self.cfg.cutout_filters.get('non_target_weed_pred_conf', {})
+
+        if non_target_weed is not None:
+            self.query['cutout_props.non_target_weed'] = non_target_weed
+
+        if non_target_weed_pred_conf:
+            min_conf = non_target_weed_pred_conf.get('min', 0.0)
+            max_conf = non_target_weed_pred_conf.get('max', 1.0)
+            self.query['cutout_props.non_target_weed_pred_conf'] = {'$gte': min_conf, '$lte': max_conf}
 
     def _add_range_filter(self, config_section: Dict[str, Any], key: str, query_field: str) -> None:
         """

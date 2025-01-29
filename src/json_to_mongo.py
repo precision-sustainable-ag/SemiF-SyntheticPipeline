@@ -6,12 +6,12 @@ from typing import Union, List, Any
 from omegaconf import DictConfig
 from tqdm import tqdm
 import logging
-import boto3
-from botocore.handlers import disable_signing
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, BulkWriteError
+import re
 log = logging.getLogger(__name__)
 
-
+    
+        
 class MongoDBDataLoader:
     """Class to handle loading JSON data into MongoDB from an NFS storage locker based on batches."""
 
@@ -29,84 +29,102 @@ class MongoDBDataLoader:
         self.collection = self.db[cfg.mongodb.collection]
 
         # Root directory of the NFS storage locker
-        self.primary_s3_root = Path(cfg.paths.primary_longterm_storage)
-        self.secondary_s3_root = Path(cfg.paths.secondary_longterm_storage)
-
-        self.s3_resource = boto3.resource('s3')
-        self.s3_resource.meta.client.meta.events.register('choose-signer.s3.*',
-                                                          disable_signing)
-        self.s3_bucket = self.s3_resource.Bucket(cfg.aws.s3_bucket)
+        self.primary_nfs_root = Path(cfg.paths.primary_longterm_storage, "semifield-cutouts")
+        self.secondary_nfs_root = Path(cfg.paths.secondary_longterm_storage, "semifield-cutouts")
+        
+        
+        # self.s3_resource = boto3.resource('s3')
+        # self.s3_resource.meta.client.meta.events.register('choose-signer.s3.*',
+                                                        #   disable_signing)
+        # self.s3_bucket = self.s3_resource.Bucket(cfg.aws.s3_bucket)
         self.create_id_index("cutouts")
 
 
-    def s3_folder_exists(self, folder_key):
-        if not folder_key.endswith('/'):
-            folder_key += '/'
-        resp = self.s3_bucket.objects.filter(Prefix=folder_key).limit(1)
-        return any(resp)
+    # def s3_folder_exists(self, folder_key):
+    #     if not folder_key.endswith('/'):
+    #         folder_key += '/'
+    #     resp = self.s3_bucket.objects.filter(Prefix=folder_key).limit(1)
+    #     return any(resp)
 
-    def load_json(self, json_path: str) -> Any:
-        try:
-            with open(json_path, 'r') as f:
-                data = json.load(f)
-            return data
-        except FileNotFoundError as e:
-            log.exception(f"Error: File not found - {e}")
-            raise
-        except json.JSONDecodeError as e:
-            log.exception(f"Error: Failed to decode JSON - {e}")
-            raise
+    # def load_json(self, json_path: str) -> Any:
+    #     try:
+    #         with open(json_path, 'r') as f:
+    #             data = json.load(f)
+    #         return data
+    #     except FileNotFoundError as e:
+    #         log.exception(f"Error: File not found - {e}")
+    #         raise
+    #     except json.JSONDecodeError as e:
+    #         log.exception(f"Error: Failed to decode JSON - {e}")
+    #         raise
         
-    def load_batches_from_yaml(self) -> List[str]:
-        """
-        Load batch names from a YAML configuration file.
+    # def load_batches_from_yaml(self) -> List[str]:
+    #     """
+    #     Load batch names from a YAML configuration file.
 
-        Args:
-            yaml_file_path (Union[str, Path]): Path to the YAML file.
-        """
-        batches = self.cfg.batches
-        log.info(f"Loaded {len(batches)} batches from YAML file.")
-        return batches
+    #     Args:
+    #         yaml_file_path (Union[str, Path]): Path to the YAML file.
+    #     """
+    #     batches = self.cfg.batches
+    #     log.info(f"Loaded {len(batches)} batches from YAML file.")
+    #     return batches
 
-    def load_json_files_from_batches(self, batches: List[str]) -> None:
-        """
-        Load JSON files from batch directories in the NFS storage locker and insert them into MongoDB.
-        If the batch is not found in the primary storage path, the script checks the alternative storage path.
+    # def load_json_files_from_batches_mongodb(self, batches: List[str]) -> None:
+    #     """
+    #     Load JSON files from batch directories in the NFS storage locker and insert them into MongoDB.
+    #     If the batch is not found in the primary storage path, the script checks the alternative storage path.
 
-        Args:
-            batches (List[str]): List of batch directories to process.
-        """
-        # primary_nfs_root_path = Path(self.primary_nfs_root)
-        # secondary_nfs_root_path = Path(self.secondary_nfs_root)
+    #     Args:
+    #         batches (List[str]): List of batch directories to process.
+    #     """
+    #     # Loop through all the batch directories
+    #     for batch in tqdm(batches):
+            
+    #         json_files = list(batch.glob('*.json'))
+    #         log.info(f"Processing batch '{batch}' with {len(json_files)} JSON files.")
+            
+    #         for json_file_path in json_files:
+    #             self.insert_data_from_file(json_file_path)
 
-        # Loop through all the batch directories
-        for batch_name in tqdm(batches):
-            batch_dir = os.path.join(self.primary_s3_root, batch_name)
-            # Check if the batch exists in the primary storage
-            if self.s3_folder_exists(batch_dir):
-                json_files = []
-                for obj in self.s3_bucket.objects.filter(Prefix=batch_dir):
-                    if obj.key.endswith('.json'):
-                        json_files.append(obj.key)
-                log.info(
-                    f"Processing batch '{batch_name}' in primary storage with {len(json_files)} JSON files.")
-            else:
-                # If not found, check the alternative storage
-                batch_dir = os.path.join(self.secondary_s3_root, batch_name)
-                if self.s3_folder_exists(batch_dir):
-                    json_files = []
-                    for obj in self.s3_bucket.objects.filter(Prefix=batch_dir):
-                        if obj.key.endswith('.json'):
-                            json_files.append(obj.key)
-                    log.info(
-                        f"Processing batch '{batch_dir}' in alternative storage with {len(json_files)} JSON files.")
-                else:
-                    log.warning(
-                        f"Batch directory '{batch_dir}' not found in either primary or alternative storage.")
-                    continue
+    # def load_json_files_from_batches(self, batches: List[str]) -> None:
+    #     """
+    #     Load JSON files from batch directories in the NFS storage locker and insert them into MongoDB.
+    #     If the batch is not found in the primary storage path, the script checks the alternative storage path.
 
-            for json_file_path in tqdm(json_files):
-                self.insert_data_from_file(json_file_path)
+    #     Args:
+    #         batches (List[str]): List of batch directories to process.
+    #     """
+    #     # primary_nfs_root_path = Path(self.primary_nfs_root)
+    #     # secondary_nfs_root_path = Path(self.secondary_nfs_root)
+
+    #     # Loop through all the batch directories
+    #     for batch_name in tqdm(batches):
+    #         batch_dir = os.path.join(self.primary_s3_root, batch_name)
+    #         # Check if the batch exists in the primary storage
+    #         if self.s3_folder_exists(batch_dir):
+    #             json_files = []
+    #             for obj in self.s3_bucket.objects.filter(Prefix=batch_dir):
+    #                 if obj.key.endswith('.json'):
+    #                     json_files.append(obj.key)
+    #             log.info(
+    #                 f"Processing batch '{batch_name}' in primary storage with {len(json_files)} JSON files.")
+    #         else:
+    #             # If not found, check the alternative storage
+    #             batch_dir = os.path.join(self.secondary_s3_root, batch_name)
+    #             if self.s3_folder_exists(batch_dir):
+    #                 json_files = []
+    #                 for obj in self.s3_bucket.objects.filter(Prefix=batch_dir):
+    #                     if obj.key.endswith('.json'):
+    #                         json_files.append(obj.key)
+    #                 log.info(
+    #                     f"Processing batch '{batch_dir}' in alternative storage with {len(json_files)} JSON files.")
+    #             else:
+    #                 log.warning(
+    #                     f"Batch directory '{batch_dir}' not found in either primary or alternative storage.")
+    #                 continue
+
+    #         for json_file_path in tqdm(json_files):
+    #             self.insert_data_from_file(json_file_path)
 
     def create_id_index(self, data_type: str) -> None:
         """Create a unique index on the 'cutout_id' field to enforce uniqueness and improve lookup performance."""
@@ -117,36 +135,94 @@ class MongoDBDataLoader:
         except Exception as e:
             log.exception(f"Failed to create index on '{index_value}': {e}")
             exit()
+    
+    def get_all_batches(self):
+        # Get all the batches in both primary and secondary storage
+        primary_batches = [x for x in self.primary_nfs_root.iterdir() if x.is_dir()]
+        secondary_batches = [x for x in self.secondary_nfs_root.iterdir() if x.is_dir()]
+        
+        # Make sure that each batch name matches the expected format
+        pattern = r'^[A-Z]{2}_\d{4}-\d{2}-\d{2}$'
+        primary_batches = [x for x in primary_batches if re.match(pattern, x.name)]
+        secondary_batches = [x for x in secondary_batches if re.match(pattern, x.name)]
+        batches = primary_batches + secondary_batches
+        exclude_these_batches = ["MD_2022-06-21"]
+        batches = sorted([x for x in batches if x.name not in exclude_these_batches])
+        return batches 
 
-    def insert_data_from_file(self, json_file_path: Union[str, Path]) -> None:
+
+    # def insert_data_from_file(self, json_file_path: Union[str, Path]) -> None:
+    #     """
+    #     Insert data from a JSON file into the MongoDB collection.
+
+    #     Args:
+    #         json_file_path (Union[str, Path]): Path to the JSON file.
+    #     """
+    #     try:
+    #         with open(json_file_path) as file:
+    #             data = json.load(file)
+    #         # data = self.s3_bucket.Object(json_file_path).get()['Body'].read()
+    #         # data = json.loads(data.decode('utf-8'))
+
+    #         # Insert data and handle duplicates
+    #         if isinstance(data, list):
+    #             for item in data:
+    #                 try:
+    #                     self.collection.insert_one(item, bypass_document_validation=False)
+    #                 except DuplicateKeyError as e:
+    #                     log.warning(f"Duplicate entry skipped for {item.get('cutout_id', 'unknown')}: {e}")
+    #         else:
+    #             try:
+    #                 self.collection.insert_one(data, bypass_document_validation=False)
+    #             except DuplicateKeyError as e:
+    #                 log.warning(f"Duplicate entry skipped for {data.get('cutout_id', 'unknown')}: {e}")
+
+    #     except Exception as e:
+    #         log.exception(f"Failed to insert data from {json_file_path}: {e}")
+    
+    def load_json_files_from_batches_mongodb_inbuffer(self, batches: List[str], batch_size: int = 1000) -> None:
         """
-        Insert data from a JSON file into the MongoDB collection.
+        Load JSON files from batch directories in the NFS storage locker and insert them into MongoDB in bulk.
 
         Args:
-            json_file_path (Union[str, Path]): Path to the JSON file.
+            batches (List[str]): List of batch directories to process.
+            batch_size (int): Number of documents to insert in a single batch.
         """
-        try:
-            # with open(json_file_path) as file:
-            #     data = json.load(file)
-            data = self.s3_bucket.Object(json_file_path).get()['Body'].read()
-            data = json.loads(data.decode('utf-8'))
+        buffer = []  # Buffer to hold documents for batch insertion
 
-            # Insert data and handle duplicates
-            if isinstance(data, list):
-                for item in data:
-                    try:
-                        self.collection.insert_one(item, bypass_document_validation=False)
-                    except DuplicateKeyError as e:
-                        log.warning(f"Duplicate entry skipped for {item.get('cutout_id', 'unknown')}: {e}")
-            else:
+        for batch in tqdm(batches):
+            json_files = sorted(list(batch.glob('*.json')))
+            json_files = [x for x in json_files if "NCX" not in x.name]
+            json_files = [x for x in json_files if "NCY" not in x.name]
+            
+            log.info(f"Processing batch '{batch}' with {len(json_files)} JSON files.")
+
+            for json_file_path in tqdm(json_files, leave=False):
                 try:
-                    self.collection.insert_one(data, bypass_document_validation=False)
-                except DuplicateKeyError as e:
-                    log.warning(f"Duplicate entry skipped for {data.get('cutout_id', 'unknown')}: {e}")
+                    with open(json_file_path) as file:
+                        data = json.load(file)
+                        if isinstance(data, list):
+                            buffer.extend(data)
+                        else:
+                            buffer.append(data)
 
-        except Exception as e:
-            log.exception(f"Failed to insert data from {json_file_path}: {e}")
+                    # Insert in batches
+                    if len(buffer) >= batch_size:
+                        try:
+                            self.collection.insert_many(buffer, ordered=False)
+                            buffer.clear()  # Clear the buffer after successful insertion
+                        except BulkWriteError as e:
+                            log.warning(f"Some documents were not inserted due to duplicates: {e.details}")
+                            buffer.clear()  # Clear the buffer regardless of errors
+                except Exception as e:
+                    log.exception(f"Failed to process file {json_file_path}: {e}")
 
+        # Insert remaining documents in the buffer
+        if buffer:
+            try:
+                self.collection.insert_many(buffer, ordered=False)
+            except BulkWriteError as e:
+                log.warning(f"Some documents were not inserted due to duplicates: {e.details}")
 
 # Example usage:
 def main(cfg: DictConfig) -> None:
@@ -154,7 +230,11 @@ def main(cfg: DictConfig) -> None:
     data_loader = MongoDBDataLoader(cfg)
 
     # Load batch names from the YAML file
-    batch_names = data_loader.load_batches_from_yaml()
+    # batch_names = data_loader.load_batches_from_yaml()
+    batches = data_loader.get_all_batches()
+    log.info(f"Found {len(batches)} batches in the NFS storage locker.")
 
     # Load and insert JSON files from the specified batch directories
-    data_loader.load_json_files_from_batches(batch_names)
+    # data_loader.load_json_files_from_batches(batch_names)
+    # data_loader.load_json_files_from_batches_mongodb(batches)
+    data_loader.load_json_files_from_batches_mongodb_inbuffer(batches)

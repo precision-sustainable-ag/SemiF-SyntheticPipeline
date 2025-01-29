@@ -113,7 +113,7 @@ class MongoDBRecipeManager:
     
     def weighted_sampling(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Perform weighted sampling based on the class weights defined in the config.
+        Perform weighted sampling based on the class weights defined in the config, handling case-insensitive common names.
 
         Args:
             documents (List[Dict[str, Any]]): List of available cutouts.
@@ -121,21 +121,35 @@ class MongoDBRecipeManager:
         Returns:
             List[Dict[str, Any]]: List of sampled cutouts based on weights.
         """
-        # Extract weights from config
-        weights = self.cfg.cutout_filters.common_name_weights
+        # Extract and normalize weights from config (convert keys to lowercase)
+        raw_weights = self.cfg.cutout_filters.common_name_weights
+        
+        weights = {k.lower(): v for k, v in raw_weights.items()}
 
-        # Group documents by species/class
+        # Validate weights
+        total_weight = sum(weights.values())
+        if total_weight == 0:
+            log.warning("Total weight is 0. No sampling will occur.")
+            return []
+
+        # Normalize weights
+        normalized_weights = {k: v / total_weight for k, v in weights.items()}
+
+        # Group documents by normalized common_name
         class_groups = defaultdict(list)
         for doc in documents:
-            # print(doc)
-            # exit()
-            class_groups[doc['category']['common_name']].append(doc)
+            common_name = doc['category']['common_name'].lower()  # Normalize to lowercase
+            class_groups[common_name].append(doc)
 
-        # Create a weighted population based on class weights
+        # Create a weighted population based on normalized weights
         weighted_population = []
         for class_name, group in class_groups.items():
-            weight = weights.get(class_name, 1.0)  # Default weight of 1 if not in config
-            weighted_population.extend(group * int(weight * 10))  # Adjust multiplier as needed
+            weight = normalized_weights.get(class_name, 0.0)  # Default to 0 if not in config
+            if weight > 0:
+                # Calculate the number of samples to take from this class
+                num_samples = int(len(documents) * weight)
+                sampled_group = random.choices(group, k=num_samples)  # Sample with replacement
+                weighted_population.extend(sampled_group)
 
         return weighted_population
 
@@ -161,6 +175,7 @@ class MongoDBRecipeManager:
         # Use weighted sampling to create a pool of cutouts
         if self.cfg.cutout_filters.common_name_weights:
             available_cutouts = self.weighted_sampling(documents)
+            log_sample_counts(available_cutouts, text="Weighted samples:")
         else:
             available_cutouts = documents.copy()  # Copy documents to avoid modifying the original list
 
@@ -215,6 +230,23 @@ class MongoDBRecipeManager:
         self.recipe_creator.save_recipes(self.output_dir)
         log.info(f"Total images generated: {min(image_index + 1, total_images)}")
 
+def log_sample_counts(documents, text="samples"):
+    """
+    Print the number of samples for each common name class in the dataset.
+
+    Args:
+        documents (List[Dict[str, Any]]): List of MongoDB documents containing cutout metadata.
+    """
+    # Group documents by common_name and count occurrences
+    class_counts = defaultdict(int)
+    for doc in documents:
+        common_name = doc['category']['common_name']
+        class_counts[common_name] += 1
+
+    # Print the counts
+    log.info(text)
+    for class_name, count in sorted(class_counts.items(), key=lambda x: x[0]):
+        log.info(f"{class_name}: {count}")
 
 def main(cfg: DictConfig) -> None:
     """

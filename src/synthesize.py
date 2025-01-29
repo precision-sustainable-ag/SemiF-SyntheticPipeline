@@ -14,6 +14,7 @@ import random
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 from pathlib import Path
+import math
 from typing import List, Tuple, Dict, Union
 
 import albumentations as A
@@ -161,7 +162,7 @@ class ImageProcessor:
             A.HorizontalFlip(p=0.5), 
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=1),
-            A.Transpose(p=0.5),
+            # A.Transpose(p=0.5),
             # Weather augmentations
             # A.RandomSunFlare(flare_roi=(0.1, 0.1, 0.9, 0.9),src_radius=50, p=0.2),
             # A.RandomShadow(num_shadows_lower=1, num_shadows_upper=1, shadow_dimension=5, shadow_roi=(0, 0.5, 1, 1), p=1),
@@ -585,29 +586,49 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
     try:
         # Extract background path
         background_path = Path(cfg.paths.backgrounddir, recipe['background_image_id'])
-        
-        resize_factor = cfg.synthesize.resize_factor # Added resize factor
+        background_fov_cm2 = cfg.cutout_filters.background_fov_cm2  # Real-world FoV for background
 
         # Check if the background is already loaded in shared_data
         if background_path not in shared_data:
             log.info(f"Loading background image {background_path}")
             background_image = cv2.imread(str(background_path), cv2.IMREAD_COLOR)
+            
+            # Calculate real-world pixel-to-cm ratio for the background
+            bg_height, bg_width = background_image.shape[:2]
+            pixel_cm_ratio = (bg_width * bg_height) / background_fov_cm2
+            
+            # Resize background for consistent scaling
+            resize_factor = cfg.cutout_filters.resize_factor # Added resize factor
             if resize_factor != 1.0:
                 background_image = resize_image(background_image, resize_factor)
-            shared_data[background_path] = background_image
+            
+            # Calculate real-world pixel-to-cm ratio after resizing
+            bg_height, bg_width = background_image.shape[:2]
+            pixel_cm_ratio = (bg_width * bg_height) / background_fov_cm2
+            shared_data[background_path] = (background_image, pixel_cm_ratio)
         
-        background = shared_data[background_path]  # Get the pre-loaded background image
+        # background = shared_data[background_path]  # Get the pre-loaded background image
+        background, pixel_cm_ratio = shared_data[background_path]
         
         # Process the cutouts and check if they are in shared_data
         cutout_paths = [Path(cfg.paths.cutoutdir, cutout['cutout_id'] + ".png") for cutout in recipe['cutouts']]
         images = []
-        for cutout_path in cutout_paths:
+        # for cutout_path in cutout_paths:
+        for cutout_path, cutout_metadata in zip(cutout_paths, recipe['cutouts']):
             if cutout_path not in shared_data:
                 log.debug(f"Loading cutout image {cutout_path}")
                 img = cv2.imread(str(cutout_path), cv2.IMREAD_UNCHANGED)
-                # Resize the image based on the resize scale
-                if resize_factor != 1.0:
-                    img = resize_image(img, resize_factor)
+                
+                # Calculate real-world scaling for the cutout
+                cutout_area = cutout_metadata['cutout_props']['bbox_area_cm2']
+                cutout_pixel_area = cutout_area * pixel_cm_ratio
+                cutout_scaling_factor = math.sqrt(cutout_pixel_area / (img.shape[1] * img.shape[0]))
+
+                # Resize cutout
+                img = resize_image(img, cutout_scaling_factor)
+                # # Resize the image based on the resize scale
+                # if resize_factor != 1.0:
+                #     img = resize_image(img, resize_factor)
                 if img.shape[2] == 4:
                     img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
 
@@ -619,7 +640,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         
         # Distribute the cutout images on the background
         result, result_semantic_mask, result_instance_mask, coord_results, yolo_bboxes = processor.distribute_images(
-            background, images, recipe['cutouts'], mode="random"
+            background, images, recipe['cutouts'], mode="random", min_visibility=cfg.cutout_filters.min_visibility
         )
         
         # Save the results
