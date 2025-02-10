@@ -3,7 +3,7 @@
 
 #--------- Project Ignore ---------
 
-
+projects
 # Log files
 *.log
 
@@ -29,3 +29,6 @@ __pycache__
 
 # VsCode settings file
 *.vscode
+
+# IntelliJ stuff
+**/.idea

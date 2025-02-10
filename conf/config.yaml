@@ -1,35 +1,40 @@
 defaults:
-  - synth: synth
-  - cutouts: cutouts
+  - cutout_filters: default
+  - paths: default
   - _self_
 
 hydra:
   run:
-    dir: ${general.workdir}/data/projects/${general.project_name}
-  output_subdir: ${general.workdir}/data/projects/${general.project_name}
-
-datadir: 
+    dir: ${paths.workdir}/projects/${general.project_name}/${general.sub_project_name}
+  output_subdir: ${paths.workdir}/projects/${general.project_name}/${general.sub_project_name}
 
 general:
-  task: config_cutouts # config_cutouts, synthesize
-  project_name: very_big
-  workdir: ${hydra:runtime.cwd}  # where the code is executed
-  projectdir: ${general.workdir}/data/projects/${general.project_name}
+  project_name: test
+  sub_project_name: new_db
 
-repo_names:
-  semif_annotation: SemiF-AnnotationPipeline
-  semif_snyth: SemiF-SyntheticPipeline
+tasks:
+  # - json_to_mongo
+  - create_recipes
+  - move_cutouts
+  - synthesize
 
-blob_names:
-  developed: semifield-developed-images
-  synth: semifield-synth
-  cutout: semifield-cutouts  
+move_cutouts:
+  parallel: True
+  parallel_workers: 20
 
-data:
-  datadir: ${general.workdir}/data
-  # datadir: /mnt/research-projects/s/screberg/longterm_storage
-  developed: ${data.datadir}/${blob_names.developed}
-  cutoutdir: /mnt/research-projects/s/screberg/longterm_images/semifield-cutouts # ???
-  csvpath: ${general.projectdir}/${general.project_name}.csv
-  
-  
+synthesize:
+  resize_factor: 0.35 # Resize factor for the cutouts. Anything lower than 0.15 may give issues related to RandomScale transformation
+  parallel: false
+  parallel_workers: 4
+  instance_masks: False
+  yolo_contour_labels: False
+  yolo_bbox_labels: True
+
+aws:
+  s3_bucket: psi-hackathon
+
+mongodb:
+  host: localhost
+  port: 27017
+  db: agir_synth
+  collection: cutouts

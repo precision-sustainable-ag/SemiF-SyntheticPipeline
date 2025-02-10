@@ -1,209 +1,270 @@
+
 # SemiF-SyntheticPipeline
 
-## Setup
 
-### Config data csv
-Create a custom synthetic dataset by specifying various properties.
+## Installation and Setup
 
-1. Define SemiField-cutout input data directory in [conf/config.yaml](conf/config.yaml#L31)
-2. Configure your dataset in [conf/cutouts/cutouts.yaml](conf/cutouts/cutouts.yaml)
-3. Fill in a unique project name (`project_name`) in [conf/config.yaml](conf/cutouts/cutouts.yaml#L)
-3. Run
+### Installing Conda
+To manage the project's dependencies efficiently, we use Conda, a powerful package manager and environment manager. Follow these steps to install Conda if you haven't already:
+
+1. Download the appropriate version of Miniconda for your operating system from the official [Miniconda website](https://docs.anaconda.com/free/miniconda/).
+2. Follow the installation instructions provided on the website for your OS. This typically involves running the installer from the command line and following the on-screen prompts.
+3. Once installed, open a new terminal window and type `conda list` to ensure Conda was installed correctly. You should see a list of installed packages.
+
+
+### Setting Up Your Environment Using an Environment File
+After installing Conda, you can set up an environment for this project using an environment file, which specifies all necessary dependencies. Here's how:
+
+1. Clone this repository to your local machine.
+2. Navigate to the repository directory in your terminal.
+3. Locate the `environment.yaml` file in the repository. This file contains the list of packages needed for the project.
+4. Create a new Conda environment by running the following command:
+   ```bash
+   conda env create -f environment.yml
+   ```
+   This command reads the `environment.yaml` file and creates an environment with the name and dependencies specified within it.
+
+5. Once the environment is created, activate it with:
+   ```bash
+   conda activate <env_name>
+   ```
+   Replace `<env_name>` with the name of the environment specified in the `environment.yaml` file.
+
+6. (Optional): To update your environment after making changes to the environment.yaml file, run: 
     ```bash
-    python SYNTH.py general.task=config_cutouts
-    ```
-4. CSV along with processing log and saved configurations are saved in [data/projects/{project_name}](data/projects)
-
-### Generate Synthetic data
-
-Using the configured dataset csv in [data/projects/{project_name}](data/projects), `images`, `masks`, and `metadata` by default will be created in similarly named folders (respectively). Optionally, YOLO formatted labels can be produced in a `yolo_labels` folder.
-
-| Configs | Description | Default |
-| --- | --- | --- |
-| `count` | the number of synthetic images to generate | 10 |
-| `multiprocess` | Flag to use multiprocessing. `False` makes it easier to debug | `True` |
-| `export_yolo_labels` | `True` creates a `yolo_labels` folder in `<project_name>/results` for Yolo formatted `.txt` files for bounding box locations in normalized `class` `x` `y` `width` `height` | `False` |
-| `pot_jitter` | amount of random movement in the x and y position of pots | `[100, 100]` |
-
-2. Run
-    ```bash
-    python SYNTH.py general.task=synthesize
+    conda env update --file environment.yml
     ```
 
-# Data Structure
+### Setting Up MongoDB and Mongosh
 
-* Pot and background images are located in this repository
-* Outputs (`images`, `masks`, and `metadata`) are also located in this repository.
+#### Step 1: Download and Install MongoDB
+1. **SSH into your server**.
+2. **Create a directory** for MongoDB:
+   ```bash
+   mkdir -p ~/mongodb && cd ~/mongodb
+   ```
+3. **Download MongoDB binaries** from the [MongoDB Download Center](https://www.mongodb.com/try/download/community) or use `wget`:
+   ```bash
+   wget https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-<version>.tgz
+   ```
+4. **Extract the binaries**:
+   ```bash
+   tar -zxvf mongodb-linux-x86_64-<version>.tgz
+   mv mongodb-linux-x86_64-<version> mongo
+   ```
+
+#### Step 2: Configure MongoDB
+1. **Add MongoDB to your PATH**:
+   ```bash
+   echo 'export PATH=~/mongodb/mongo/bin:$PATH' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+2. **Create directories** for MongoDB data and logs:
+   ```bash
+   mkdir -p ~/mongodb/data ~/mongodb/logs
+   ```
+
+#### Step 3: Install Mongosh
+1. **Download Mongosh** from the [MongoDB Shell download page](https://www.mongodb.com/try/download/shell) or use `wget`:
+   ```bash
+   wget https://downloads.mongodb.com/compass/mongosh-<version>-linux-x64.tgz
+   ```
+2. **Extract and install Mongosh**:
+   ```bash
+   mkdir ~/bin
+   tar -xzvf mongosh-<version>-linux-x64.tgz -C ~/bin/
+   ```
+3. **Update PATH for Mongosh**:
+   ```bash
+   echo 'export PATH="$HOME/bin/mongosh-<version>-linux-x64/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+#### Step 4: Running MongoDB
+
+1. **Start MongoDB**:
+   ```bash
+   mongod --dbpath ~/mongodb/data/db --bind_ip_all --logpath ~/mongodb/logs/mongod.log --fork
+   ```
+
+2. **Verify MongoDB is running**:
+   ```bash
+   ps -aux | grep mongod
+   ```
+   Parts that need access to the mongodb can now access it.
+
+#### Step 5: Stop a running MongoDB
+
+3. **Use `mongod` with a Shutdown Option**:
+   
+   If you’re running mongod as a background process, you can send a shutdown signal:
+
+   ```bash
+   mongod --shutdown --dbpath <path-to-db>
+   ```
+
+### Exporting a MongoDB
+
+#### Option 1: `mongodump` and `mongorestore`
+
+##### Install `mongodump` and `mongorestore`
+
+1. **Download MongoDB Database Tools**
+
+   You can manually download the tools from MongoDB’s official website:
+
+   ```bash
+   wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.9.5.tgz
+   ```
+   *(Make sure to replace `ubuntu2204` with your specific version if needed, and `100.9.5` with the latest version available.)*
+
+---
+
+2. **Extract the Archive**
+   
+   ```bash
+   tar -xvzf mongodb-database-tools-ubuntu2204-x86_64-100.9.5.tgz
+   ```
+
+   This will create a directory with MongoDB tools.
+
+---
+
+3. **Add to PATH (Temporary)**
+   
+   If you want to use the tools just for this session, add them to your `PATH`:
+   ```bash
+   export PATH=$HOME/mongodb-database-tools-ubuntu2204-x86_64-100.9.5/bin:$PATH
+   ```
+   Now, you should be able to run:
+   ```bash
+   mongodump --help
+   mongorestore --help
+   ```
+---
+
+4. **Add to PATH Permanently**
+   
+   If you want to keep these tools accessible in future sessions, add this line to your `~/.bashrc` or `~/.bash_profile`:
+   ```bash
+   echo 'export PATH=$HOME/mongodb-database-tools-ubuntu2204-x86_64-100.9.5/bin:$PATH' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+##### Use `mongodump` and `mongorestore`
+This method exports the entire database as BSON files, which can be restored on another system.
+
+1. **Export the MongoDB database**
+   
+   Run the following command on the source machine:
+   ```bash
+   mongodump --host <your_host> --port <your_port> -d <database_name> --out /path/to/backup
+   ```
+   - Replace `<your_host>` and `<your_port>` with the MongoDB server details.
+   - Replace `<database_name>` with the actual database name.
+   - The backup will be stored in `/path/to/backup/<database_name>`.
+
+2. **Transfer the Backup**
+   
+   Copy the `/path/to/backup` directory to the target location.
+
+3. **Restore on the Target Machine**
+   
+   On the target machine, run:
+   ```bash
+   mongorestore --host <target_host> --port <target_port> --db <new_database_name> /destination/path/<database_name>
+   ```
+   - Replace `<new_database_name>` with the desired database name.
+
+---
+
+#### Option 2: `mongoexport` and `mongoimport`(For JSON Transfer) 
 
 
-## Pipeline
-![](asset/Pipeline_flowchart.png)
+##### Install `mongoexport` and `mongoimport`
 
-<br>
+Follow the instruction from Option 1. 
 
-## UML Class diagram
+##### Use `mongoexport` and `mongoimport`
 
-![](asset/Class_diagrams-synthetic.png)
+1. **Export Data to JSON**
+   
+   ```bash
+   mongoexport --host <your_host> --port <your_port> -d <database_name> -c <collection_name> --out /path/to/export.json
+   ```
+   - This creates a JSON dump of the collection.
+
+2. **Transfer the JSON File**
+
+   Copy it to another location
+   
+3. **Import the JSON into the Target Database**
+
+   On the target machine, run:
+   ```bash
+   mongoimport --host <target_host> --port <target_port> -d <new_database_name> -c <collection_name> --file /destination/path/export.json --jsonArray
+   ```
+   - Ensure `--jsonArray` is used if the exported file contains an array of documents.
 
 
-```
-SemiF-SyntheticPipeline
-└── data
-    └── semifield-synth
-        ├── backgrounds
-        │   ├── background_1.json
-        │   └── background_1.png
-        ├── pots
-        │   ├── pot_1.json
-        │   └── pot_1.png
-        ├── images
-        │   ├── c2cd770ad1ba4543803bbce4cc4b6184.png
-        │   └── cccd3d7264624a72a3b11888bf2edde6.png
-        ├── masks
-        │   ├── c2cd770ad1ba4543803bbce4cc4b6184.png
-        │   └── cccd3d7264624a72a3b11888bf2edde6.png
-        └── metadata
-            ├── c2cd770ad1ba4543803bbce4cc4b6184.json
-            └── cccd3d7264624a72a3b11888bf2edde6.json
-```  
-* Cutouts are taken from the Semifield-cutout directory, in this example, another repository.
+## Scripts:
 
-```
-SemiF-AnnotationPipeline
-└── data
-    └── semifield-cutouts
-        └── MD_2022-06-28
-            ├── MD_2_2_1655826744.0_0.png
-            └── MD_2_2_1655826744.0_0.json
-```
-<br>
 
-## Data
+### Json to Mongo
 
-### background_1.json
-```Json
-{
-    "background_path": "backgrounds/background_1.png",
-    "background_id": "4440b6a6-38da-463b-8d40-dde1b7b79900"
-}
-```
+This script loads JSON data from batch directories in an NFS storage system into a MongoDB database. It reads the batch names from a YAML configuration file, checks both primary and secondary NFS storage locations for the corresponding JSON metadata files, and inserts the data into a specified MongoDB collection.
 
-<br>
+#### Key Features
+- **MongoDB Integration**: Connects to MongoDB to insert JSON data.
+- **Batch Processing**: Reads batch names from a YAML configuration and processes the corresponding directories in the NFS storage locker.
+- **Primary and Secondary Storage**: Automatically checks both primary and secondary NFS storage paths for the presence of batch directories.
 
-### pot_1.json
-```Json
-{
-    "pot_path": "pots/MD_1_16_1656440273.0.png",
-    "pot_id": "db9225b1-342f-483c-b350-85014b7bf611"
-}
-```
+#### Output
+- **Data Insertion**: Inserts JSON data from batch directories into the specified MongoDB collection. 
 
-<br>
+### **Create Recipes**
 
-### Cutout example
-```Json
-{
-    "blob_home": "data",
-    "data_root": "semifield-cutouts",
-    "batch_id": "MD_2022-06-21",
-    "image_id": "MD_2_2_1655826744.0",
-    "cutout_id": "MD_2_2_1655826744.0_0",
-    "cutout_path": "MD_2022-06-21/MD_2_2_1655826744.0_0.png",
-    "cls": "plant",
-    "cutout_num": 0,
-    "is_primary": false,
-    "datetime": "2022:06:21 23:56:59",
-    "cutout_props": {
-        "area": 6117.0,
-        "area_bbox": 17358.0,
-        "area_convex": 7551.0,
-        "axis_major_length": 270.7782922363416,
-        "axis_minor_length": 31.13171551152259,
-        "centroid0": 124.0601602092529,
-        "centroid1": 193.53997057381068,
-        "eccentricity": 0.9933688209359223,
-        "solidity": 0.8100913786253476,
-        "perimeter": 642.3229432149742
-    },
-    "schema_version": "1.0"
-}
-```
-## Synthetic image
+This script is responsible for creating synthetic image recipes by selecting cutout images based on specific criteria and associating them with background images. The recipes are then saved in JSON format for use in synthetic dataset generation.
 
-```Json
-{
-    "data_root": "semifield-synth",
-    "synth_path": "images/cccd3d7264624a72a3b11888bf2edde6.png",
-    "synth_maskpath": "masks/cccd3d7264624a72a3b11888bf2edde6.png",
-    "pots": [
-        {
-            "pot_path": "pots/MD_72_2_1655836004.0.png",
-            "pot_id": "ad4676e7-9fcc-4280-80ed-ddd5688c6d10"
-        },
-        {
-            "pot_path": "pots/pot_5.png",
-            "pot_id": "a5166e35-bd08-40ac-a741-d2d11ca30361"
-        }
-    ],
-    "background": [
-        {
-            "background_path": "backgrounds/MD_72_2_1655836004.0_background.png",
-            "background_id": "4e0a75d4-f3ef-4920-b671-a9d94b38f27c"
-        }
-    ],
-    "cutouts": [
-        {
-            
-            "blob_home": "data",
-            "data_root": "semifield-cutouts",
-            "batch_id": "MD_2022-06-28",
-            "image_id": "MD_2_14_1656451343.0",
-            "cutout_num": 53,
-            "datetime": "2022:06:29 05:19:25",
-            "cutout_props": {
-                "area": 35006.0,
-                "area_bbox": 51170.0,
-                "area_convex": 37856.0,
-                "axis_major_length": 281.0165308653915,
-                "axis_minor_length": 164.29763429928514,
-                "centroid0": 554.6574587213621,
-                "centroid1": 354.5368222590413,
-                "eccentricity": 0.8112822486437252,
-                "solidity": 0.9247147083685545,
-                "perimeter": 849.2935059634514
-            },
-            "cutout_path": "MD_2022-06-28/MD_2_14_1656451343.0_53.png",
-            "cutout_id": "MD_2_14_1656451343.0_53",
-            "cls": "dicot",
-            "is_primary": false,
-            "schema_version": "1.0"
-        },
-        {
-            "blob_home": "data",
-            "data_root": "semifield-cutouts",
-            "batch_id": "MD_2022-06-28",
-            "image_id": "MD_3_4_1656430853.0",
-            "cutout_num": 4,
-            "datetime": "2022:06:28 23:37:56",
-            "cutout_props": {
-                "area": 63096.0,
-                "area_bbox": 91780.0,
-                "area_convex": 66771.0,
-                "axis_major_length": 381.4839752304773,
-                "axis_minor_length": 216.45776748452977,
-                "centroid0": 776.4104380626347,
-                "centroid1": 184.30910041841005,
-                "eccentricity": 0.823435519768727,
-                "solidity": 0.9449611358224379,
-                "perimeter": 1087.259018078045
-            },
-            "cutout_path": "MD_2022-06-28/MD_3_4_1656430853.0_4.png",
-            "cutout_id": "MD_3_4_1656430853.0_4",
-            "cls": "dicot",
-            "is_primary": false,
-            "schema_version": "1.0"
-        }
-    ],
-    "synth_id": "a6fd06ab-862f-4fb4-954e-7be34dc82c0c"
-}
-```
+#### Key Features
+- **MongoDB Integration**: Retrieves cutout metadata from a MongoDB collection based on specific filter criteria defined in the configuration.
+- **Randomized Synthetic Image Generation**: Associates cutouts with randomly selected background images and creates synthetic images with varying numbers of cutouts.
+- **Flexible Cutout Usage**: Configurable to either reuse cutouts across multiple synthetic images or ensure each cutout is used only once.
+- **JSON Output**: Saves the generated synthetic image recipes to a JSON file for further processing.
+
+#### Output
+- **Synthetic Image Recipes**: A JSON file containing a list of synthetic images, each with a unique ID, background image, and associated cutouts. The file is saved in the `recipes` directory under the project directory.
+
+
+### **Move Cutouts**
+
+This script is responsible for downloading plant cutout images from long-term storage to a local directory. It can handle both sequential and concurrent data transfer. The downloaded cutouts are stored locally for further use in synthetic image generation.
+
+#### Key Features
+- **Sequential and Parallel Processing**: The script can download cutouts in a sequential manner or use multithreading.
+- **Dual Storage Locations**: Looks in both primary and secondary long-term storage locations.
+
+#### Output
+- **Downloaded Images**: The script downloads `.png` cutout images to the specified local directory.
+
+
+### **Synthesize**
+
+This script is designed to generate synthetic images by overlaying plant cutout images onto various backgrounds using a copy-and-paste method. The script provides CPU parallelism.
+
+- **Parallelism**: Utilizes Python's `concurrent.futures.ProcessPoolExecutor` to enable concurrent processing of multiple image recipes, leveraging multi-core CPUs.
+- **Transformations**: Applies a variety of image transformations (e.g., rotation, flipping) using the Albumentations library.
+- **Dynamic Shadow Generation**: Simulates dynamic shadows for the cutouts based on their size and position relative to the light source.
+- **Cutout Distribution**: Supports random placement of cutouts on background images, creating diverse compositions.
+- **Output Flexibility**: Saves images, semantic masks, instance masks, and YOLO format segmentation labels.
+
+#### Output
+- **Images**: Generated synthetic images in `.jpg` format.
+- **Semantic Masks**: Corresponding masks with class annotations in `.png` format.
+- **Instance Masks**: Optional masks for instance annotations.
+- **YOLO Labels**: Segmentation contours in YOLO format.
+
+
+
+## License
+
+This script is provided as-is, with no warranties or guarantees. You are free to modify and distribute it as needed. However, attribution is appreciated if you share it publicly.
