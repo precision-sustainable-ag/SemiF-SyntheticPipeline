@@ -9,18 +9,18 @@ hydra:
   output_subdir: ${paths.workdir}/projects/${general.project_name}/${general.sub_project_name}
 
 general:
-  project_name: test
-  sub_project_name: new_db
+  project_name: pm3d
+  sub_project_name: test
 
 tasks:
-  # - json_to_mongo
+  # - json_to_mongo # Deprecated
   - create_recipes
   - move_cutouts
   - synthesize
 
 move_cutouts:
   parallel: True
-  parallel_workers: 20
+  parallel_workers: 8
 
 synthesize:
   resize_factor: 0.35 # Resize factor for the cutouts. Anything lower than 0.15 may give issues related to RandomScale transformation
@@ -30,11 +30,7 @@ synthesize:
   yolo_contour_labels: False
   yolo_bbox_labels: True
 
-aws:
-  s3_bucket: psi-hackathon
-
-mongodb:
-  host: localhost
-  port: 27017
-  db: agir_synth
-  collection: cutouts
+sqlite3:
+  dev_imgs: "semif_developed_images" # Table name
+  cutouts: "semif_cutouts" # Table name
+  db_name: "agir"

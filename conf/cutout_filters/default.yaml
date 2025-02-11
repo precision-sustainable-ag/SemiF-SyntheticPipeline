@@ -1,14 +1,14 @@
 # Settings
 
-total_images: 10
+total_images: 150
 
-# background_fov_cm2: 7500 # bbot images, Assumed real-world field of view for backgrounds (in cm²)
-background_fov_cm2: 3000  # unsplash images Assumed real-world field of view for backgrounds (in cm²)
+background_fov_cm2: 7500 # bbot images, Assumed real-world field of view for backgrounds (in cm²)
+# background_fov_cm2: 3000  # unsplash images Assumed real-world field of view for backgrounds (in cm²)
 resize_factor: 0.5
 
 cuts_n_image: # Number of cutouts per image
-  min: 3
-  max: 10
+  min: 1000
+  max: 10000
 
 reuse_cutouts: true  # Whether to allow reusing cutouts in multiple images
 min_visibility: 0.9  # Minimum visibility ratio required for the new cutout
@@ -22,8 +22,8 @@ morphological:
   extends_border: false
   
   bbox_area_cm2:  # Area range in cm2
-    min: 1000
-    max: 1000000
+    min: 100
+    max: 1000
     area_categories:
     # very_small: [0, 0.1]
     # small: [0.1, 1]
@@ -49,20 +49,66 @@ category:
   species:   # Exact species
   subclass:   # Exact subclass
   common_name: 
-    - black oats
-    - oats
-    - cereal rye
-    - crimson clover
-    - red clover
+    # - black oats
+    # - oats
+    # - cereal rye
+    # - Crimson clover
+    # - red clover
     - winter pea
     - hairy vetch
+    # - Barley
+    # - Barnyardgrass
+    # - Black Oats
+    # - Broadleaf Signalgrass
+    # - Cereal Rye
+    # - Cocklebur
+    # # - Colorchecker
+    # - Common Lambsquarters
+    # - Common Ragweed
+    # - Common Sunflower
+    # - Crimson Clover
+    # - Cultivated Radish
+    # - Fall Panicum
+    # - Giant Foxtail
+    # - Goosegrass
+    # - Hairy Vetch
+    # - Horseweed
+    # - Italian Ryegrass
+    # - Jimson Weed
+    # - Johnsongrass
+    # - Jungle Rice
+    # - Kochia
+    # - Large Crabgrass
+    # - Maize
+    # - Mustards
+    # - Oats
+    # - Palmer Amaranth
+    # - Pitted Morning-Glory
+    # - Prickly Sida
+    # - Purple Nutsedge
+    # - Ragweed Parthenium
+    # - Red Clover
+    # - Sicklepod
+    # - Smooth Pigweed
+    # - Soybean
+    # - Spiny Amaranth
+    # - Sprawling Signalgrass
+    # - Texas Millet
+    # - Triticale
+    # # - Unknown
+    # - Upland Cotton
+    # - Velvetleaf
+    # - Waterhemp
+    # - Winter Pea
+    # - Winter Wheat
+    # - Yellow Foxtail
     
-common_name_weights:
-    crimson clover: 0.25  # Broadleaf
-    red clover: 0.25      # Broadleaf
-    winter pea: 0.25      # Broadleaf
-    hairy vetch: 0.3     # Broadleaf
-    black oats: 0.001      # Grass
-    oats: 0.001            # Grass
-    cereal rye: 0.001      # Grass
+common_name_weights: # Not used
+    # crimson clover: 0.25  # Broadleaf
+    # red clover: 0.25      # Broadleaf
+    # winter pea: 0.25      # Broadleaf
+    # hairy vetch: 0.3     # Broadleaf
+    # black oats: 0.001      # Grass
+    # oats: 0.001            # Grass
+    # cereal rye: 0.001      # Grass
     

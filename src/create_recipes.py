@@ -5,11 +5,9 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Any
 from collections import defaultdict
-
-from pymongo import MongoClient
 from omegaconf import DictConfig
 
-from utils.query import MongoDBQueryHandler
+from utils.sql3_query import SQLiteQueryHandler
 
 log = logging.getLogger(__name__)
   
@@ -92,7 +90,7 @@ class RecipeCreator:
         log.info(f"Saved recipes to {output_path}.")
 
 
-class MongoDBRecipeManager:
+class DBRecipeManager:
     """Main class to manage MongoDB document retrieval and recipe creation."""
 
     def __init__(self, cfg: DictConfig) -> None:
@@ -103,10 +101,6 @@ class MongoDBRecipeManager:
             cfg (DictConfig): The configuration object.
         """
         self.cfg = cfg
-        # Set up MongoDB connection
-        self.client = MongoClient(f'mongodb://{cfg.mongodb.host}:{cfg.mongodb.port}/')
-        self.db = self.client[cfg.mongodb.db]  # Access MongoDB database
-        self.collection = self.db[cfg.mongodb.collection]  # Access MongoDB collection
         self.recipe_creator = RecipeCreator(cfg)
         self.output_dir = Path(cfg.paths.projectdir, "recipes")  # Output directory for synthetic image recipes
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -210,8 +204,14 @@ class MongoDBRecipeManager:
             
             # Add each sampled cutout to the synthetic image
             for cutout in sampled_cutouts:
-                if not self.cfg.cutout_filters.reuse_cutouts and cutout["_id"] in self.recipe_creator.used_cutouts:
-                    continue  # Skip cutout if it has already been used and reuse is not allowed
+                cutout_id = cutout.get("_id") or cutout.get("id")
+                if cutout_id is None:
+                    log.warning("No identifier found for cutout, skipping.")
+                    continue
+
+                if not self.cfg.cutout_filters.reuse_cutouts and cutout_id in self.recipe_creator.used_cutouts:
+                    continue  # Skip cutout if already used and reuse is not allowed
+
                 self.recipe_creator.used_cutouts.add(cutout["_id"])  # Track used cutouts
                 self.recipe_creator.add_cutout_to_image(synthetic_image, cutout)  # Add cutout to the synthetic image
                 cutouts_added_to_image = True  # Set flag to True
@@ -253,10 +253,19 @@ def main(cfg: DictConfig) -> None:
     Main function to initialize the MongoDBRecipeManager and start the recipe creation process.
     """
     log.info("Starting recipe creation process.")  # Log the start of the process
-    query_handler = MongoDBQueryHandler(cfg)
-    query_handler.build_query()
-    documents = query_handler.execute_query()
 
-    recipe_manager = MongoDBRecipeManager(cfg)
+    query_handler = SQLiteQueryHandler(cfg)
+    query_handler.add_conditions()
+    rows, columns = query_handler.execute_query()
+    query_handler.close()
+    # Convert the rows to a list of dictionaries.
+    documents = [dict(zip(columns, row)) for row in rows]
+    # Ensure each document has an _id field.
+    for doc in documents:
+        if "_id" not in doc:
+            # Generate a new unique identifier as a string.
+            doc["_id"] = str(uuid.uuid4())
+    
+    recipe_manager = DBRecipeManager(cfg)
     recipe_manager.process_cutouts(documents)
     log.info("Recipe creation completed.")
