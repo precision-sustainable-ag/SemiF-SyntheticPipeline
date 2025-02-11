@@ -11,8 +11,6 @@ projects
 .hydra
 
 # ---------- Misc -----------
-# Shell scripts
-*.sh
 
 # Mac stuff
 **/.DS_Store

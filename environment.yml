@@ -13,7 +13,6 @@ dependencies:
   # - scikit-image
   # - scikit-learn
   # - scipy
-  - pymongo
   - tqdm
   - albumentations
   - pip:
