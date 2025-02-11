@@ -230,6 +230,32 @@ class DBRecipeManager:
         self.recipe_creator.save_recipes(self.output_dir)
         log.info(f"Total images generated: {min(image_index + 1, total_images)}")
 
+def recursively_parse_json(obj):
+    """
+    Recursively convert JSON strings in a nested structure (dict or list) into Python objects.
+    
+    Args:
+        obj: The object to process (can be dict, list, or a primitive value).
+    
+    Returns:
+        The object with any JSON strings parsed into dictionaries/lists.
+    """
+    if isinstance(obj, str):
+        # Try to parse the string as JSON. If it fails, return the original string.
+        try:
+            parsed = json.loads(obj)
+            # Recursively process the parsed object.
+            return recursively_parse_json(parsed)
+        except json.JSONDecodeError:
+            return obj  # Not a JSON string, return as-is.
+    elif isinstance(obj, dict):
+        return {key: recursively_parse_json(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [recursively_parse_json(item) for item in obj]
+    else:
+        # For any other data type, return it unchanged.
+        return obj
+    
 def log_sample_counts(documents, text="samples"):
     """
     Print the number of samples for each common name class in the dataset.
@@ -265,7 +291,8 @@ def main(cfg: DictConfig) -> None:
         if "_id" not in doc:
             # Generate a new unique identifier as a string.
             doc["_id"] = str(uuid.uuid4())
-    
+    # Convert nested JSON strings into dictionaries/lists.
+    documents = [recursively_parse_json(doc) for doc in documents]
     recipe_manager = DBRecipeManager(cfg)
     recipe_manager.process_cutouts(documents)
     log.info("Recipe creation completed.")
