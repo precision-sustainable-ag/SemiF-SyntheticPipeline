@@ -81,7 +81,7 @@ class RecipeCreator:
             output_dir (str): Directory to save the recipe files.
         """
         # Define the output file path
-        recipe_filename = f"{self.cfg.general.project_name}_{self.cfg.general.sub_project_name}.json"
+        recipe_filename = f"{self.cfg.project_name}_{self.cfg.sub_name}.json"
         output_path = Path(output_dir) / recipe_filename
 
         # Write recipes to a JSON file with proper formatting

@@ -26,7 +26,7 @@ class CutoutDownloader:
         :param local_download_folder: Local folder where the images will be downloaded.
         """
         self.json_file_path = Path(cfg.paths.projectdir, "recipes",
-                                   f"{cfg.general.project_name}_{cfg.general.sub_project_name}.json")
+                                   f"{cfg.project_name}_{cfg.sub_name}.json")
 
         self.primary_storage_base = Path(cfg.paths.primary_longterm_storage, "semifield-cutouts")
         self.secondary_storage_base = Path(cfg.paths.secondary_longterm_storage, "semifield-cutouts")
@@ -84,10 +84,6 @@ class CutoutDownloader:
         # Construct the file path in long-term storage
         image_filename = f"{cutout_id}.png"
 
-        # self.s3_bucket.download_file(
-        #     'longterm_images/MD_2022-08-04/MD_1659617815_55.png', 'tmp')
-        #
-
         primary_image_path = Path(self.primary_storage_base, batch_id,
                                           image_filename)
         secondary_image_path = Path(self.secondary_storage_base,
@@ -102,11 +98,8 @@ class CutoutDownloader:
             return
 
         # Check if the file exists in the primary storage
-        # if self.s3_file_exists(primary_image_path):
         if primary_image_path.exists():
             try:
-                # self.s3_bucket.download_file(primary_image_path,
-                                            #  local_image_path)
                 shutil.copy(primary_image_path, local_image_path)
                 log.debug(
                     f"Downloaded from primary: {cutout_id} to {local_image_path}")
@@ -115,11 +108,8 @@ class CutoutDownloader:
                     f"Error copying file from primary: {primary_image_path} to {local_image_path} - {e}")
 
         # If the file does not exist in primary, try the secondary storage
-        # elif self.s3_file_exists(secondary_image_path):
         elif secondary_image_path.exists():
             try:
-                # self.s3_bucket.download_file(secondary_image_path,
-                #                              local_image_path)
                 shutil.copy(secondary_image_path, local_image_path)
                 log.debug(
                     f"Downloaded from secondary: {cutout_id} to {local_image_path}")

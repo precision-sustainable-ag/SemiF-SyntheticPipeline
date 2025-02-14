@@ -27,7 +27,7 @@ class MongoDBQueryHandler:
         self.client = MongoClient(f'mongodb://{cfg.mongodb.host}:{cfg.mongodb.port}/')
         self.db = self.client[cfg.mongodb.db]
         self.collection = self.db[cfg.mongodb.collection]
-        self.output_file = Path(self.cfg.paths.resultsdir, cfg.general.project_name + ".json")
+        self.output_file = Path(self.cfg.paths.resultsdir, cfg.project_name + ".json")
         self.query = {}
 
     def build_query(self) -> None:
