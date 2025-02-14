@@ -4,6 +4,15 @@
 SemiF-SyntheticPipeline is a Python-based pipeline for generating synthetic images of AgIR data by compositing plant cutouts onto background images. It is designed with configurable filters, image transformations, and metadata management.
 
 
+## Known Issues and ToDos
+
+### **YOLO Contour Labels Accuracy and Format Update**
+- **Issue**: The current implementation of `yolo_contour_labels` is uncertain in terms of accuracy, and it is unclear if the contours are correctly formatted for YOLO segmentation.
+- **Current Status**: This setting is **not recommended for use** in its current state.
+- **Planned Update**:
+  - The `yolo_contour_labels` output should be updated to generate COCO-style polygon annotations instead of YOLO contours.
+  - This will improve compatibility with existing COCO-based datasets and annotation tools.
+
 ## Installation and Setup
 
 ### Prerequisites
@@ -42,9 +51,8 @@ The pipeline is configured using **Hydra-based YAML files**.
 ### Main Configuration: `config.yaml`
 Defines project details, processing tasks, and key settings:
 ```yaml
-general:
-  project_name: pm3d
-  sub_project_name: test
+project_name: pm3d
+sub_name: test
 
 tasks:
   - create_recipes
@@ -88,7 +96,7 @@ Generates synthetic image recipes by selecting cutouts and assigning them to bac
 - Outputs recipes as JSON files.
 
 #### Output:
-- `recipes/{project_name}_{sub_project_name}.json`
+- `recipes/{project_name}_{sub_name}.json`
   ```json
   {
     "synthetic_images": [

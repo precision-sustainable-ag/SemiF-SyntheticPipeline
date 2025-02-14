@@ -5,12 +5,12 @@ defaults:
 
 hydra:
   run:
-    dir: ${paths.workdir}/projects/${general.project_name}/${general.sub_project_name}
-  output_subdir: ${paths.workdir}/projects/${general.project_name}/${general.sub_project_name}
+    dir: ${paths.workdir}/projects/${project_name}/${sub_name}
+  output_subdir: ${paths.workdir}/projects/${project_name}/${sub_name}
 
-general:
-  project_name: pm3d
-  sub_project_name: test
+
+project_name: pm3d
+sub_name: mixed
 
 tasks:
   # - json_to_mongo # Deprecated
@@ -23,12 +23,12 @@ move_cutouts:
   parallel_workers: 8
 
 synthesize:
-  resize_factor: 0.35 # Resize factor for the cutouts. Anything lower than 0.15 may give issues related to RandomScale transformation
   parallel: false
   parallel_workers: 4
+  semantic_masks: True
   instance_masks: False
-  yolo_contour_labels: False
-  yolo_bbox_labels: True
+  yolo_contour_labels: False  # TODO: Convert this to generate COCO-format labels instead of YOLO-style contours
+  yolo_bbox_labels: False
 
 sqlite3:
   dev_imgs: "semif_developed_images" # Table name
