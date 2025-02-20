@@ -1,270 +1,147 @@
+# SemiF-SyntheticPipeline Documentation
 
-# SemiF-SyntheticPipeline
+## Overview
+SemiF-SyntheticPipeline is a Python-based pipeline for generating synthetic images of AgIR data by compositing plant cutouts onto background images. It is designed with configurable filters, image transformations, and metadata management.
 
+
+## Known Issues and ToDos
+
+### **YOLO Contour Labels Accuracy and Format Update**
+- **Issue**: The current implementation of `yolo_contour_labels` is uncertain in terms of accuracy, and it is unclear if the contours are correctly formatted for YOLO segmentation.
+- **Current Status**: This setting is **not recommended for use** in its current state.
+- **Planned Update**:
+  - The `yolo_contour_labels` output should be updated to generate COCO-style polygon annotations instead of YOLO contours.
+  - This will improve compatibility with existing COCO-based datasets and annotation tools.
 
 ## Installation and Setup
 
-### Installing Conda
-To manage the project's dependencies efficiently, we use Conda, a powerful package manager and environment manager. Follow these steps to install Conda if you haven't already:
+### Prerequisites
+- **Python**: Ensure Python (>=3.11) is installed.
+- **Conda** (recommended): Used for environment management.
 
-1. Download the appropriate version of Miniconda for your operating system from the official [Miniconda website](https://docs.anaconda.com/free/miniconda/).
-2. Follow the installation instructions provided on the website for your OS. This typically involves running the installer from the command line and following the on-screen prompts.
-3. Once installed, open a new terminal window and type `conda list` to ensure Conda was installed correctly. You should see a list of installed packages.
+### Install Conda
+1. Download Miniconda from [Miniconda website](https://docs.anaconda.com/free/miniconda/).
+2. Follow installation instructions for your OS.
+3. Verify installation by running:
+   ```bash
+   conda list
+   ```
 
-
-### Setting Up Your Environment Using an Environment File
-After installing Conda, you can set up an environment for this project using an environment file, which specifies all necessary dependencies. Here's how:
-
-1. Clone this repository to your local machine.
-2. Navigate to the repository directory in your terminal.
-3. Locate the `environment.yaml` file in the repository. This file contains the list of packages needed for the project.
-4. Create a new Conda environment by running the following command:
+### Set Up Environment
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-repo/SemiF-SyntheticPipeline.git
+   cd SemiF-SyntheticPipeline
+   ```
+2. Create and activate the environment:
    ```bash
    conda env create -f environment.yml
-   ```
-   This command reads the `environment.yaml` file and creates an environment with the name and dependencies specified within it.
-
-5. Once the environment is created, activate it with:
-   ```bash
    conda activate <env_name>
    ```
-   Replace `<env_name>` with the name of the environment specified in the `environment.yaml` file.
-
-6. (Optional): To update your environment after making changes to the environment.yaml file, run: 
-    ```bash
-    conda env update --file environment.yml
-    ```
-
-### Setting Up MongoDB and Mongosh
-
-#### Step 1: Download and Install MongoDB
-1. **SSH into your server**.
-2. **Create a directory** for MongoDB:
+3. **Download the Database Locally**
+   The pipeline relies on an SQLite database. You need to download it using the provided `copy_db.sh` script run from the repo root:
    ```bash
-   mkdir -p ~/mongodb && cd ~/mongodb
+   bash copy_db.sh
    ```
-3. **Download MongoDB binaries** from the [MongoDB Download Center](https://www.mongodb.com/try/download/community) or use `wget`:
-   ```bash
-   wget https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-<version>.tgz
-   ```
-4. **Extract the binaries**:
-   ```bash
-   tar -zxvf mongodb-linux-x86_64-<version>.tgz
-   mv mongodb-linux-x86_64-<version> mongo
-   ```
+   Ensure the database is placed in the correct directory as specified in the configuration files.
 
-#### Step 2: Configure MongoDB
-1. **Add MongoDB to your PATH**:
-   ```bash
-   echo 'export PATH=~/mongodb/mongo/bin:$PATH' >> ~/.bashrc
-   source ~/.bashrc
-   ```
-2. **Create directories** for MongoDB data and logs:
-   ```bash
-   mkdir -p ~/mongodb/data ~/mongodb/logs
-   ```
+## Configuration
+The pipeline is configured using **Hydra-based YAML files**.
 
-#### Step 3: Install Mongosh
-1. **Download Mongosh** from the [MongoDB Shell download page](https://www.mongodb.com/try/download/shell) or use `wget`:
-   ```bash
-   wget https://downloads.mongodb.com/compass/mongosh-<version>-linux-x64.tgz
-   ```
-2. **Extract and install Mongosh**:
-   ```bash
-   mkdir ~/bin
-   tar -xzvf mongosh-<version>-linux-x64.tgz -C ~/bin/
-   ```
-3. **Update PATH for Mongosh**:
-   ```bash
-   echo 'export PATH="$HOME/bin/mongosh-<version>-linux-x64/bin:$PATH"' >> ~/.bashrc
-   source ~/.bashrc
-   ```
+### Main Configuration: `config.yaml`
+Defines project details, processing tasks, and key settings:
+```yaml
+project_name: pm3d
+sub_name: test
 
-#### Step 4: Running MongoDB
+tasks:
+  - create_recipes
+  - move_cutouts
+  - synthesize
 
-1. **Start MongoDB**:
-   ```bash
-   mongod --dbpath ~/mongodb/data/db --bind_ip_all --logpath ~/mongodb/logs/mongod.log --fork
-   ```
+move_cutouts:
+  parallel: True
+  parallel_workers: 8
 
-2. **Verify MongoDB is running**:
-   ```bash
-   ps -aux | grep mongod
-   ```
-   Parts that need access to the mongodb can now access it.
+synthesize:
+  resize_factor: 0.35
+  parallel: false
+  parallel_workers: 4
+  instance_masks: False
+  yolo_contour_labels: False
+  yolo_bbox_labels: True
+```
 
-#### Step 5: Stop a running MongoDB
+### Cutout Filters: `default.yaml`
+Defines filtering criteria for cutouts:
+```yaml
+morphological:
+  non_target_weed: false
+  non_target_weed_pred_conf:
+    min: 0.9
+    max: 1.0
 
-3. **Use `mongod` with a Shutdown Option**:
-   
-   If you’re running mongod as a background process, you can send a shutdown signal:
+bbox_area_cm2:
+  min: 100
+  max: 1000
+```
 
-   ```bash
-   mongod --shutdown --dbpath <path-to-db>
-   ```
+## Scripts and Functionality
+### **1. Create Recipes** (`create_recipes.py`)
+Generates synthetic image recipes by selecting cutouts and assigning them to background images.
 
-### Exporting a MongoDB
+#### Features:
+- Queries cutout metadata from SQLite.
+- Use `conf/cutout_filters/default.yaml` for creating synthetic image recipes.
+- Outputs recipes as JSON files.
 
-#### Option 1: `mongodump` and `mongorestore`
+#### Output:
+- `recipes/{project_name}_{sub_name}.json`
+  ```json
+  {
+    "synthetic_images": [
+      {
+        "synthetic_image_id": "unique_id",
+        "background_image_id": "bg_001.jpg",
+        "cutouts": [
+          { "cutout_id": "cutout_001", "batch_id": "batch_1" }
+        ]
+      }
+    ]
+  }
+  ```
 
-##### Install `mongodump` and `mongorestore`
+### **2. Move Cutouts** (`move_cutouts.py`)
+Moves cutout images from long-term storage to a local directory.
 
-1. **Download MongoDB Database Tools**
+#### Includes:
+- **Parallel download support**
+- **Looks into both primary and secondary storage locations**
+- **Ensures unique cutouts** before downloading to save time.
 
-   You can manually download the tools from MongoDB’s official website:
+#### Output:
+- `data/cutouts/*.png` (Downloaded cutout images)
 
-   ```bash
-   wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.9.5.tgz
-   ```
-   *(Make sure to replace `ubuntu2204` with your specific version if needed, and `100.9.5` with the latest version available.)*
+### **3. Synthesize** (`synthesize.py`)
+Generates synthetic images by overlaying cutouts onto backgrounds.
 
----
+#### Includes:
+- **Parallel processing** with `ProcessPoolExecutor`.
+- **Random transformations**: Rotation, flipping, etc.
+- **Shadow simulation**: Adjusts shadows based on cutout sizes.
+- **Output flexibility**: Saves images, masks, and YOLO labels.
 
-2. **Extract the Archive**
-   
-   ```bash
-   tar -xvzf mongodb-database-tools-ubuntu2204-x86_64-100.9.5.tgz
-   ```
+#### Output:
+- `projects/<project>/<name>/results/images/*.jpg` (Synthetic images)
+- `projects/<project>/<name>/results/semantic_masks/*.png` (Class-based masks)
+- `projects/<project>/<name>/results/instance_masks/*.png` (Instance masks, optional)
+- `projects/<project>/<name>/results/yolo_bbox_labels/*.txt` (YOLO format labels)
 
-   This will create a directory with MongoDB tools.
-
----
-
-3. **Add to PATH (Temporary)**
-   
-   If you want to use the tools just for this session, add them to your `PATH`:
-   ```bash
-   export PATH=$HOME/mongodb-database-tools-ubuntu2204-x86_64-100.9.5/bin:$PATH
-   ```
-   Now, you should be able to run:
-   ```bash
-   mongodump --help
-   mongorestore --help
-   ```
----
-
-4. **Add to PATH Permanently**
-   
-   If you want to keep these tools accessible in future sessions, add this line to your `~/.bashrc` or `~/.bash_profile`:
-   ```bash
-   echo 'export PATH=$HOME/mongodb-database-tools-ubuntu2204-x86_64-100.9.5/bin:$PATH' >> ~/.bashrc
-   source ~/.bashrc
-   ```
-##### Use `mongodump` and `mongorestore`
-This method exports the entire database as BSON files, which can be restored on another system.
-
-1. **Export the MongoDB database**
-   
-   Run the following command on the source machine:
-   ```bash
-   mongodump --host <your_host> --port <your_port> -d <database_name> --out /path/to/backup
-   ```
-   - Replace `<your_host>` and `<your_port>` with the MongoDB server details.
-   - Replace `<database_name>` with the actual database name.
-   - The backup will be stored in `/path/to/backup/<database_name>`.
-
-2. **Transfer the Backup**
-   
-   Copy the `/path/to/backup` directory to the target location.
-
-3. **Restore on the Target Machine**
-   
-   On the target machine, run:
-   ```bash
-   mongorestore --host <target_host> --port <target_port> --db <new_database_name> /destination/path/<database_name>
-   ```
-   - Replace `<new_database_name>` with the desired database name.
-
----
-
-#### Option 2: `mongoexport` and `mongoimport`(For JSON Transfer) 
-
-
-##### Install `mongoexport` and `mongoimport`
-
-Follow the instruction from Option 1. 
-
-##### Use `mongoexport` and `mongoimport`
-
-1. **Export Data to JSON**
-   
-   ```bash
-   mongoexport --host <your_host> --port <your_port> -d <database_name> -c <collection_name> --out /path/to/export.json
-   ```
-   - This creates a JSON dump of the collection.
-
-2. **Transfer the JSON File**
-
-   Copy it to another location
-   
-3. **Import the JSON into the Target Database**
-
-   On the target machine, run:
-   ```bash
-   mongoimport --host <target_host> --port <target_port> -d <new_database_name> -c <collection_name> --file /destination/path/export.json --jsonArray
-   ```
-   - Ensure `--jsonArray` is used if the exported file contains an array of documents.
-
-
-## Scripts:
-
-
-### Json to Mongo
-
-This script loads JSON data from batch directories in an NFS storage system into a MongoDB database. It reads the batch names from a YAML configuration file, checks both primary and secondary NFS storage locations for the corresponding JSON metadata files, and inserts the data into a specified MongoDB collection.
-
-#### Key Features
-- **MongoDB Integration**: Connects to MongoDB to insert JSON data.
-- **Batch Processing**: Reads batch names from a YAML configuration and processes the corresponding directories in the NFS storage locker.
-- **Primary and Secondary Storage**: Automatically checks both primary and secondary NFS storage paths for the presence of batch directories.
-
-#### Output
-- **Data Insertion**: Inserts JSON data from batch directories into the specified MongoDB collection. 
-
-### **Create Recipes**
-
-This script is responsible for creating synthetic image recipes by selecting cutout images based on specific criteria and associating them with background images. The recipes are then saved in JSON format for use in synthetic dataset generation.
-
-#### Key Features
-- **MongoDB Integration**: Retrieves cutout metadata from a MongoDB collection based on specific filter criteria defined in the configuration.
-- **Randomized Synthetic Image Generation**: Associates cutouts with randomly selected background images and creates synthetic images with varying numbers of cutouts.
-- **Flexible Cutout Usage**: Configurable to either reuse cutouts across multiple synthetic images or ensure each cutout is used only once.
-- **JSON Output**: Saves the generated synthetic image recipes to a JSON file for further processing.
-
-#### Output
-- **Synthetic Image Recipes**: A JSON file containing a list of synthetic images, each with a unique ID, background image, and associated cutouts. The file is saved in the `recipes` directory under the project directory.
-
-
-### **Move Cutouts**
-
-This script is responsible for downloading plant cutout images from long-term storage to a local directory. It can handle both sequential and concurrent data transfer. The downloaded cutouts are stored locally for further use in synthetic image generation.
-
-#### Key Features
-- **Sequential and Parallel Processing**: The script can download cutouts in a sequential manner or use multithreading.
-- **Dual Storage Locations**: Looks in both primary and secondary long-term storage locations.
-
-#### Output
-- **Downloaded Images**: The script downloads `.png` cutout images to the specified local directory.
-
-
-### **Synthesize**
-
-This script is designed to generate synthetic images by overlaying plant cutout images onto various backgrounds using a copy-and-paste method. The script provides CPU parallelism.
-
-- **Parallelism**: Utilizes Python's `concurrent.futures.ProcessPoolExecutor` to enable concurrent processing of multiple image recipes, leveraging multi-core CPUs.
-- **Transformations**: Applies a variety of image transformations (e.g., rotation, flipping) using the Albumentations library.
-- **Dynamic Shadow Generation**: Simulates dynamic shadows for the cutouts based on their size and position relative to the light source.
-- **Cutout Distribution**: Supports random placement of cutouts on background images, creating diverse compositions.
-- **Output Flexibility**: Saves images, semantic masks, instance masks, and YOLO format segmentation labels.
-
-#### Output
-- **Images**: Generated synthetic images in `.jpg` format.
-- **Semantic Masks**: Corresponding masks with class annotations in `.png` format.
-- **Instance Masks**: Optional masks for instance annotations.
-- **YOLO Labels**: Segmentation contours in YOLO format.
-
-
+## Running the Pipeline
+To execute all tasks:
+```bash
+python main.py
+```
 
 ## License
-
-This script is provided as-is, with no warranties or guarantees. You are free to modify and distribute it as needed. However, attribution is appreciated if you share it publicly.
+This repository is open-source. You are free to use and modify it. Attribution is appreciated if shared publicly.

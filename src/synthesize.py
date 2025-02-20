@@ -154,7 +154,6 @@ class ImageProcessor:
         """
         self.cfg = cfg
         self.num_cutouts = num_cutouts
-        self.resize_scale = cfg.synthesize.resize_factor  # Added scaling factor
 
         # Non destructive transformations
         self.transform = A.Compose([
@@ -367,7 +366,7 @@ class ImageProcessor:
             rgb_image = image[:, :, :3]  # Extract RGB channels
         else:
             # alpha_channel = np.ones((img_height, img_width), dtype=np.float32)
-            alpha_channel = image[:, :, -1] > 0  # This is a 2D array (height, width)
+            alpha_channel = (image[:, :, -1] > 0).astype(np.uint8)  # This is a 2D array (height, width)
             rgb_image = image
 
         # Define the region of interest (ROI) in the background
@@ -383,8 +382,11 @@ class ImageProcessor:
         img_y_end = img_height - max(0, (y + img_height) - background.shape[0])
 
         
-        cutout_rgb = rgb_image[img_y_start:img_y_end, img_x_start:img_x_end]
+        cutout_rgb = rgb_image[img_y_start:img_y_end, img_x_start:img_x_end].astype(np.float32)     
         cutout_alpha = alpha_channel[img_y_start:img_y_end, img_x_start:img_x_end]
+        kernel = np.ones((3, 3), np.uint8)
+        cutout_alpha = cv2.erode(cutout_alpha, kernel, iterations=1)
+        cutout_rgb[cutout_alpha == 0] = 0
         roi_background = background[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
 
          # Create the binary mask for the cutout
@@ -396,12 +398,13 @@ class ImageProcessor:
             roi_background * (1 - cutout_alpha_expanded) + cutout_rgb * cutout_alpha_expanded
         ).astype(np.uint8)
 
-        # Update the semantic and instance masks in the ROI
-        background_semantic_mask[roi_y_start:roi_y_end, roi_x_start:roi_x_end] = np.where(
-            cutout_alpha > 0,
-            class_id,
-            background_semantic_mask[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
-        )
+        if self.cfg.synthesize.semantic_masks:
+            # Update the semantic and instance masks in the ROI
+            background_semantic_mask[roi_y_start:roi_y_end, roi_x_start:roi_x_end] = np.where(
+                cutout_alpha > 0,
+                class_id,
+                background_semantic_mask[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
+            )
 
         
 
@@ -485,12 +488,16 @@ class ImageCompositor:
         self.yolo_cont_label_savedir = Path(self.savedir, "yolo_contour_labels")
         self.yolo_bbox_label_savedir = Path(self.savedir, "yolo_bbox_labels")
 
-        for directory in [
-            self.image_savedir, self.semantic_savedir,
-            self.instance_savedir, self.yolo_cont_label_savedir, 
-            self.yolo_bbox_label_savedir
-        ]:
-            directory.mkdir(exist_ok=True, parents=True)
+        self.image_savedir.mkdir(exist_ok=True, parents=True)
+        
+        if self.cfg.synthesize.semantic_masks:
+            self.semantic_savedir.mkdir(exist_ok=True, parents=True)
+        if self.cfg.synthesize.instance_masks:
+            self.instance_savedir.mkdir(exist_ok=True, parents=True)
+        if self.cfg.synthesize.yolo_contour_labels:
+            self.yolo_cont_label_savedir.mkdir(exist_ok=True, parents=True)
+        if self.cfg.synthesize.yolo_bbox_labels:
+            self.yolo_bbox_label_savedir.mkdir(exist_ok=True, parents=True)
 
     def save_bboxes(self, txtpath: Path, yolo_bboxes: List[List[Union[str, float]]]) -> None:
         """
@@ -542,11 +549,15 @@ class ImageCompositor:
         semanticsavepath = Path(self.semantic_savedir, f"{synthetic_image_id}.png")
         
         cv2.imwrite(str(imagesavepath), image, [cv2.IMWRITE_JPEG_QUALITY, 100])
-        cv2.imwrite(str(semanticsavepath), semantic_mask, [cv2.IMWRITE_PNG_COMPRESSION, 0])
         
+        if self.cfg.synthesize.semantic_masks:
+            semanticsavepath = Path(self.semantic_savedir, f"{synthetic_image_id}.png")
+            cv2.imwrite(str(semanticsavepath), semantic_mask, [cv2.IMWRITE_PNG_COMPRESSION, 0])
+
         if self.cfg.synthesize.instance_masks:
             instancesavepath = Path(self.instance_savedir, f"{synthetic_image_id}.png")
             cv2.imwrite(str(instancesavepath), instance_mask, [cv2.IMWRITE_PNG_COMPRESSION, 0])
+
         if self.cfg.synthesize.yolo_contour_labels:
             yololabelpath = Path(self.yolo_cont_label_savedir, f"{synthetic_image_id}.txt")
             self.save_contour(yololabelpath, coord_results)
@@ -618,7 +629,9 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
             if cutout_path not in shared_data:
                 log.debug(f"Loading cutout image {cutout_path}")
                 img = cv2.imread(str(cutout_path), cv2.IMREAD_UNCHANGED)
-                
+                if img is None:
+                    log.error(f"Failed to load cutout image {cutout_path}. Skipping.")
+                    continue
                 # Calculate real-world scaling for the cutout
                 cutout_area = cutout_metadata['cutout_props']['bbox_area_cm2']
                 cutout_pixel_area = cutout_area * pixel_cm_ratio
@@ -626,9 +639,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
 
                 # Resize cutout
                 img = resize_image(img, cutout_scaling_factor)
-                # # Resize the image based on the resize scale
-                # if resize_factor != 1.0:
-                #     img = resize_image(img, resize_factor)
+
                 if img.shape[2] == 4:
                     img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
 
@@ -653,7 +664,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
 
 def main(cfg: DictConfig) -> None:
     log.info("Starting synthetic image generation.")
-    json_recipe_path = Path(cfg.paths.projectdir,"recipes", f"{cfg.general.project_name}_{cfg.general.sub_project_name}.json")
+    json_recipe_path = Path(cfg.paths.projectdir,"recipes", f"{cfg.project_name}_{cfg.sub_name}.json")
     # Load the JSON once and share the data between processes
     with open(json_recipe_path, 'r') as file:
         data = json.load(file)

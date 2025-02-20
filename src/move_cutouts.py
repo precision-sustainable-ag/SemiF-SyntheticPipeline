@@ -26,10 +26,11 @@ class CutoutDownloader:
         :param local_download_folder: Local folder where the images will be downloaded.
         """
         self.json_file_path = Path(cfg.paths.projectdir, "recipes",
-                                   f"{cfg.general.project_name}_{cfg.general.sub_project_name}.json")
+                                   f"{cfg.project_name}_{cfg.sub_name}.json")
 
         self.primary_storage_base = Path(cfg.paths.primary_longterm_storage, "semifield-cutouts")
         self.secondary_storage_base = Path(cfg.paths.secondary_longterm_storage, "semifield-cutouts")
+        self.tertiary_storage_base = Path(cfg.paths.tertiary_longterm_storage, "semifield-cutouts")
         self.local_download_folder = Path(cfg.paths.cutoutdir)
         self.max_workers = cfg.move_cutouts.parallel_workers
 
@@ -81,56 +82,40 @@ class CutoutDownloader:
         :param cutout_id: The ID of the cutout to download.
         :param batch_id: The batch ID to locate the cutout in the long-term storage.
         """
-        # Construct the file path in long-term storage
         image_filename = f"{cutout_id}.png"
 
-        # self.s3_bucket.download_file(
-        #     'longterm_images/MD_2022-08-04/MD_1659617815_55.png', 'tmp')
-        #
+        # List of storage locations in order of preference.
+        storages = [
+            ("primary", Path(self.primary_storage_base, batch_id, image_filename)),
+            ("secondary", Path(self.secondary_storage_base, batch_id, image_filename)),
+            ("tertiary", Path(self.tertiary_storage_base, batch_id, image_filename))
+        ]
 
-        primary_image_path = Path(self.primary_storage_base, batch_id,
-                                          image_filename)
-        secondary_image_path = Path(self.secondary_storage_base,
-                                            batch_id,
-                                            image_filename)
+        # Construct the local path where the image will be saved
+        local_image_path = Path(self.local_download_folder, image_filename)
+        # Ensure the local directory exists
+        local_image_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Construct the local path to save the image
-        local_image_path = Path(self.local_download_folder,
-                                        image_filename)
-        if Path(local_image_path).exists():
+        if local_image_path.exists():
             log.debug(f"Image already exists locally: {cutout_id}")
             return
 
-        # Check if the file exists in the primary storage
-        # if self.s3_file_exists(primary_image_path):
-        if primary_image_path.exists():
-            try:
-                # self.s3_bucket.download_file(primary_image_path,
-                                            #  local_image_path)
-                shutil.copy(primary_image_path, local_image_path)
-                log.debug(
-                    f"Downloaded from primary: {cutout_id} to {local_image_path}")
-            except IOError as e:
-                log.error(
-                    f"Error copying file from primary: {primary_image_path} to {local_image_path} - {e}")
-
-        # If the file does not exist in primary, try the secondary storage
-        # elif self.s3_file_exists(secondary_image_path):
-        elif secondary_image_path.exists():
-            try:
-                # self.s3_bucket.download_file(secondary_image_path,
-                #                              local_image_path)
-                shutil.copy(secondary_image_path, local_image_path)
-                log.debug(
-                    f"Downloaded from secondary: {cutout_id} to {local_image_path}")
-            except IOError as e:
-                log.error(
-                    f"Error copying file from secondary: {secondary_image_path} to {local_image_path} - {e}")
-
-        else:
-            log.error(
-                f"Image not found in both primary ({primary_image_path}) or secondary ({secondary_image_path}) storage: {cutout_id}")
-
+        # Try each storage location until the image is found and copied
+        for storage_name, storage_path in storages:
+            if storage_path.exists():
+                try:
+                    shutil.copy(storage_path, local_image_path)
+                    log.debug(f"Downloaded from {storage_name} storage: {cutout_id} to {local_image_path}")
+                    return  # Exit after successful download.
+                except IOError as e:
+                    log.error(f"Error copying file from {storage_name} storage ({storage_path}) to {local_image_path} - {e}")
+                    # Optionally, continue to the next storage if copy fails.
+        
+        # If we reach this point, the file was not found or could not be copied from any storage.
+        log.error(
+            f"Image not found in any storage for cutout_id: {cutout_id}. Tried paths: " +
+            ", ".join(f"{name}: {path}" for name, path in storages)
+        )
     def get_unique_cutouts(self, synthetic_images: List[Dict]) -> Dict[
         str, str]:
         """

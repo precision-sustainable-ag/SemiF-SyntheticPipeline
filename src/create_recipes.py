@@ -5,11 +5,9 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Any
 from collections import defaultdict
-
-from pymongo import MongoClient
 from omegaconf import DictConfig
-
-from utils.query import MongoDBQueryHandler
+from tqdm import tqdm
+from utils.sql3_query import SQLiteQueryHandler
 
 log = logging.getLogger(__name__)
   
@@ -83,7 +81,7 @@ class RecipeCreator:
             output_dir (str): Directory to save the recipe files.
         """
         # Define the output file path
-        recipe_filename = f"{self.cfg.general.project_name}_{self.cfg.general.sub_project_name}.json"
+        recipe_filename = f"{self.cfg.project_name}_{self.cfg.sub_name}.json"
         output_path = Path(output_dir) / recipe_filename
 
         # Write recipes to a JSON file with proper formatting
@@ -92,7 +90,7 @@ class RecipeCreator:
         log.info(f"Saved recipes to {output_path}.")
 
 
-class MongoDBRecipeManager:
+class DBRecipeManager:
     """Main class to manage MongoDB document retrieval and recipe creation."""
 
     def __init__(self, cfg: DictConfig) -> None:
@@ -103,10 +101,6 @@ class MongoDBRecipeManager:
             cfg (DictConfig): The configuration object.
         """
         self.cfg = cfg
-        # Set up MongoDB connection
-        self.client = MongoClient(f'mongodb://{cfg.mongodb.host}:{cfg.mongodb.port}/')
-        self.db = self.client[cfg.mongodb.db]  # Access MongoDB database
-        self.collection = self.db[cfg.mongodb.collection]  # Access MongoDB collection
         self.recipe_creator = RecipeCreator(cfg)
         self.output_dir = Path(cfg.paths.projectdir, "recipes")  # Output directory for synthetic image recipes
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -153,6 +147,47 @@ class MongoDBRecipeManager:
 
         return weighted_population
 
+    def remove_cutouts_that_dont_exist(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Remove cutouts from the list that do not exist in the local directories.
+
+        Args:
+            documents (List[Dict[str, Any]]): List of MongoDB documents containing cutout metadata.
+
+        Returns:
+            List[Dict[str, Any]]: List of cutouts that exist in the local directories.
+        """
+        valid_cutout_ids = set()
+        cutout_dir1 = Path(self.cfg.paths.primary_longterm_storage, "semifield-cutouts")
+        cutout_dir2 = Path(self.cfg.paths.secondary_longterm_storage, "semifield-cutouts")
+        cutout_dir3 = Path(self.cfg.paths.tertiary_longterm_storage, "semifield-cutouts")
+
+        for doc in tqdm(documents, desc="Validating cutouts"):
+            cutout_id = doc.get("cutout_id")
+            batch_id = doc.get("batch_id")
+            
+            # Skip if cutout_id or batch_id is missing
+            if not cutout_id or not batch_id:
+                continue
+
+            # Construct the expected file path in the primary directory.
+            file_found = False
+            for base_dir in (cutout_dir1, cutout_dir2, cutout_dir3):
+                cutout_path = Path(base_dir, batch_id, f"{cutout_id}.png")
+                if cutout_path.exists():
+                    file_found = True
+                    break  # No need to check further directories
+
+            if file_found:
+                valid_cutout_ids.add(cutout_id)
+            else:
+                # Optionally log a warning here
+                # log.warning(f"Cutout {cutout_id}, batch_id {batch_id} does not exist in any storage.")
+                pass
+
+        # Return only the documents whose cutout_id is in the set of valid IDs.
+        return [doc for doc in documents if doc.get("cutout_id") in valid_cutout_ids]
+
     def process_cutouts(self, documents: List[Dict[str, Any]]) -> None:
         """
         Process cutouts from MongoDB documents and create synthetic image recipes.
@@ -160,6 +195,11 @@ class MongoDBRecipeManager:
         Args:
             documents (List[Dict[str, Any]]): List of MongoDB documents containing cutout metadata.
         """
+        # Remove cutouts that do not exist in the local directory
+        log.info("Filtering cutouts that may not exist in the LTS.")
+        log.info(f"Total cutouts: {len(documents)} before filtering.")
+        documents = self.remove_cutouts_that_dont_exist(documents)
+        log.info(f"Filtered cutouts: {len(documents)}")
         # Gather all available background images (JPEG format) from the specified directory
         background_images = list(Path(self.cfg.paths.backgrounddir).glob('*.JPG')) + list(Path(self.cfg.paths.backgrounddir).glob('*.jpg'))
 
@@ -210,8 +250,14 @@ class MongoDBRecipeManager:
             
             # Add each sampled cutout to the synthetic image
             for cutout in sampled_cutouts:
-                if not self.cfg.cutout_filters.reuse_cutouts and cutout["_id"] in self.recipe_creator.used_cutouts:
-                    continue  # Skip cutout if it has already been used and reuse is not allowed
+                cutout_id = cutout.get("_id") or cutout.get("id")
+                if cutout_id is None:
+                    log.warning("No identifier found for cutout, skipping.")
+                    continue
+
+                if not self.cfg.cutout_filters.reuse_cutouts and cutout_id in self.recipe_creator.used_cutouts:
+                    continue  # Skip cutout if already used and reuse is not allowed
+
                 self.recipe_creator.used_cutouts.add(cutout["_id"])  # Track used cutouts
                 self.recipe_creator.add_cutout_to_image(synthetic_image, cutout)  # Add cutout to the synthetic image
                 cutouts_added_to_image = True  # Set flag to True
@@ -230,6 +276,32 @@ class MongoDBRecipeManager:
         self.recipe_creator.save_recipes(self.output_dir)
         log.info(f"Total images generated: {min(image_index + 1, total_images)}")
 
+def recursively_parse_json(obj):
+    """
+    Recursively convert JSON strings in a nested structure (dict or list) into Python objects.
+    
+    Args:
+        obj: The object to process (can be dict, list, or a primitive value).
+    
+    Returns:
+        The object with any JSON strings parsed into dictionaries/lists.
+    """
+    if isinstance(obj, str):
+        # Try to parse the string as JSON. If it fails, return the original string.
+        try:
+            parsed = json.loads(obj)
+            # Recursively process the parsed object.
+            return recursively_parse_json(parsed)
+        except json.JSONDecodeError:
+            return obj  # Not a JSON string, return as-is.
+    elif isinstance(obj, dict):
+        return {key: recursively_parse_json(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [recursively_parse_json(item) for item in obj]
+    else:
+        # For any other data type, return it unchanged.
+        return obj
+    
 def log_sample_counts(documents, text="samples"):
     """
     Print the number of samples for each common name class in the dataset.
@@ -253,10 +325,21 @@ def main(cfg: DictConfig) -> None:
     Main function to initialize the MongoDBRecipeManager and start the recipe creation process.
     """
     log.info("Starting recipe creation process.")  # Log the start of the process
-    query_handler = MongoDBQueryHandler(cfg)
-    query_handler.build_query()
-    documents = query_handler.execute_query()
 
-    recipe_manager = MongoDBRecipeManager(cfg)
+    query_handler = SQLiteQueryHandler(cfg)
+    query_handler.add_conditions()
+    rows, columns = query_handler.execute_query()
+    log.info(f"Retrieved {len(rows)} documents from the database.")
+    query_handler.close()
+    # Convert the rows to a list of dictionaries.
+    documents = [dict(zip(columns, row)) for row in rows]
+    # Ensure each document has an _id field.
+    for doc in documents:
+        if "_id" not in doc:
+            # Generate a new unique identifier as a string.
+            doc["_id"] = str(uuid.uuid4())
+    # Convert nested JSON strings into dictionaries/lists.
+    documents = [recursively_parse_json(doc) for doc in documents]
+    recipe_manager = DBRecipeManager(cfg)
     recipe_manager.process_cutouts(documents)
     log.info("Recipe creation completed.")
