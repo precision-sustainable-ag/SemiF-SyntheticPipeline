@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 from collections import defaultdict
 from omegaconf import DictConfig
-
+from tqdm import tqdm
 from utils.sql3_query import SQLiteQueryHandler
 
 log = logging.getLogger(__name__)
@@ -147,6 +147,47 @@ class DBRecipeManager:
 
         return weighted_population
 
+    def remove_cutouts_that_dont_exist(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Remove cutouts from the list that do not exist in the local directories.
+
+        Args:
+            documents (List[Dict[str, Any]]): List of MongoDB documents containing cutout metadata.
+
+        Returns:
+            List[Dict[str, Any]]: List of cutouts that exist in the local directories.
+        """
+        valid_cutout_ids = set()
+        cutout_dir1 = Path(self.cfg.paths.primary_longterm_storage, "semifield-cutouts")
+        cutout_dir2 = Path(self.cfg.paths.secondary_longterm_storage, "semifield-cutouts")
+        cutout_dir3 = Path(self.cfg.paths.tertiary_longterm_storage, "semifield-cutouts")
+
+        for doc in tqdm(documents, desc="Validating cutouts"):
+            cutout_id = doc.get("cutout_id")
+            batch_id = doc.get("batch_id")
+            
+            # Skip if cutout_id or batch_id is missing
+            if not cutout_id or not batch_id:
+                continue
+
+            # Construct the expected file path in the primary directory.
+            file_found = False
+            for base_dir in (cutout_dir1, cutout_dir2, cutout_dir3):
+                cutout_path = Path(base_dir, batch_id, f"{cutout_id}.png")
+                if cutout_path.exists():
+                    file_found = True
+                    break  # No need to check further directories
+
+            if file_found:
+                valid_cutout_ids.add(cutout_id)
+            else:
+                # Optionally log a warning here
+                # log.warning(f"Cutout {cutout_id}, batch_id {batch_id} does not exist in any storage.")
+                pass
+
+        # Return only the documents whose cutout_id is in the set of valid IDs.
+        return [doc for doc in documents if doc.get("cutout_id") in valid_cutout_ids]
+
     def process_cutouts(self, documents: List[Dict[str, Any]]) -> None:
         """
         Process cutouts from MongoDB documents and create synthetic image recipes.
@@ -154,6 +195,11 @@ class DBRecipeManager:
         Args:
             documents (List[Dict[str, Any]]): List of MongoDB documents containing cutout metadata.
         """
+        # Remove cutouts that do not exist in the local directory
+        log.info("Filtering cutouts that may not exist in the LTS.")
+        log.info(f"Total cutouts: {len(documents)} before filtering.")
+        documents = self.remove_cutouts_that_dont_exist(documents)
+        log.info(f"Filtered cutouts: {len(documents)}")
         # Gather all available background images (JPEG format) from the specified directory
         background_images = list(Path(self.cfg.paths.backgrounddir).glob('*.JPG')) + list(Path(self.cfg.paths.backgrounddir).glob('*.jpg'))
 
@@ -283,6 +329,7 @@ def main(cfg: DictConfig) -> None:
     query_handler = SQLiteQueryHandler(cfg)
     query_handler.add_conditions()
     rows, columns = query_handler.execute_query()
+    log.info(f"Retrieved {len(rows)} documents from the database.")
     query_handler.close()
     # Convert the rows to a list of dictionaries.
     documents = [dict(zip(columns, row)) for row in rows]
