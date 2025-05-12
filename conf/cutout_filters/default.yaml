@@ -1,14 +1,14 @@
 # Settings
 
-total_images: 3
+total_images: 2000
 
-background_fov_cm2: 7500 # bbot images, Assumed real-world field of view for backgrounds (in cm²)
-# background_fov_cm2: 3000  # unsplash images Assumed real-world field of view for backgrounds (in cm²)
-resize_factor: 0.25
+# background_fov_cm2: 1500 # bbot images, Assumed real-world field of view for backgrounds (in cm²)
+background_fov_cm2: 750  # unsplash images Assumed real-world field of view for backgrounds (in cm²)
+resize_factor: .40
 
 cuts_n_image: # Number of cutouts per image
-  min: 500
-  max: 1500
+  min: 100
+  max: 102
 
 reuse_cutouts: true  # Whether to allow reusing cutouts in multiple images
 min_visibility: 0.0  # Minimum visibility ratio required for the new cutout
@@ -24,13 +24,15 @@ morphological:
   
   bbox_area_cm2:  # Area range in cm2
     default:
-      min: 10
-      max: 1000
+      min: 0
+      max: 1000000
     common_name_ranges: # applies to specific common names, use default if not specified here but in the common_name list
-      Mustards:
-        min: 10
-        max: 1000
-    
+        Cereal Rye:
+          min: 0
+          max: 1000000
+        Hairy vetch:
+          min: 0
+          max: 1000000
     
     # very_small: [0, 0.1]
     # small: [0.1, 1]
@@ -43,75 +45,47 @@ morphological:
     min: 
     max: 
   num_components: # Number of components range
-    min:
-    max:
+    min: 
+    max: 
+
+  rgb:
+    default:
+      mean:
+        red: {}
+        green: {}
+        blue: {}
+      std:
+        red: {}
+        green: {}
+        blue: {}
+    common_name_ranges:
+        Cereal Rye:
+          mean:
+            red: {min: 0.35, max: 0.40}
+            green: {min: 0.31, max: 0.40}
+            blue: {min: 0.275, max: 0.325}
+          std:
+            red: {min: 0.14, max: 0.20}
+            green: {min: 0.14, max: 0.21}
+            blue: {min: 0.14, max: 0.20}
+        Hairy vetch:
+          mean:
+            red: {min: 0.375, max: 0.555}
+            green: {min: 0.34, max: 0.48}
+            blue: {min: 0.20, max: 0.40}
+          std:
+            red: {min: 0.14, max: 0.20}
+            green: {min: 0.165, max: 0.221}
+            blue: {min: 0.15, max: 0.221}
+
 
 category:
   # Filter settings for category attributes
   common_name:
-    - oats
-    - cereal rye
-    - Crimson clover
-    - red clover
-    - winter pea
-    - hairy vetch
-    - Black Oats
-    - Winter Wheat
-    - Mustards
-    
-    # - Barley
-    # - Barnyardgrass
-    # - Broadleaf Signalgrass
-    # - Cereal Rye
-    # - Cocklebur
-    # # - Colorchecker
-    # - Common Lambsquarters
-    # - Common Ragweed
-    # - Common Sunflower
-    # - Crimson Clover
-    # - Cultivated Radish
-    # - Fall Panicum
-    # - Giant Foxtail
-    # - Goosegrass
-    # - Hairy Vetch
-    # - Horseweed
-    # - Italian Ryegrass
-    # - Jimson Weed
-    # - Johnsongrass
-    # - Jungle Rice
-    # - Kochia
-    # - Large Crabgrass
-    # - Maize
-    # - Mustards
-    # - Oats
-    # - Palmer Amaranth
-    # - Pitted Morning-Glory
-    # - Prickly Sida
-    # - Purple Nutsedge
-    # - Ragweed Parthenium
-    # - Red Clover
-    # - Sicklepod
-    # - Smooth Pigweed
-    # - Soybean
-    # - Spiny Amaranth
-    # - Sprawling Signalgrass
-    # - Texas Millet
-    # - Triticale
-    # # - Unknown
-    # - Upland Cotton
-    # - Velvetleaf
-    # - Waterhemp
-    # - Winter Pea
-    # - Winter Wheat
-    # - Yellow Foxtail
-    
+    - Hairy vetch
+    - Cereal Rye
+
 common_name_weights:
-    crimson clover: 0.15  # clover
-    red clover: 0.15      # clover
-    winter pea: 0.15      # peas
-    hairy vetch: 0.15     # vetch
-    mustards: 0.15        # brassicas
-    black oats: 0.075      # Grass
-    oats: 0.075            # Grass
-    cereal rye: 0.075      # Grass
-    winter wheat: 0.075    # Grass
+    Cereal Rye:  0.70
+    Hairy vetch: 0.30
+

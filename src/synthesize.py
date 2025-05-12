@@ -477,6 +477,8 @@ class ImageCompositor:
         self.processor = ImageProcessor(cfg, num_cutouts=len(self.cutout_paths))
         self.config_save_dirs(cfg)
 
+        
+
     def config_save_dirs(self, cfg: DictConfig) -> None:
         """
         Configure and create necessary directories for saving results.
@@ -658,6 +660,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         compositor = ImageCompositor(cfg, recipe)
         compositor.save_data(result, result_semantic_mask, result_instance_mask, coord_results, yolo_bboxes, recipe['synthetic_image_id'])
         log.info(f"Synthetic image {recipe['synthetic_image_id']} processed successfully.")
+        
     
     except Exception as exc:
         log.exception(f"Failed to process synthetic image {recipe['synthetic_image_id']}: {exc}")
@@ -696,9 +699,13 @@ def main(cfg: DictConfig) -> None:
                         log.exception(f"Recipe processing failed: {exc}")
         else:
             # Sequential processing for debugging
+            i = 0
+            total_images = cfg.cutout_filters.total_images
             for recipe in synthetic_images:
                 try:
+                    i += 1
                     process_recipe(cfg, recipe, shared_data)
                     log.info(f"Processed recipe {recipe['synthetic_image_id']}")
+                    log.info(f"Synthetic: {i} out of {total_images}")
                 except Exception as exc:
                     log.exception(f"Failed to process recipe: {exc}")

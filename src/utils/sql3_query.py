@@ -148,6 +148,64 @@ class SQLiteQueryHandler:
             self.add_condition("json_extract(cutout_props, '$.bbox_area_cm2')", ">=", default_min)
             self.add_condition("json_extract(cutout_props, '$.bbox_area_cm2')", "<=", default_max)
 
+
+    def _extract_range(self, rgb_type, color, cn_conf):
+        return cn_conf.get(rgb_type, {}).get(color, {})
+
+    def build_color_conditions(self, rgb_type, channel_index) -> None:
+        rgb_config = self.filter.morphological.get("rgb", {})
+        default = rgb_config.get("default", {})
+        cn_ranges = rgb_config.get("common_name_ranges", {})
+
+        conditions = []
+        params = []
+
+        # Per-common-name ranges
+        for cn, cn_conf in cn_ranges.items():
+            cn_lower = cn.lower().strip()
+            min_val = self._extract_range(rgb_type, channel_index["name"], cn_conf).get("min")
+            max_val = self._extract_range(rgb_type, channel_index["name"], cn_conf).get("max")
+
+            clauses = [f"LOWER(trim(json_extract(category, '$.common_name'))) = ?"]
+            args = [cn_lower]
+
+            if min_val is not None:
+                clauses.append(f"json_extract(cutout_props, '{channel_index['json_path']}') >= ?")
+                args.append(min_val)
+            if max_val is not None:
+                clauses.append(f"json_extract(cutout_props, '{channel_index['json_path']}') <= ?")
+                args.append(max_val)
+
+            if len(clauses) > 1:
+                conditions.append("(" + " AND ".join(clauses) + ")")
+                params.extend(args)
+
+        # Default fallback for non-listed common names
+        default_min = self._extract_range(rgb_type, channel_index["name"], default).get("min")
+        default_max = self._extract_range(rgb_type, channel_index["name"], default).get("max")
+
+        if default_min is not None or default_max is not None:
+            not_in = ", ".join("?" for _ in cn_ranges)
+            fallback_clauses = [
+                f"LOWER(trim(json_extract(category, '$.common_name'))) NOT IN ({not_in})"
+            ]
+            fallback_args = [cn.lower().strip() for cn in cn_ranges]
+
+            if default_min is not None:
+                fallback_clauses.append(f"json_extract(cutout_props, '{channel_index['json_path']}') >= ?")
+                fallback_args.append(default_min)
+            if default_max is not None:
+                fallback_clauses.append(f"json_extract(cutout_props, '{channel_index['json_path']}') <= ?")
+                fallback_args.append(default_max)
+
+            conditions.append("(" + " AND ".join(fallback_clauses) + ")")
+            params.extend(fallback_args)
+
+        if conditions:
+            self.conditions.append("(" + " OR ".join(conditions) + ")")
+            self.params.extend(params)
+
+
     def add_validated_filter(self) -> None:
         """
         Add a filter for the 'validated' column.
@@ -199,6 +257,26 @@ class SQLiteQueryHandler:
 
         # Handle num_components filter
         self.add_range_filter(morph, 'num_components', 'json_extract(cutout_props, "$.num_components")')
+
+        # Handle RGB mean filter
+        for color, index in {"red": 0, "green": 1, "blue": 2}.items():
+            self.add_range_filter(
+                morph.get("rgb", {}).get("mean", {}),
+                color,
+                f'json_extract(cutout_props, "$.cropout_rgb_mean[{index}]")'
+            )
+
+        # Handle RGB mean filter and standard deviation filter
+        channel_map = {
+            "red": {"name": "red", "index": 0},
+            "green": {"name": "green", "index": 1},
+            "blue": {"name": "blue", "index": 2},
+        }
+        for rgb_type in ["mean", "std"]:
+            for color, meta in channel_map.items():
+                meta["json_path"] = f"$.cropout_rgb_{rgb_type}[{meta['index']}]"
+                self.build_color_conditions(rgb_type, meta)
+
 
     def add_category_condition(self) -> None:
         """
