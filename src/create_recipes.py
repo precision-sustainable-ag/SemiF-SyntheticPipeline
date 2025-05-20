@@ -158,6 +158,7 @@ class DBRecipeManager:
             List[Dict[str, Any]]: List of cutouts that exist in the local directories.
         """
         valid_cutout_ids = set()
+        cutout_dir0 = Path(self.cfg.paths.cutoutdir)
         cutout_dir1 = Path(self.cfg.paths.primary_longterm_storage, "semifield-cutouts")
         cutout_dir2 = Path(self.cfg.paths.secondary_longterm_storage, "semifield-cutouts")
         cutout_dir3 = Path(self.cfg.paths.tertiary_longterm_storage, "semifield-cutouts")
@@ -165,6 +166,9 @@ class DBRecipeManager:
         for doc in tqdm(documents, desc="Validating cutouts"):
             cutout_id = doc.get("cutout_id")
             batch_id = doc.get("batch_id")
+            if Path(cutout_dir0, f"{cutout_id}.png").exists():
+                valid_cutout_ids.add(cutout_id)
+                continue
             
             # Skip if cutout_id or batch_id is missing
             if not cutout_id or not batch_id:
