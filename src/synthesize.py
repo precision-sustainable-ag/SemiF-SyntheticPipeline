@@ -592,7 +592,61 @@ def resize_image(img: np.ndarray, resize_scale: float) -> np.ndarray:
     new_size = (int(width * resize_scale), int(height * resize_scale))
     resized_img = cv2.resize(img, new_size, interpolation=cv2.INTER_LINEAR)
     return resized_img
-    
+
+def remove_soil_background_exg(cutout_img: np.ndarray, method: str = 'otsu', fixed_thresh: int = 20) -> np.ndarray:
+    """
+    Remove soil background using Excess Green (ExG) index and thresholding.
+
+    Args:
+        cutout_img (np.ndarray): Input image (BGR, uint8).
+        method (str): 'otsu' or 'fixed' thresholding.
+        fixed_thresh (int): Threshold value if method='fixed'.
+
+    Returns:
+        np.ndarray: Binary mask with plant as foreground (255) and soil as background (0).
+    """
+    # Convert BGR to float for calculation
+    b, g, r, _ = cv2.split(cutout_img.astype('float32'))
+
+    # Compute Excess Green Index (ExG)
+    exg = 2 * g - r - b
+
+    # Normalize ExG to [0,255] for thresholding
+    exg_norm = cv2.normalize(exg, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+    exg_norm = exg_norm.astype(np.uint8)
+
+    # Thresholding
+    if method == 'otsu':
+        _, mask = cv2.threshold(exg_norm, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    elif method == 'fixed':
+        _, mask = cv2.threshold(exg_norm, fixed_thresh, 255, cv2.THRESH_BINARY)
+    else:
+        raise ValueError("method must be 'otsu' or 'fixed'.")
+
+    return mask
+
+def apply_exg_mask_rgba(cutout_img: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """
+    Apply a binary mask to a 4-channel RGBA image to mask out soil background.
+
+    Args:
+        cutout_img (np.ndarray): Input image with shape (H, W, 4), dtype uint8.
+        mask (np.ndarray): Binary mask with shape (H, W), values 0 (background) or 255 (foreground).
+
+    Returns:
+        np.ndarray: Masked RGBA image where background is transparent.
+    """
+    assert cutout_img.shape[2] == 4, "Input image must have 4 channels (RGBA)."
+    assert cutout_img.shape[:2] == mask.shape, "Mask shape must match image spatial dimensions."
+
+    # Copy image to avoid modifying original
+    masked_img = cutout_img.copy()
+
+    # Apply mask: set alpha to 0 where mask == 0, keep alpha as-is where mask == 255
+    masked_img[:, :, 3] = np.where(mask == 255, masked_img[:, :, 3], 0)
+
+    return masked_img
+
 # def process_recipe(cfg: DictConfig, json_file: Path) -> None:
 def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
     """
@@ -603,6 +657,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         recipe (Dict): Recipe containing metadata for synthetic image generation.
         shared_data (Dict): Shared dictionary for pre-loaded cutouts and backgrounds.
     """
+    exg_clean = cfg.cutout_filters.exg_clean
     try:
         # Extract background path
         background_path = Path(cfg.paths.backgrounddir, recipe['background_image_id'])
@@ -641,6 +696,12 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
                 if img is None:
                     log.error(f"Failed to load cutout image {cutout_path}. Skipping.")
                     continue
+
+                if exg_clean:
+                    # Apply ExG mask to remove soil background
+                    mask = remove_soil_background_exg(img, method='otsu', fixed_thresh=20)
+                    img = apply_exg_mask_rgba(img, mask)
+
                 # Calculate real-world scaling for the cutout
                 cutout_area = cutout_metadata['cutout_props']['bbox_area_cm2']
                 cutout_pixel_area = cutout_area * pixel_cm_ratio
@@ -649,8 +710,8 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
                 # Resize cutout
                 img = resize_image(img, cutout_scaling_factor)
 
-                # if img.shape[2] == 4:
-                    # img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
+                if img.shape[2] == 4 and not exg_clean:
+                    img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
 
                 shared_data[cutout_path] = img
             images.append(shared_data[cutout_path])

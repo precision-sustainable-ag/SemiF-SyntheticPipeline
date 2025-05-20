@@ -1,7 +1,7 @@
 # Settings
 
 total_images: 3
-
+exg_clean: false  # Whether to use the EXG clean method for individual cutouts
 background_fov_cm2: 7500 # bbot images, Assumed real-world field of view for backgrounds (in cm²)
 # background_fov_cm2: 3000  # unsplash images Assumed real-world field of view for backgrounds (in cm²)
 resize_factor: 0.25
