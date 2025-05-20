@@ -201,10 +201,10 @@ class ImageProcessor:
         return combined_image
 
     def distribute_images(
-        self, background: np.ndarray, images: List[np.ndarray],
-        cutout_paths: List[str], mode: str = "random", min_visibility: float = 0.9,
-        max_retries: int = 10
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict[int, List[List[float]]]]]:
+            self, background: np.ndarray, images: List[np.ndarray],
+            cutout_data: List[Tuple[str, Dict]], mode: str = "random",
+            min_visibility: float = 0.9, max_retries: int = 10
+            ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict[int, List[List[float]]]]]:
         """
         Distribute images on a background either randomly or in a semi-even grid pattern.
 
@@ -226,7 +226,7 @@ class ImageProcessor:
         instance_id = 1
         placed_regions = []  # List to store the coordinates of already placed cutouts
 
-        for _, (img, cutout_metadata) in enumerate(zip(images, cutout_paths)):
+        for img, (cutout_id, cutout_metadata) in zip(images, cutout_data):            
             class_id = cutout_metadata['category']['class_id']
             cutout_id = cutout_metadata['cutout_id']
 
@@ -261,7 +261,7 @@ class ImageProcessor:
                     cutout_placed = True
                     break
             if not cutout_placed:
-                log.warning(f"Could not place cutout {cutout_id} after {max_retries} attempts.")
+                log.debug(f"Could not place cutout {cutout_id} after {max_retries} attempts.")
 
 
         return background, background_semantic_mask, background_instance_mask, coord_results, yolo_bboxes
@@ -631,10 +631,10 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         background, pixel_cm_ratio = shared_data[background_path]
         
         # Process the cutouts and check if they are in shared_data
-        cutout_paths = [Path(cfg.paths.cutoutdir, cutout['cutout_id'] + ".png") for cutout in recipe['cutouts']]
         images = []
-        # for cutout_path in cutout_paths:
-        for cutout_path, cutout_metadata in zip(cutout_paths, recipe['cutouts']):
+        cutout_data = [(cutout['cutout_id'], cutout) for cutout in recipe['cutouts']]
+        for cutout_id, cutout_metadata in cutout_data:
+            cutout_path = Path(cfg.paths.cutoutdir, f"{cutout_id}.png")
             if cutout_path not in shared_data:
                 log.debug(f"Loading cutout image {cutout_path}")
                 img = cv2.imread(str(cutout_path), cv2.IMREAD_UNCHANGED)
@@ -649,8 +649,8 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
                 # Resize cutout
                 img = resize_image(img, cutout_scaling_factor)
 
-                if img.shape[2] == 4:
-                    img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
+                # if img.shape[2] == 4:
+                    # img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
 
                 shared_data[cutout_path] = img
             images.append(shared_data[cutout_path])
@@ -660,8 +660,8 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         
         # Distribute the cutout images on the background
         result, result_semantic_mask, result_instance_mask, coord_results, yolo_bboxes = processor.distribute_images(
-            background, images, recipe['cutouts'], mode="random", min_visibility=cfg.cutout_filters.min_visibility
-        )
+           background, images, cutout_data, mode="random", min_visibility=cfg.cutout_filters.min_visibility
+           )
         
         # Save the results
         compositor = ImageCompositor(cfg, recipe)
