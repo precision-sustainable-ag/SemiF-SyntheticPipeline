@@ -156,7 +156,19 @@ class ImageProcessor:
         self.num_cutouts = num_cutouts
 
         # Non destructive transformations
-        self.transform = A.Compose([
+        self.transform = self.create_transform()
+
+        self.create_contours = cfg.synthesize.yolo_contour_labels
+        self.create_bbox = cfg.synthesize.yolo_bbox_labels
+    
+    def create_transform(self) -> A.Compose:
+        """
+        Create a new random transformation for each image.
+
+        Returns:
+            A.Compose: The random transformation.
+        """
+        transform= A.Compose([
             # A.GaussNoise(p=0.2), 
             A.HorizontalFlip(p=0.5), 
             A.VerticalFlip(p=0.5),
@@ -168,10 +180,7 @@ class ImageProcessor:
             # A.RandomBrightnessContrast(p=0.2),
             # A.RandomScale(scale_limit=self.scale_limit, p=0.5),  # Dynamically set scale_limit
         ])
-
-        self.create_contours = cfg.synthesize.yolo_contour_labels
-        self.create_bbox = cfg.synthesize.yolo_bbox_labels
-    
+        return transform
     
     def apply_random_transform(self, img: np.ndarray) -> np.ndarray:
         """
