@@ -84,7 +84,7 @@ def main(cfg: DictConfig) -> None:
         output_mask = output_mask_dir / input_mask.name
         
         # Read the grayscale mask. Ensure the image loads in grayscale mode.
-        mask = cv2.imread(input_mask, cv2.IMREAD_GRAYSCALE)
+        mask = cv2.imread(str(input_mask), cv2.IMREAD_GRAYSCALE)
         if mask is None:
             print(f"Failed to load image: {input_mask}")
             return
@@ -92,7 +92,7 @@ def main(cfg: DictConfig) -> None:
         colored_mask = colorize_mask_fixed(mask, class_rgb_mapping)
         
         # Save the resulting image.
-        cv2.imwrite(output_mask, colored_mask)
+        cv2.imwrite(str(output_mask), colored_mask)
         print(f"Colored mask saved to {output_mask}")
 
 if __name__ == "__main__":

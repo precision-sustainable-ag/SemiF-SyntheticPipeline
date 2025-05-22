@@ -156,7 +156,19 @@ class ImageProcessor:
         self.num_cutouts = num_cutouts
 
         # Non destructive transformations
-        self.transform = A.Compose([
+        self.transform = self.create_transform()
+
+        self.create_contours = cfg.synthesize.yolo_contour_labels
+        self.create_bbox = cfg.synthesize.yolo_bbox_labels
+    
+    def create_transform(self) -> A.Compose:
+        """
+        Create a new random transformation for each image.
+
+        Returns:
+            A.Compose: The random transformation.
+        """
+        transform= A.Compose([
             # A.GaussNoise(p=0.2), 
             A.HorizontalFlip(p=0.5), 
             A.VerticalFlip(p=0.5),
@@ -168,10 +180,7 @@ class ImageProcessor:
             # A.RandomBrightnessContrast(p=0.2),
             # A.RandomScale(scale_limit=self.scale_limit, p=0.5),  # Dynamically set scale_limit
         ])
-
-        self.create_contours = cfg.synthesize.yolo_contour_labels
-        self.create_bbox = cfg.synthesize.yolo_bbox_labels
-    
+        return transform
     
     def apply_random_transform(self, img: np.ndarray) -> np.ndarray:
         """
@@ -192,10 +201,10 @@ class ImageProcessor:
         return combined_image
 
     def distribute_images(
-        self, background: np.ndarray, images: List[np.ndarray],
-        cutout_paths: List[str], mode: str = "random", min_visibility: float = 0.9,
-        max_retries: int = 10
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict[int, List[List[float]]]]]:
+            self, background: np.ndarray, images: List[np.ndarray],
+            cutout_data: List[Tuple[str, Dict]], mode: str = "random",
+            min_visibility: float = 0.9, max_retries: int = 10
+            ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict[int, List[List[float]]]]]:
         """
         Distribute images on a background either randomly or in a semi-even grid pattern.
 
@@ -217,7 +226,7 @@ class ImageProcessor:
         instance_id = 1
         placed_regions = []  # List to store the coordinates of already placed cutouts
 
-        for _, (img, cutout_metadata) in enumerate(zip(images, cutout_paths)):
+        for img, (cutout_id, cutout_metadata) in zip(images, cutout_data):            
             class_id = cutout_metadata['category']['class_id']
             cutout_id = cutout_metadata['cutout_id']
 
@@ -252,7 +261,7 @@ class ImageProcessor:
                     cutout_placed = True
                     break
             if not cutout_placed:
-                log.warning(f"Could not place cutout {cutout_id} after {max_retries} attempts.")
+                log.debug(f"Could not place cutout {cutout_id} after {max_retries} attempts.")
 
 
         return background, background_semantic_mask, background_instance_mask, coord_results, yolo_bboxes
@@ -583,7 +592,61 @@ def resize_image(img: np.ndarray, resize_scale: float) -> np.ndarray:
     new_size = (int(width * resize_scale), int(height * resize_scale))
     resized_img = cv2.resize(img, new_size, interpolation=cv2.INTER_LINEAR)
     return resized_img
-    
+
+def remove_soil_background_exg(cutout_img: np.ndarray, method: str = 'otsu', fixed_thresh: int = 20) -> np.ndarray:
+    """
+    Remove soil background using Excess Green (ExG) index and thresholding.
+
+    Args:
+        cutout_img (np.ndarray): Input image (BGR, uint8).
+        method (str): 'otsu' or 'fixed' thresholding.
+        fixed_thresh (int): Threshold value if method='fixed'.
+
+    Returns:
+        np.ndarray: Binary mask with plant as foreground (255) and soil as background (0).
+    """
+    # Convert BGR to float for calculation
+    b, g, r, _ = cv2.split(cutout_img.astype('float32'))
+
+    # Compute Excess Green Index (ExG)
+    exg = 2 * g - r - b
+
+    # Normalize ExG to [0,255] for thresholding
+    exg_norm = cv2.normalize(exg, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+    exg_norm = exg_norm.astype(np.uint8)
+
+    # Thresholding
+    if method == 'otsu':
+        _, mask = cv2.threshold(exg_norm, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    elif method == 'fixed':
+        _, mask = cv2.threshold(exg_norm, fixed_thresh, 255, cv2.THRESH_BINARY)
+    else:
+        raise ValueError("method must be 'otsu' or 'fixed'.")
+
+    return mask
+
+def apply_exg_mask_rgba(cutout_img: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """
+    Apply a binary mask to a 4-channel RGBA image to mask out soil background.
+
+    Args:
+        cutout_img (np.ndarray): Input image with shape (H, W, 4), dtype uint8.
+        mask (np.ndarray): Binary mask with shape (H, W), values 0 (background) or 255 (foreground).
+
+    Returns:
+        np.ndarray: Masked RGBA image where background is transparent.
+    """
+    assert cutout_img.shape[2] == 4, "Input image must have 4 channels (RGBA)."
+    assert cutout_img.shape[:2] == mask.shape, "Mask shape must match image spatial dimensions."
+
+    # Copy image to avoid modifying original
+    masked_img = cutout_img.copy()
+
+    # Apply mask: set alpha to 0 where mask == 0, keep alpha as-is where mask == 255
+    masked_img[:, :, 3] = np.where(mask == 255, masked_img[:, :, 3], 0)
+
+    return masked_img
+
 # def process_recipe(cfg: DictConfig, json_file: Path) -> None:
 def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
     """
@@ -594,6 +657,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         recipe (Dict): Recipe containing metadata for synthetic image generation.
         shared_data (Dict): Shared dictionary for pre-loaded cutouts and backgrounds.
     """
+    exg_clean = cfg.cutout_filters.exg_clean
     try:
         # Extract background path
         background_path = Path(cfg.paths.backgrounddir, recipe['background_image_id'])
@@ -622,16 +686,22 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         background, pixel_cm_ratio = shared_data[background_path]
         
         # Process the cutouts and check if they are in shared_data
-        cutout_paths = [Path(cfg.paths.cutoutdir, cutout['cutout_id'] + ".png") for cutout in recipe['cutouts']]
         images = []
-        # for cutout_path in cutout_paths:
-        for cutout_path, cutout_metadata in zip(cutout_paths, recipe['cutouts']):
+        cutout_data = [(cutout['cutout_id'], cutout) for cutout in recipe['cutouts']]
+        for cutout_id, cutout_metadata in cutout_data:
+            cutout_path = Path(cfg.paths.cutoutdir, f"{cutout_id}.png")
             if cutout_path not in shared_data:
                 log.debug(f"Loading cutout image {cutout_path}")
                 img = cv2.imread(str(cutout_path), cv2.IMREAD_UNCHANGED)
                 if img is None:
                     log.error(f"Failed to load cutout image {cutout_path}. Skipping.")
                     continue
+
+                if exg_clean:
+                    # Apply ExG mask to remove soil background
+                    mask = remove_soil_background_exg(img, method='otsu', fixed_thresh=20)
+                    img = apply_exg_mask_rgba(img, mask)
+
                 # Calculate real-world scaling for the cutout
                 cutout_area = cutout_metadata['cutout_props']['bbox_area_cm2']
                 cutout_pixel_area = cutout_area * pixel_cm_ratio
@@ -640,7 +710,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
                 # Resize cutout
                 img = resize_image(img, cutout_scaling_factor)
 
-                if img.shape[2] == 4:
+                if img.shape[2] == 4 and not exg_clean:
                     img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
 
                 shared_data[cutout_path] = img
@@ -651,8 +721,8 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         
         # Distribute the cutout images on the background
         result, result_semantic_mask, result_instance_mask, coord_results, yolo_bboxes = processor.distribute_images(
-            background, images, recipe['cutouts'], mode="random", min_visibility=cfg.cutout_filters.min_visibility
-        )
+           background, images, cutout_data, mode="random", min_visibility=cfg.cutout_filters.min_visibility
+           )
         
         # Save the results
         compositor = ImageCompositor(cfg, recipe)
