@@ -30,3 +30,6 @@ __pycache__
 
 # IntelliJ stuff
 **/.idea
+
+# Graphs from graphical_analysis dir
+**/graphs/

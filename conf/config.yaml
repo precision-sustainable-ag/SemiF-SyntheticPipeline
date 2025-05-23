@@ -9,7 +9,7 @@ hydra:
   output_subdir: ${paths.workdir}/projects/${project_name}/${sub_name}
 
 
-project_name: pm3d
+project_name: no_resize
 sub_name: mixed
 
 tasks:
