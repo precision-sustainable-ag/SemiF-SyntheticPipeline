@@ -661,8 +661,13 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict, resize_area
 
                 # Resize cutout
                 img = resize_image(img, cutout_scaling_factor)
+                if cutout_metadata['category']['common_name'].lower() in resize_area:
+                    pixel_resize = resize_area[cutout_metadata['category']['common_name'].lower()]
+                    print(pixel_resize)
+                    mask = resize_to_target_pixels(mask, pixel_resize)
+                    img = resize_to_target_pixels(img, pixel_resize)
 
-                if img.shape[2] == 4:
+                if img.shape[2] == 4 and not exg_clean:
                     img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
 
                 shared_data[cutout_path] = img

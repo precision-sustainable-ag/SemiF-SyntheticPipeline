@@ -324,7 +324,7 @@ def log_sample_counts(documents, text="samples"):
     for class_name, count in sorted(class_counts.items(), key=lambda x: x[0]):
         log.info(f"{class_name}: {count}")
 
-def main(cfg: DictConfig) -> int:
+def main(cfg: DictConfig) -> Dict[str, int]:
     """
     Main function to initialize the MongoDBRecipeManager and start the recipe creation process.
     """
@@ -339,22 +339,47 @@ def main(cfg: DictConfig) -> int:
     documents = [dict(zip(columns, row)) for row in rows]
     # Ensure each document has an _id field.
 
-    total_cutouts = 0
-    cutout_height = 0
-    cutout_width = 0
-    for doc in documents:
-        cutout_height += doc["cutout_height"]
-        cutout_width += doc["cutout_width"]
-        total_cutouts += 1
 
+    species_to_resize = cfg.cutout_filters.resize
+    resize_species = {}
+    for species in species_to_resize:
+        resize_species[species.lower()] = {
+            "total_cutouts": 0,
+            "cutout_height": 0,
+            "cutout_width": 0,
+            "resize_factor": species_to_resize[species]
+        }
+    
+    for doc in documents:
+        
         if "_id" not in doc:
             # Generate a new unique identifier as a string.
             doc["_id"] = str(uuid.uuid4())
+
+        category_json = json.loads(doc["category"])
+        species = category_json["common_name"].lower()
+        if species in resize_species:
+            resize_species[species]["cutout_height"] += doc["cutout_height"]
+            resize_species[species]["cutout_width"] += doc["cutout_width"]
+            resize_species[species]["total_cutouts"] += 1
+
     # Convert nested JSON strings into dictionaries/lists.
     documents = [recursively_parse_json(doc) for doc in documents]
     recipe_manager = DBRecipeManager(cfg)
     recipe_manager.process_cutouts(documents)
     log.info("Recipe creation completed.")
 
-    print(F"AREA: {cutout_height/total_cutouts * cutout_width/total_cutouts}")
-    return cutout_height/total_cutouts * cutout_width/total_cutouts
+    species_resize_area = {}
+    for species in species_to_resize:
+        species = species.lower()
+        total = resize_species[species]["total_cutouts"]
+        if total > 0:
+            avg_height = resize_species[species]["cutout_height"] / total
+            avg_width = resize_species[species]["cutout_width"] / total
+            area = avg_height * avg_width
+            print(f"AREA for {species}: {area}")
+            species_resize_area[species.lower()] = area * resize_species[species]["resize_factor"]
+        else:
+            print(f"AREA for {species}: No cutouts found.")
+
+    return species_resize_area
