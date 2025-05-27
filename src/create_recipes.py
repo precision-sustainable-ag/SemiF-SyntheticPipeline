@@ -324,7 +324,7 @@ def log_sample_counts(documents, text="samples"):
     for class_name, count in sorted(class_counts.items(), key=lambda x: x[0]):
         log.info(f"{class_name}: {count}")
 
-def main(cfg: DictConfig) -> None:
+def main(cfg: DictConfig) -> int:
     """
     Main function to initialize the MongoDBRecipeManager and start the recipe creation process.
     """
@@ -338,7 +338,15 @@ def main(cfg: DictConfig) -> None:
     # Convert the rows to a list of dictionaries.
     documents = [dict(zip(columns, row)) for row in rows]
     # Ensure each document has an _id field.
+
+    total_cutouts = 0
+    cutout_height = 0
+    cutout_width = 0
     for doc in documents:
+        cutout_height += doc["cutout_height"]
+        cutout_width += doc["cutout_width"]
+        total_cutouts += 1
+
         if "_id" not in doc:
             # Generate a new unique identifier as a string.
             doc["_id"] = str(uuid.uuid4())
@@ -347,3 +355,6 @@ def main(cfg: DictConfig) -> None:
     recipe_manager = DBRecipeManager(cfg)
     recipe_manager.process_cutouts(documents)
     log.info("Recipe creation completed.")
+
+    print(F"AREA: {cutout_height/total_cutouts * cutout_width/total_cutouts}")
+    return cutout_height/total_cutouts * cutout_width/total_cutouts
