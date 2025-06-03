@@ -100,7 +100,6 @@ def bar_chart_plot(shape_count_dict, species, filename="shape_count_plot.png"):
     print(f"Plot saved as {filename}")
     plt.close()
 
-
 def bbox_plot(bbox_dict, species, filename="bbox"):
     # Get unique batch IDs
     unique_batch_ids = list(bbox_dict.keys())
@@ -111,23 +110,23 @@ def bbox_plot(bbox_dict, species, filename="bbox"):
     norm = mcolors.Normalize(vmin=0, vmax=num_batches - 1)
     batch_color_map = {batch_id: cmap(norm(i)) for i, batch_id in enumerate(unique_batch_ids)}
     
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 2))  # Slim height to emphasize X-axis
 
-    for batch_id in unique_batch_ids:
+    for i, batch_id in enumerate(unique_batch_ids):
         shape_counts = bbox_dict[batch_id]
-        shape_freq = Counter(shape_counts)  # Count frequency of each shape count
-        sorted_counts = sorted(shape_freq.items())  # Sort by shape count
-        x_vals, y_vals = zip(*sorted_counts)
+        x_vals = shape_counts
+        # Add jitter around y = 0
+        y_vals = np.random.uniform(-0.2, 0.2, size=len(x_vals))
         color = batch_color_map[batch_id]
-        plt.plot(x_vals, y_vals, marker='o', linestyle='none', label=batch_id, color=color)
+        plt.scatter(x_vals, y_vals, label=batch_id, color=color, alpha=0.7, edgecolor='k', linewidth=0.3)
 
+    plt.yticks([])  # Remove y-axis labels
     plt.xlabel(filename)
-    plt.ylabel("Frequency")
-    plt.title(f"{species}: {filename} distriubtion")
+    plt.title(f"{species}: {filename}")
     plt.legend(title="Batch IDs", bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True)
+    plt.grid(axis='x')
 
     # Save the plot
     plt.savefig(from_root(f'analyze_images/graphs/{species}_{filename}.png'), bbox_inches='tight')
-    print(f"Plot saved as {filename}.png")
+    print(f"Plot saved as {filename}_jittered.png")
     plt.close()
