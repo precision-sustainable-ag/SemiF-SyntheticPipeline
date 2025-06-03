@@ -168,7 +168,6 @@ class SyntheticAnalyzer():
         for species in self.rgb_std_blue.keys():
             bbox_plot(self.rgb_std_blue[species], species, "std_blue.png")
 
-test = SyntheticAnalyzer({'7cf1720c-4c1e-4ff6-bee1-c99d40577e39': '/home/hpmcclea/SemiF-SyntheticPipeline/projects/golden-vetch/mixed/recipes/golden-vetch_mixed.json',
-                         '53c93498-8e5b-4c17-8f41-ae5f685b4ade': '/home/hpmcclea/SemiF-SyntheticPipeline/projects/golden-vetch/mixed/recipes/golden-vetch_mixed.json'
+test = SyntheticAnalyzer({'0a389870-2640-431e-a4cc-2dd7f6cbb366': '/home/hpmcclea/SemiF-SyntheticPipeline/projects/NC02-TM-1-Running/mixed/recipes/NC02-TM-1-Running_mixed.json'
                         },
                          ["Hairy Vetch","Cereal Rye"])
