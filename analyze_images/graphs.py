@@ -51,7 +51,7 @@ def scatter_plot(batch_image_dict, species, filename="batch_sizes_plot.png"):
     plt.legend(title="Batch IDs", bbox_to_anchor=(1.05, 1), loc='upper left')
     
     # Save the plot to a file
-    plt.savefig(from_root(f'analyze_images/graphs/{species}_{filename}'), bbox_inches='tight')
+    plt.savefig(from_root(f'{file_path}/{species}_{filename}'), bbox_inches='tight')
     print(f"Plot saved as {filename}")
     plt.close()  # Close the figure to free up memory
 
@@ -96,37 +96,49 @@ def bar_chart_plot(shape_count_dict, species, filename="shape_count_plot.png"):
     plt.grid(axis='y')
 
     # Save the plot
-    plt.savefig(from_root(f'analyze_images/graphs/{species}_{filename}'), bbox_inches='tight')
+    plt.savefig(from_root(f'{file_path}/{species}_{filename}'), bbox_inches='tight')
     print(f"Plot saved as {filename}")
     plt.close()
 
-def bbox_plot(bbox_dict, species, filename="bbox"):
-    # Get unique batch IDs
-    unique_batch_ids = list(bbox_dict.keys())
-    num_batches = len(unique_batch_ids)
+'''
+    The jitter plot is used to visualize the distribution of individual data points 
+    along an axis by adding small random noise (jitter) to reduce overlap, making it 
+    easier to see the spread and density of the data.
+'''
+def jitter_plot(bbox_dict, species, filename, file_path):
+    # Group data by the states that they are from
+    # this is done by taking the first two letters 
+    # of batch ID keys.
+    grouped_data = {}
+    for key, values in bbox_dict.items():
+        prefix = key[:2]
+        if prefix not in grouped_data:
+            grouped_data[prefix] = []
+        grouped_data[prefix].extend(values)
+    unique_states = sorted(grouped_data.keys())
+    num_states = len(unique_states)
     
-    # Create a colormap
+    # ADD COLORING
     cmap = plt.get_cmap("tab20")
-    norm = mcolors.Normalize(vmin=0, vmax=num_batches - 1)
-    batch_color_map = {batch_id: cmap(norm(i)) for i, batch_id in enumerate(unique_batch_ids)}
+    norm = mcolors.Normalize(vmin=0, vmax=num_states - 1)
+    color_map = {state: cmap(norm(i)) for i, state in enumerate(unique_states)}
     
-    plt.figure(figsize=(10, 2))  # Slim height to emphasize X-axis
+    plt.figure(figsize=(10, 2))
 
-    for i, batch_id in enumerate(unique_batch_ids):
-        shape_counts = bbox_dict[batch_id]
+    for state in unique_states:
+        shape_counts = grouped_data[state]
         x_vals = shape_counts
-        # Add jitter around y = 0
         y_vals = np.random.uniform(-0.2, 0.2, size=len(x_vals))
-        color = batch_color_map[batch_id]
-        plt.scatter(x_vals, y_vals, label=batch_id, color=color, alpha=0.7, edgecolor='k', linewidth=0.3)
+        color = color_map[state]
+        plt.scatter(x_vals, y_vals, label=state, color=color, alpha=0.7, edgecolor='k', linewidth=0.3)
 
-    plt.yticks([])  # Remove y-axis labels
+    plt.yticks([])
     plt.xlabel(filename)
     plt.title(f"{species}: {filename}")
-    plt.legend(title="Batch IDs", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.legend(title="STATES", bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(axis='x')
 
     # Save the plot
-    plt.savefig(from_root(f'analyze_images/graphs/{species}_{filename}.png'), bbox_inches='tight')
-    print(f"Plot saved as {filename}_jittered.png")
+    plt.savefig(from_root(f'{file_path}/{species}_{filename}.png'), bbox_inches='tight')
+    print(f"Plot saved as {filename}.png")
     plt.close()
