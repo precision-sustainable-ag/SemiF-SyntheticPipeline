@@ -7,7 +7,7 @@ from omegaconf import DictConfig, OmegaConf
 from graphs import scatter_plot, bar_chart_plot, jitter_plot
 
 class CutoutAnalyzer():
-    def __init__(self, images_dir=None, common_name=None):
+    def __init__(self, query_type, param=None):
         self.db_path = str(from_root("data/db/agir.db"))
 
         # Initialize dictionaries for stats
@@ -22,14 +22,6 @@ class CutoutAnalyzer():
         self.rgb_std_green = {}
         self.rgb_std_blue = {}
 
-        if images_dir: # load downloaded cutout metadata
-            self.load_cutout_metadata(images_dir)
-        elif common_name: # load all data of species specified in config
-            self.load_species_metadata(common_name)
-
-        self.graph_cutout_data()
-
-    def load_cutout_metadata(self, images_dir):
         # Connect to database (READ ONLY)
         conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
         cursor = conn.cursor()
@@ -37,53 +29,29 @@ class CutoutAnalyzer():
         # Get column names
         cursor.execute("PRAGMA table_info(semif_cutouts);")
         columns = [col[1] for col in cursor.fetchall()]
+
+        if query_type == 'downloaded': # load downloaded cutout metadata
+            self.load_cutout_metadata(param, cursor, columns)
+        elif query_type == 'all': # load all data of species specified in config
+            self.load_species_metadata(param, cursor, columns)
+
+        conn.close()
+
+        self.graph_cutout_data()
+
+    def load_cutout_metadata(self, images_dir, cursor, columns):
 
         # Loop through images
         for filename in os.listdir(images_dir):
             if filename.lower().endswith(".png"):
                 cutout_id = filename[:-4]  # strip .png
-
                 cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
                 rows = cursor.fetchall()
+                self.query_for_metadata(rows, columns, cutout_id)
 
-                for row in rows:
-                    row_dict = dict(zip(columns, row))
-                    try:
-                        row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
-                        row_dict['category'] = json.loads(row_dict['category'])
-                    except Exception:
-                        continue
+    def load_species_metadata(self, common_name, cursor, columns):
 
-                    species = row_dict['category']['common_name'].upper()
-
-                    # Initialize species
-                    for d in [self.batch_image_dict, self.batch_num_components, self.bbox, self.blur,
-                              self.rgb_mean_red, self.rgb_mean_green, self.rgb_mean_blue,
-                              self.rgb_std_red, self.rgb_std_green, self.rgb_std_blue]:
-                        if species not in d:
-                            d[species] = {}
-
-                    synthetic = cutout_id  # use cutout_id as synthetic image ID
-
-                    self.append_image_size(species, synthetic, row_dict)
-                    self.append_num_components(species, synthetic, row_dict)
-                    self.append_bbox(species, synthetic, row_dict)
-                    self.append_blur(species, synthetic, row_dict)
-                    self.append_rgb_mean(species, synthetic, row_dict)
-                    self.append_rgb_std(species, synthetic, row_dict)
-
-        conn.close()
-    
-    def load_species_metadata(self, common_name):
-        # Connect to database (READ ONLY)
-        conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
-        cursor = conn.cursor()
-
-        # Get column names
-        cursor.execute("PRAGMA table_info(semif_cutouts);")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        # Loop through images
+        # Loop through all species
         for species in common_name:
             species_lower = species.lower()
             cursor.execute(
@@ -91,34 +59,36 @@ class CutoutAnalyzer():
                 (species_lower,)
             )
             rows = cursor.fetchall()
-
-            for row in rows:
-                row_dict = dict(zip(columns, row))
-                try:
-                    row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
-                    row_dict['category'] = json.loads(row_dict['category'])
-                except Exception:
-                    continue
-
-                species = row_dict['category']['common_name'].upper()
-
-                # Initialize species
-                for d in [self.batch_image_dict, self.batch_num_components, self.bbox, self.blur,
-                            self.rgb_mean_red, self.rgb_mean_green, self.rgb_mean_blue,
-                            self.rgb_std_red, self.rgb_std_green, self.rgb_std_blue]:
-                    if species not in d:
-                        d[species] = {}
-
-                synthetic = species_lower  # use cutout_id as synthetic image ID
-
-                self.append_image_size(species, synthetic, row_dict)
-                self.append_num_components(species, synthetic, row_dict)
-                self.append_bbox(species, synthetic, row_dict)
-                self.append_blur(species, synthetic, row_dict)
-                self.append_rgb_mean(species, synthetic, row_dict)
-                self.append_rgb_std(species, synthetic, row_dict)
+            self.query_for_metadata(rows, columns, species_lower)
 
 
+    def query_for_metadata(self, rows, columns, I_dont_know_what_this_is):
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+            try:
+                row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
+                row_dict['category'] = json.loads(row_dict['category'])
+            except Exception:
+                continue
+
+            species = row_dict['category']['common_name'].upper()
+
+            # Initialize species
+            for d in [self.batch_image_dict, self.batch_num_components, self.bbox, self.blur,
+                        self.rgb_mean_red, self.rgb_mean_green, self.rgb_mean_blue,
+                        self.rgb_std_red, self.rgb_std_green, self.rgb_std_blue]:
+                if species not in d:
+                    d[species] = {}
+
+            self.metadata_to_dict(species, I_dont_know_what_this_is, row_dict)
+
+    def metadata_to_dict(self, species, synthetic, row_dict):
+        self.append_image_size(species, synthetic, row_dict)
+        self.append_num_components(species, synthetic, row_dict)
+        self.append_bbox(species, synthetic, row_dict)
+        self.append_blur(species, synthetic, row_dict)
+        self.append_rgb_mean(species, synthetic, row_dict)
+        self.append_rgb_std(species, synthetic, row_dict)
 
     def append_image_size(self, species, synthetic, cutout):
         self.batch_image_dict[species].setdefault(synthetic, []).append((cutout['cutout_height'], cutout['cutout_width']))
@@ -170,10 +140,10 @@ def main(cfg: DictConfig):
     cfg = OmegaConf.create(cfg)
 
     # Graph cutouts from local folder
-    CutoutAnalyzer(str(from_root("data/cutouts")), None)
+    CutoutAnalyzer("downloaded", str(from_root("data/cutouts")))
 
     # Graph all species specified in config
-    CutoutAnalyzer(None, cfg.cutout_filters.category.common_name)
+    CutoutAnalyzer("all", cfg.cutout_filters.category.common_name)
 
 if __name__ == "__main__":
     main()
