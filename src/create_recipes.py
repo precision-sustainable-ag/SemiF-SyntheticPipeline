@@ -7,7 +7,7 @@ from typing import Dict, List, Any
 from collections import defaultdict
 from omegaconf import DictConfig
 from tqdm import tqdm
-from utils.sql3_query import SQLiteQueryHandler
+from src.utils.sql3_query import SQLiteQueryHandler
 
 log = logging.getLogger(__name__)
   

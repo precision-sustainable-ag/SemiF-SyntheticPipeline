@@ -14,9 +14,10 @@ sub_name: mixed
 
 tasks:
   # - json_to_mongo # Deprecated
-  - create_recipes
-  - move_cutouts
-  - synthesize
+  - src.create_recipes
+  - src.move_cutouts
+  - analyze_images.analysis
+  # - synthesize
 
 move_cutouts:
   parallel: True

@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -59,9 +60,9 @@ def scatter_plot(batch_image_dict, species, file_name, file_path, title_info, pa
     plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left')
 
     # Save plot
-    file_name = f'{species.lower()}_{title_info.lower()}_{file_name.lower()}.png'
+    file_name = f'{species.lower()}_{file_name.lower()}.png'
     file_name = file_name.replace(" ", "_").lower()
-    plt.savefig(from_root(f'{file_path}/{file_name}'), bbox_inches='tight')
+    plt.savefig(from_root(f'{file_path}/{title_info.lower()}/{file_name}'), bbox_inches='tight')
     print(f"Plot saved as {file_name}")
     plt.close()
 
@@ -114,9 +115,9 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
     plt.grid(axis='y')
 
     # Save the plot
-    file_name = f'{species.lower()}_{title_info.lower()}_{file_name.lower()}.png'
+    file_name = f'{species.lower()}_{file_name.lower()}.png'
     file_name = file_name.replace(" ", "_").lower()
-    plt.savefig(from_root(f'{file_path}/{file_name}'), bbox_inches='tight')
+    plt.savefig(from_root(f'{file_path}/{title_info.lower()}/{file_name}'), bbox_inches='tight')
     print(f"Plot saved as {file_name}")
     plt.close()
 
@@ -158,28 +159,30 @@ def jitter_plot(bbox_dict, species, file_name, file_path, title_info, palette):
     plt.grid(True, axis='x')
 
     plt.tight_layout()
-    out_name = f'{species.lower()}_{title_info.lower()}_{file_name.lower()}.png'.replace(" ", "_")
+    file_name = f'{species.lower()}_{file_name.lower()}.png'.replace(" ", "_")
+    plt.savefig(from_root(f'{file_path}/{title_info.lower()}/{file_name}'), bbox_inches='tight')
+    print(f"Strip plot saved as {file_name}")
+    plt.close()
+
+
+def pie_chart(data_dict, file_name, file_path):
+    labels = []
+    for key in data_dict.keys():
+        label_type, path = key.split(":", 1)
+        path = path.strip()
+        last_folder = os.path.basename(path)
+        labels.append(f"{label_type.strip()}: {last_folder}")
+
+    sizes = list(data_dict.values())
+
+    plt.figure(figsize=(8, 6))
+    plt.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=90)
+    plt.title("Cutouts Downloaded per Storage Path")
+    plt.axis("equal")
+
+    plt.tight_layout()
+    out_name = f'{file_name.lower()}.png'.replace(" ", "_")
     plt.savefig(from_root(f'{file_path}/{out_name}'), bbox_inches='tight')
     print(f"Strip plot saved as {out_name}")
     plt.close()
 
-def pie_chart(storage_data)
-    # Filter out zero values (optional, to avoid empty slices)
-    filtered_data = {k: v for k, v in storage_data.items() if v > 0}
-
-    # Prepare labels and sizes
-    labels = list(filtered_data.keys())
-    sizes = list(filtered_data.values())
-
-    # Create pie chart
-    plt.figure(figsize=(6, 6))
-    plt.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=90)
-    plt.title("Storage Distribution")
-    plt.axis("equal")  # Make the pie a circle
-
-    # Save the plot
-    output_path = from_root("analyze_images/graphs/storage_distribution.png")
-    plt.tight_layout()
-    plt.savefig(output_path, bbox_inches="tight")
-    print(f"Pie chart saved to {output_path}")
-    plt.close()

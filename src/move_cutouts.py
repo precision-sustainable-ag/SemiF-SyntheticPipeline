@@ -204,11 +204,10 @@ def main(cfg: DictConfig) -> None:
 
     # echo number of downloaded files from each of the storage bases for reporting purposes
     data = {
-        cfg.paths.primary_longterm_storage: downloader.primary_storage_base_downloads,
-        cfg.paths.secondary_longterm_storage: downloader.secondary_storage_base_downloads, 
-        cfg.paths.tertiary_longterm_storage: downloader.tertiary_storage_base_downloads
+        f"primary: {cfg.paths.primary_longterm_storage}": downloader.primary_storage_base_downloads,
+        f"secondary: {cfg.paths.secondary_longterm_storage}": downloader.secondary_storage_base_downloads,
+        f"tertiary: {cfg.paths.tertiary_longterm_storage}": downloader.tertiary_storage_base_downloads
     }
-    print("hit")
     file_path = str(from_root("analyze_images/storage_log.json"))
     if os.path.exists(file_path):
         os.remove(file_path)

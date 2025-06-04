@@ -1,12 +1,11 @@
 import os
-import hydra
 import json
 import sqlite3
 from from_root import from_root
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from omegaconf import DictConfig, OmegaConf
-from graphs import scatter_plot, bar_chart_plot, jitter_plot
+
+from analyze_images.graphs import scatter_plot, bar_chart_plot, jitter_plot, pie_chart
 
 class CutoutAnalyzer():
     def __init__(self, query_type, param, states):
@@ -27,6 +26,10 @@ class CutoutAnalyzer():
         # KEEP TRACK OF STATES FOR COLOR COORDINATION BETWEEN GRAPHS
         self.states = states
 
+        # READ JSON TO CREATE STORAGE PIE CHART
+        with open(str(from_root("analyze_images/storage_log.json")), "r") as f:
+            json_file = json.load(f)
+
         # Connect to database (READ ONLY)
         conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
         cursor = conn.cursor()
@@ -37,10 +40,10 @@ class CutoutAnalyzer():
 
         if query_type == 'downloaded': # load downloaded cutout metadata
             self.load_cutout_metadata(param, cursor, columns)
-            self.graph_cutout_data("Downloaded Cutouts")
+            self.graph_cutout_data("Downloaded Cutouts", json_file)
         elif query_type == 'all': # load all data of species specified in config
             self.load_species_metadata(param, cursor, columns)
-            self.graph_cutout_data("All Cutouts")
+            self.graph_cutout_data("All Cutouts", json_file)
 
         conn.close()
 
@@ -124,9 +127,11 @@ class CutoutAnalyzer():
         self.rgb_std_green[species].setdefault(synthetic, []).append(g)
         self.rgb_std_blue[species].setdefault(synthetic, []).append(b)
 
-    def graph_cutout_data(self, title_info):
+    def graph_cutout_data(self, title_info, json_file):
         file_path = from_root('analyze_images/cutouts/')
-        os.makedirs(file_path, exist_ok=True)
+
+        title_info = title_info.replace(" ", "_").lower()
+        os.makedirs(str(f"{file_path}/{title_info}"), exist_ok=True)
 
         # Grab graph colors
         cmap = plt.get_cmap("tab20")
@@ -152,15 +157,4 @@ class CutoutAnalyzer():
         #     jitter_plot(self.rgb_std_green[species], species, "std_green")
         #     jitter_plot(self.rgb_std_blue[species], species, "std_blue")
 
-@hydra.main(version_base="1.2", config_path=str(from_root("conf")), config_name="config")
-def main(cfg: DictConfig):
-    cfg = OmegaConf.create(cfg)
-
-    # Graph all species specified in config
-    all_cutouts = CutoutAnalyzer("all", cfg.cutout_filters.category.common_name, [])
-
-    # Graph cutouts from local folder
-    CutoutAnalyzer("downloaded", str(from_root("data/cutouts")), all_cutouts.states)
-
-if __name__ == "__main__":
-    main()
+        pie_chart(json_file, "Cutout Distribution Across Storages", file_path)
