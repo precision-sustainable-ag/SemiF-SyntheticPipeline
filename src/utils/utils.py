@@ -211,67 +211,53 @@ def is_rectangular(mask, threshold_percentage):
     return is_filled_enough, filled_percentage
 
 
-def 
 
+def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], cfg) -> None:
 
-                    if storage_name == "primary":
-                        self.primary_storage_base_downloads += 1
-                    elif storage_name == "secondary":
-                        self.secondary_storage_base_downloads += 1
-                    elif storage_name == "tertiary":
-                        self.tertiary_storage_base_downloads += 1
-
-
-    def download_image(self, cutout_id: str, batch_id: str) -> None:
-        """
-        Downloads an image corresponding to a given cutout_id and batch_id from the long-term storage.
-
-        :param cutout_id: The ID of the cutout to download.
-        :param batch_id: The batch ID to locate the cutout in the long-term storage.
-        """
+    primary_storage_base_downloads = secondary_storage_base_downloads = tertiary_storage_base_downloads = 0
+    for batch_id, cutout_id in zip(batch_ids, cutout_ids):
         image_filename = f"{cutout_id}.png"
 
         # List of storage locations in order of preference.
         storages = [
-            ("primary", Path(self.primary_storage_base, batch_id, image_filename)),
-            ("secondary", Path(self.secondary_storage_base, batch_id, image_filename)),
-            ("tertiary", Path(self.tertiary_storage_base, batch_id, image_filename))
+            ("primary", Path(Path(cfg.paths.primary_longterm_storage, "semifield-cutouts"), batch_id, image_filename)),
+            ("secondary", Path(Path(cfg.paths.secondary_longterm_storage, "semifield-cutouts"), batch_id, image_filename)),
+            ("tertiary", Path(Path(cfg.paths.tertiary_longterm_storage, "semifield-cutouts"), batch_id, image_filename))
         ]
-
-        # Construct the local path where the image will be saved
-        local_image_path = Path(self.local_download_folder, image_filename)
-        # Ensure the local directory exists
-        local_image_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if local_image_path.exists():
-            log.debug(f"Image already exists locally: {cutout_id}")
-            return
 
         # Try each storage location until the image is found and copied
         for storage_name, storage_path in storages:
             if storage_path.exists():
-                try:
-                    shutil.copy(storage_path, local_image_path)
-                    log.debug(f"Downloaded from {storage_name} storage: {cutout_id} to {local_image_path}")
-                    return  # Exit after successful download.
-                except IOError as e:
-                    log.error(f"Error copying file from {storage_name} storage ({storage_path}) to {local_image_path} - {e}")
-                    # Optionally, continue to the next storage if copy fails.
-        
-        # If we reach this point, the file was not found or could not be copied from any storage.
-        log.error(
-            f"Image not found in any storage for cutout_id: {cutout_id}. Tried paths: " +
-            ", ".join(f"{name}: {path}" for name, path in storages)
-        )
+                if storage_name == "primary":
+                    primary_storage_base_downloads += 1
+                elif storage_name == "secondary":
+                    secondary_storage_base_downloads += 1
+                elif storage_name == "tertiary":
+                    tertiary_storage_base_downloads += 1
+                break  # Exit .
 
     # echo number of downloaded files from each of the storage bases for reporting purposes
     data = {
-        f"primary: {cfg.paths.primary_longterm_storage}": downloader.primary_storage_base_downloads,
-        f"secondary: {cfg.paths.secondary_longterm_storage}": downloader.secondary_storage_base_downloads,
-        f"tertiary: {cfg.paths.tertiary_longterm_storage}": downloader.tertiary_storage_base_downloads
+        f"primary: {cfg.paths.primary_longterm_storage}": primary_storage_base_downloads,
+        f"secondary: {cfg.paths.secondary_longterm_storage}": secondary_storage_base_downloads,
+        f"tertiary: {cfg.paths.tertiary_longterm_storage}": tertiary_storage_base_downloads
     }
-    file_path = str(from_root("analyze_images/storage_log.json"))
-    if os.path.exists(file_path):
-        os.remove(file_path)
-    with open(file_path, "x") as f:
-        json.dump(data, f, indent=4)
+
+    return data
+
+def read_recipe(json_file_path):
+    # Load your JSON file
+    with open(json_file_path, "r") as f:
+        data = json.load(f)
+
+    # Initialize empty lists to store batch_id and cutout_id
+    batch_ids = []
+    cutout_ids = []
+
+    # Loop through the synthetic images and their cutouts
+    for image in data.get("synthetic_images", []):
+        for cutout in image.get("cutouts", []):
+            batch_ids.append(cutout.get("batch_id"))
+            cutout_ids.append(cutout.get("cutout_id"))
+
+    return batch_ids, cutout_ids

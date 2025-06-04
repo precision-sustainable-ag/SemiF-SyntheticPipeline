@@ -6,8 +6,6 @@ from collections import Counter
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
-
-
 def scatter_plot(batch_image_dict, species, file_name, file_path, title_info, palette):
     # Create lists for height, width, and state codes
     heights = []
@@ -61,7 +59,7 @@ def scatter_plot(batch_image_dict, species, file_name, file_path, title_info, pa
     # Save plot
     file_name = f'{species.lower()}_{file_name.lower()}.png'
     file_name = file_name.replace(" ", "_").lower()
-    plt.savefig(from_root(f'{file_path}/{title_info.lower()}/{file_name}'), bbox_inches='tight')
+    plt.savefig(f'{file_path}/{title_info.lower()}/{file_name}', bbox_inches='tight')
     print(f"Plot saved as {file_name}")
     plt.close()
 
@@ -116,7 +114,7 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
     # Save the plot
     file_name = f'{species.lower()}_{file_name.lower()}.png'
     file_name = file_name.replace(" ", "_").lower()
-    plt.savefig(from_root(f'{file_path}/{title_info.lower()}/{file_name}'), bbox_inches='tight')
+    plt.savefig(f'{file_path}/{title_info.lower()}/{file_name}', bbox_inches='tight')
     print(f"Plot saved as {file_name}")
     plt.close()
 
@@ -159,7 +157,7 @@ def jitter_plot(bbox_dict, species, file_name, file_path, title_info, palette):
 
     plt.tight_layout()
     file_name = f'{species.lower()}_{file_name.lower()}.png'.replace(" ", "_")
-    plt.savefig(from_root(f'{file_path}/{title_info.lower()}/{file_name}'), bbox_inches='tight')
+    plt.savefig(f'{file_path}/{title_info.lower()}/{file_name}', bbox_inches='tight')
     print(f"Strip plot saved as {file_name}")
     plt.close()
 
@@ -181,7 +179,7 @@ def pie_chart(data_dict, file_name, file_path):
 
     plt.tight_layout()
     out_name = f'{file_name.lower()}.png'.replace(" ", "_")
-    plt.savefig(from_root(f'{file_path}/{out_name}'), bbox_inches='tight')
+    plt.savefig(f'{file_path}/{out_name}', bbox_inches='tight')
     print(f"Strip plot saved as {out_name}")
     plt.close()
 

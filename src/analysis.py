@@ -6,8 +6,10 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from omegaconf import DictConfig, OmegaConf
 
-# repo imports
+# util imports
 from utils.pdf import generate_pdf
+from utils.utils import read_recipe
+from utils.utils import resolve_image_storage_locations
 from utils.graphs import scatter_plot, bar_chart_plot, jitter_plot, pie_chart
 
 class CutoutAnalyzer():
@@ -40,29 +42,30 @@ class CutoutAnalyzer():
         columns = [col[1] for col in cursor.fetchall()]
 
         # Find out which storage we would be getting the cutouts from
+        batch_ids, cutout_ids = read_recipe(f"{cfg.paths.recipesdir}/{cfg.project_name}_{cfg.sub_name}.json")
+        self.storage_location_data = resolve_image_storage_locations(batch_ids, cutout_ids, cfg)
+        self.cutout_ids = cutout_ids
 
-        if query_type == 'downloaded': # load downloaded cutout metadata
+        if query_type == 'specified_configs': # load downloaded cutout metadata
             self.load_cutout_metadata(param, cursor, columns)
-            self.graph_cutout_data("Downloaded Cutouts", json_file)
-        elif query_type == 'all': # load all data of species specified in config
+            self.graph_cutout_data("Downloaded Cutouts")
+        elif query_type == 'specified_species': # load all data of species specified in config
             self.load_species_metadata(param, cursor, columns)
-            self.graph_cutout_data("All Cutouts", json_file)
+            self.graph_cutout_data("All Cutouts")
 
         conn.close()
 
     def load_cutout_metadata(self, images_dir, cursor, columns):
 
-        # Loop through images
-        for filename in os.listdir(images_dir):
-            if filename.lower().endswith(".png"):
-                cutout_id = filename[:-4]  # strip .png
-                cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
-                rows = cursor.fetchall()
-                self.query_for_metadata(rows, columns)
+        # Loop through specified cutouts
+        for cutout_id in self.cutout_ids:
+            cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
+            rows = cursor.fetchall()
+            self.query_for_metadata(rows, columns)
 
     def load_species_metadata(self, common_name, cursor, columns):
 
-        # Loop through all species
+        # Loop through all specified species cutouts
         for species in common_name:
             species_lower = species.lower()
             cursor.execute(
@@ -130,8 +133,9 @@ class CutoutAnalyzer():
         self.rgb_std_green[species].setdefault(synthetic, []).append(g)
         self.rgb_std_blue[species].setdefault(synthetic, []).append(b)
 
-    def graph_cutout_data(self, title_info, json_file):
-        file_path = f'{self.cfg.paths.projectdir}/analyze_images/'
+    def graph_cutout_data(self, title_info):
+        
+        file_path = self.cfg.paths.analysisdir
 
         title_info = title_info.replace(" ", "_").lower()
         os.makedirs(str(f"{file_path}/{title_info}"), exist_ok=True)
@@ -160,15 +164,15 @@ class CutoutAnalyzer():
         #     jitter_plot(self.rgb_std_green[species], species, "std_green")
         #     jitter_plot(self.rgb_std_blue[species], species, "std_blue")
 
-        pie_chart(json_file, "Cutout Distribution Across Storages", file_path)
+        pie_chart(self.storage_location_data, "Cutout Distribution Across Storages", file_path)
 
 def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.create(cfg)
 
     # Graph all species specified in config
-    all_cutouts = CutoutAnalyzer("all", cfg.cutout_filters.category.common_name, [], cfg)
+    all_cutouts = CutoutAnalyzer("specified_species", cfg.cutout_filters.category.common_name, [], cfg)
 
     # Graph cutouts from local folder
-    CutoutAnalyzer("downloaded", cfg.paths.cutout_dir, all_cutouts.states, cfg)
+    CutoutAnalyzer("specified_configs", cfg.paths.cutout_dir, all_cutouts.states, cfg)
 
     generate_pdf()
