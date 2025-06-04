@@ -4,8 +4,9 @@ import logging
 import shutil
 from pathlib import Path
 from typing import List, Dict
-from from_root import from_root
+
 from omegaconf import DictConfig
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 log = logging.getLogger(__name__)
@@ -32,10 +33,6 @@ class CutoutDownloader:
         self.tertiary_storage_base = Path(cfg.paths.tertiary_longterm_storage, "semifield-cutouts")
         self.local_download_folder = Path(cfg.paths.cutoutdir)
         self.max_workers = cfg.move_cutouts.parallel_workers
-
-        self.primary_storage_base_downloads = 0
-        self.secondary_storage_base_downloads = 0
-        self.tertiary_storage_base_downloads = 0
 
         # self.s3_resource = boto3.resource('s3')
         # self.s3_resource.meta.client.meta.events.register('choose-signer.s3.*',
@@ -119,7 +116,6 @@ class CutoutDownloader:
             f"Image not found in any storage for cutout_id: {cutout_id}. Tried paths: " +
             ", ".join(f"{name}: {path}" for name, path in storages)
         )
-
     def get_unique_cutouts(self, synthetic_images: List[Dict]) -> Dict[
         str, str]:
         """
@@ -195,5 +191,3 @@ def main(cfg: DictConfig) -> None:
         downloader.process_cutouts_concurrently()
     else:
         downloader.process_cutouts_sequentially()
-
-
