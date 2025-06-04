@@ -32,12 +32,12 @@ class CutoutAnalyzer():
 
         if query_type == 'downloaded': # load downloaded cutout metadata
             self.load_cutout_metadata(param, cursor, columns)
+            self.graph_cutout_data("Downloaded Cutouts")
         elif query_type == 'all': # load all data of species specified in config
             self.load_species_metadata(param, cursor, columns)
+            self.graph_cutout_data("All Cutouts")
 
         conn.close()
-
-        self.graph_cutout_data()
 
     def load_cutout_metadata(self, images_dir, cursor, columns):
 
@@ -47,7 +47,7 @@ class CutoutAnalyzer():
                 cutout_id = filename[:-4]  # strip .png
                 cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
                 rows = cursor.fetchall()
-                self.query_for_metadata(rows, columns, cutout_id)
+                self.query_for_metadata(rows, columns)
 
     def load_species_metadata(self, common_name, cursor, columns):
 
@@ -59,10 +59,10 @@ class CutoutAnalyzer():
                 (species_lower,)
             )
             rows = cursor.fetchall()
-            self.query_for_metadata(rows, columns, species_lower)
+            self.query_for_metadata(rows, columns)
 
 
-    def query_for_metadata(self, rows, columns, I_dont_know_what_this_is):
+    def query_for_metadata(self, rows, columns):
         for row in rows:
             row_dict = dict(zip(columns, row))
             try:
@@ -80,7 +80,7 @@ class CutoutAnalyzer():
                 if species not in d:
                     d[species] = {}
 
-            self.metadata_to_dict(species, I_dont_know_what_this_is, row_dict)
+            self.metadata_to_dict(species, row_dict['cutout_id'], row_dict)
 
     def metadata_to_dict(self, species, synthetic, row_dict):
         self.append_image_size(species, synthetic, row_dict)
@@ -114,17 +114,17 @@ class CutoutAnalyzer():
         self.rgb_std_green[species].setdefault(synthetic, []).append(g)
         self.rgb_std_blue[species].setdefault(synthetic, []).append(b)
 
-    def graph_cutout_data(self):
+    def graph_cutout_data(self, title_info):
         file_path = from_root('analyze_images/cutouts/')
         os.makedirs(file_path, exist_ok=True)
-        # for species in self.batch_image_dict:
-        #     scatter_plot(self.batch_image_dict[species], species)
-        # for species in self.batch_num_components:
-        #     bar_chart_plot(self.batch_num_components[species], species)
+        for species in self.batch_image_dict:
+            scatter_plot(self.batch_image_dict[species], species, "Height V Width", file_path, title_info)
+        for species in self.batch_num_components:
+            bar_chart_plot(self.batch_num_components[species], species, "Number of Components", file_path, title_info)
         for species in self.bbox:
-            jitter_plot(self.bbox[species], species, "bbox_area_cm2", file_path)
+            jitter_plot(self.bbox[species], species, "bbox_area_cm2", file_path, title_info)
         for species in self.blur:
-            jitter_plot(self.blur[species], species, "blur_effect", file_path)
+            jitter_plot(self.blur[species], species, "blur_effect", file_path, title_info)
 
         # TODO EVAL USEFULNESS OF RGB GRAPHS
         # for species in self.rgb_mean_red:

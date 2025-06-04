@@ -1,73 +1,95 @@
-import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.colors as mcolors
+import pandas as pd
+import seaborn as sns
 from from_root import from_root
 from collections import Counter
-import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
-def scatter_plot(batch_image_dict, species, filename="batch_sizes_plot.png"):
-    # Create lists for height, width, and batch IDs
+def scatter_plot(batch_image_dict, species, file_name, file_path, title_info):
+    # Create lists for height, width, and state codes
     heights = []
     widths = []
-    batch_ids = []
-    
-    # Create a unique color for each batch using a colormap
-    unique_batch_ids = list(batch_image_dict.keys())
-    num_batches = len(unique_batch_ids)
-    cmap = plt.get_cmap("tab20")  # Use the "tab20" colormap for distinct colors
-    norm = mcolors.Normalize(vmin=0, vmax=num_batches-1)
-    
-    # Create a dictionary to map each batch_id to a color
-    batch_color_map = {batch_id: cmap(norm(i)) for i, batch_id in enumerate(unique_batch_ids)}
-    
-    # Extract the data from the batch_image_dict
+    state_codes = []
+
+    # Group images by state (first 2 characters of batch ID)
+    grouped_data = {}
     for batch_id, sizes in batch_image_dict.items():
+        state = batch_id[:2]
+        if state not in grouped_data:
+            grouped_data[state] = []
+        grouped_data[state].extend(sizes)
+
+    # Sorted list of unique state codes
+    unique_states = sorted(grouped_data.keys())
+    num_states = len(unique_states)
+
+    # Assign a unique color to each state
+    cmap = plt.get_cmap("tab20")
+    norm = mcolors.Normalize(vmin=0, vmax=num_states - 1)
+    state_color_map = {state: cmap(norm(i)) for i, state in enumerate(unique_states)}
+
+    # Collect data for plotting
+    all_heights = []
+    all_widths = []
+    all_states = []
+
+    for state, sizes in grouped_data.items():
         for size in sizes:
-            heights.append(size[0])  # height
-            widths.append(size[1])   # width
-            batch_ids.append(batch_id)  # batch_id for coloring
-    
-    # Convert lists to numpy arrays for easier plotting
-    heights = np.array(heights)
-    widths = np.array(widths)
-    
-    # Plot each batch with its corresponding color
+            all_heights.append(size[0])
+            all_widths.append(size[1])
+            all_states.append(state)
+
+    # Convert to numpy arrays for indexing
+    all_heights = np.array(all_heights)
+    all_widths = np.array(all_widths)
+
+    # Create scatter plot
     plt.figure(figsize=(10, 6))
-    
-    for batch_id in unique_batch_ids:
-        # Get the color corresponding to the current batch
-        batch_color = batch_color_map[batch_id]
-        
-        # Get the indices of the images that belong to this batch
-        batch_indices = [i for i, b_id in enumerate(batch_ids) if b_id == batch_id]
-        
-        # Plot all the (height, width) points for this batch
-        plt.scatter(heights[batch_indices], widths[batch_indices], color=batch_color, label=batch_id, alpha=0.7)
-    
-    # Add labels, title, and legend
+    for state in unique_states:
+        indices = [i for i, s in enumerate(all_states) if s == state]
+        plt.scatter(
+            all_heights[indices],
+            all_widths[indices],
+            color=state_color_map[state],
+            label=state,
+            alpha=0.7
+        )
+
+    # Add labels and title
     plt.xlabel('Height')
     plt.ylabel('Width')
-    plt.title(f'{species}: Height vs Width of Images by Batch')
-    plt.legend(title="Batch IDs", bbox_to_anchor=(1.05, 1), loc='upper left')
-    
-    # Save the plot to a file
-    plt.savefig(from_root(f'{file_path}/{species}_{filename}'), bbox_inches='tight')
-    print(f"Plot saved as {filename}")
-    plt.close()  # Close the figure to free up memory
+    plt.title(f'{species}: Height vs Width of Images by State')
+    plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left')
 
+    # Save plot
+    file_name = f'{species.lower()}_{title_info.lower()}_{file_name.lower()}.png'
+    file_name = file_name.replace(" ", "_").lower()
+    plt.savefig(from_root(f'{file_path}/{file_name}'), bbox_inches='tight')
+    print(f"Plot saved as {file_name}")
+    plt.close()
 
-def bar_chart_plot(shape_count_dict, species, filename="shape_count_plot.png"):
-    # Get unique batch IDs
-    unique_batch_ids = list(shape_count_dict.keys())
-    num_batches = len(unique_batch_ids)
+def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info):
+    # Group shape counts by state (first 2 characters of batch ID)
+    grouped_data = {}
+    for batch_id, shape_counts in shape_count_dict.items():
+        state = batch_id[:2]
+        if state not in grouped_data:
+            grouped_data[state] = []
+        grouped_data[state].extend(shape_counts)
 
-    # Collect all unique shape counts across batches
+    # Get unique state codes
+    unique_states = sorted(grouped_data.keys())
+    num_states = len(unique_states)
+
+    # Collect all unique shape counts across states
     all_shape_counts = set()
     shape_freq_dicts = {}
 
-    for batch_id, shape_counts in shape_count_dict.items():
-        freq = Counter(shape_counts)
-        shape_freq_dicts[batch_id] = freq
+    for state, shape_counts in grouped_data.items():
+        filtered_counts = [s for s in shape_counts if s is not None]
+        freq = Counter(filtered_counts)
+        shape_freq_dicts[state] = freq
         all_shape_counts.update(freq.keys())
 
     sorted_shape_counts = sorted(all_shape_counts)
@@ -75,29 +97,31 @@ def bar_chart_plot(shape_count_dict, species, filename="shape_count_plot.png"):
 
     # Create a colormap
     cmap = plt.get_cmap("tab20")
-    norm = mcolors.Normalize(vmin=0, vmax=num_batches - 1)
-    batch_color_map = {batch_id: cmap(norm(i)) for i, batch_id in enumerate(unique_batch_ids)}
+    norm = mcolors.Normalize(vmin=0, vmax=num_states - 1)
+    state_color_map = {state: cmap(norm(i)) for i, state in enumerate(unique_states)}
 
-    bar_width = 0.8 / num_batches  # total width of bars per group
+    bar_width = 0.8 / num_states  # total width of bars per group
 
     plt.figure(figsize=(12, 6))
 
-    for i, batch_id in enumerate(unique_batch_ids):
-        freq = shape_freq_dicts[batch_id]
+    for i, state in enumerate(unique_states):
+        freq = shape_freq_dicts[state]
         y = [freq.get(shape_count, 0) for shape_count in sorted_shape_counts]
-        offset = (i - num_batches / 2) * bar_width + bar_width / 2
-        plt.bar(x + offset, y, width=bar_width, label=batch_id, color=batch_color_map[batch_id])
+        offset = (i - num_states / 2) * bar_width + bar_width / 2
+        plt.bar(x + offset, y, width=bar_width, label=state, color=state_color_map[state])
 
     plt.xlabel("Number of Shapes")
     plt.ylabel("Frequency")
-    plt.title(f"{species}: Frequency of Shape Counts by Batch")
+    plt.title(f"{species}: Frequency of Shape Counts by State")
     plt.xticks(x, sorted_shape_counts)
-    plt.legend(title="Batch IDs", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(axis='y')
 
     # Save the plot
-    plt.savefig(from_root(f'{file_path}/{species}_{filename}'), bbox_inches='tight')
-    print(f"Plot saved as {filename}")
+    file_name = f'{species.lower()}_{title_info.lower()}_{file_name.lower()}.png'
+    file_name = file_name.replace(" ", "_").lower()
+    plt.savefig(from_root(f'{file_path}/{file_name}'), bbox_inches='tight')
+    print(f"Plot saved as {file_name}")
     plt.close()
 
 '''
@@ -105,40 +129,40 @@ def bar_chart_plot(shape_count_dict, species, filename="shape_count_plot.png"):
     along an axis by adding small random noise (jitter) to reduce overlap, making it 
     easier to see the spread and density of the data.
 '''
-def jitter_plot(bbox_dict, species, filename, file_path):
-    # Group data by the states that they are from
-    # this is done by taking the first two letters 
-    # of batch ID keys.
-    grouped_data = {}
-    for key, values in bbox_dict.items():
-        prefix = key[:2]
-        if prefix not in grouped_data:
-            grouped_data[prefix] = []
-        grouped_data[prefix].extend(values)
-    unique_states = sorted(grouped_data.keys())
-    num_states = len(unique_states)
-    
-    # ADD COLORING
-    cmap = plt.get_cmap("tab20")
-    norm = mcolors.Normalize(vmin=0, vmax=num_states - 1)
-    color_map = {state: cmap(norm(i)) for i, state in enumerate(unique_states)}
-    
-    plt.figure(figsize=(10, 2))
+def jitter_plot(bbox_dict, species, file_name, file_path, title_info):
 
-    for state in unique_states:
-        shape_counts = grouped_data[state]
-        x_vals = shape_counts
-        y_vals = np.random.uniform(-0.2, 0.2, size=len(x_vals))
-        color = color_map[state]
-        plt.scatter(x_vals, y_vals, label=state, color=color, alpha=0.7, edgecolor='k', linewidth=0.3)
+    # Flatten bbox_dict into a DataFrame with state info
+    data = []
+    for batch_id, values in bbox_dict.items():
+        state = batch_id[:2]
+        for count in values:
+            data.append({
+                "State": state,
+                file_name: count
+            })
 
-    plt.yticks([])
-    plt.xlabel(filename)
-    plt.title(f"{species}: {filename}")
-    plt.legend(title="STATES", bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(axis='x')
+    df = pd.DataFrame(data)
+    unique_states = sorted(df["State"].unique())
 
-    # Save the plot
-    plt.savefig(from_root(f'{file_path}/{species}_{filename}.png'), bbox_inches='tight')
-    print(f"Plot saved as {filename}.png")
+    plt.figure(figsize=(12, 4))
+    sns.stripplot(
+        data=df,
+        x=file_name,
+        y="State",
+        hue="State",
+        jitter=True,
+        palette="tab20",
+        size=5,
+        legend=False  
+    )
+
+    plt.title(f"{species}: {title_info} {file_name}")
+    plt.xlabel(file_name)
+    plt.ylabel("State")
+    plt.grid(True, axis='x')
+
+    plt.tight_layout()
+    out_name = f'{species.lower()}_{title_info.lower()}_{file_name.lower()}.png'.replace(" ", "_")
+    plt.savefig(from_root(f'{file_path}/{out_name}'), bbox_inches='tight')
+    print(f"Strip plot saved as {out_name}")
     plt.close()
