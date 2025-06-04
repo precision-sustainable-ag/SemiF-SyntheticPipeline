@@ -6,7 +6,9 @@ from collections import Counter
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
-def scatter_plot(batch_image_dict, species, file_name, file_path, title_info):
+
+
+def scatter_plot(batch_image_dict, species, file_name, file_path, title_info, palette):
     # Create lists for height, width, and state codes
     heights = []
     widths = []
@@ -22,12 +24,6 @@ def scatter_plot(batch_image_dict, species, file_name, file_path, title_info):
 
     # Sorted list of unique state codes
     unique_states = sorted(grouped_data.keys())
-    num_states = len(unique_states)
-
-    # Assign a unique color to each state
-    cmap = plt.get_cmap("tab20")
-    norm = mcolors.Normalize(vmin=0, vmax=num_states - 1)
-    state_color_map = {state: cmap(norm(i)) for i, state in enumerate(unique_states)}
 
     # Collect data for plotting
     all_heights = []
@@ -51,7 +47,7 @@ def scatter_plot(batch_image_dict, species, file_name, file_path, title_info):
         plt.scatter(
             all_heights[indices],
             all_widths[indices],
-            color=state_color_map[state],
+            color=palette[state],
             label=state,
             alpha=0.7
         )
@@ -69,7 +65,7 @@ def scatter_plot(batch_image_dict, species, file_name, file_path, title_info):
     print(f"Plot saved as {file_name}")
     plt.close()
 
-def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info):
+def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, palette):
     # Group shape counts by state (first 2 characters of batch ID)
     grouped_data = {}
     for batch_id, shape_counts in shape_count_dict.items():
@@ -129,7 +125,7 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info):
     along an axis by adding small random noise (jitter) to reduce overlap, making it 
     easier to see the spread and density of the data.
 '''
-def jitter_plot(bbox_dict, species, file_name, file_path, title_info):
+def jitter_plot(bbox_dict, species, file_name, file_path, title_info, palette):
 
     # Flatten bbox_dict into a DataFrame with state info
     data = []
@@ -151,7 +147,7 @@ def jitter_plot(bbox_dict, species, file_name, file_path, title_info):
         y="State",
         hue="State",
         jitter=True,
-        palette="tab20",
+        palette=palette,
         size=5,
         legend=False  
     )
@@ -165,4 +161,25 @@ def jitter_plot(bbox_dict, species, file_name, file_path, title_info):
     out_name = f'{species.lower()}_{title_info.lower()}_{file_name.lower()}.png'.replace(" ", "_")
     plt.savefig(from_root(f'{file_path}/{out_name}'), bbox_inches='tight')
     print(f"Strip plot saved as {out_name}")
+    plt.close()
+
+def pie_chart(storage_data)
+    # Filter out zero values (optional, to avoid empty slices)
+    filtered_data = {k: v for k, v in storage_data.items() if v > 0}
+
+    # Prepare labels and sizes
+    labels = list(filtered_data.keys())
+    sizes = list(filtered_data.values())
+
+    # Create pie chart
+    plt.figure(figsize=(6, 6))
+    plt.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=90)
+    plt.title("Storage Distribution")
+    plt.axis("equal")  # Make the pie a circle
+
+    # Save the plot
+    output_path = from_root("analyze_images/graphs/storage_distribution.png")
+    plt.tight_layout()
+    plt.savefig(output_path, bbox_inches="tight")
+    print(f"Pie chart saved to {output_path}")
     plt.close()

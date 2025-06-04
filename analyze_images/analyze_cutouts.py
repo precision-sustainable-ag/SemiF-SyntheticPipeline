@@ -3,11 +3,13 @@ import hydra
 import json
 import sqlite3
 from from_root import from_root
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from omegaconf import DictConfig, OmegaConf
 from graphs import scatter_plot, bar_chart_plot, jitter_plot
 
 class CutoutAnalyzer():
-    def __init__(self, query_type, param=None):
+    def __init__(self, query_type, param, states):
         self.db_path = str(from_root("data/db/agir.db"))
 
         # Initialize dictionaries for stats
@@ -21,6 +23,9 @@ class CutoutAnalyzer():
         self.rgb_std_red = {}
         self.rgb_std_green = {}
         self.rgb_std_blue = {}
+
+        # KEEP TRACK OF STATES FOR COLOR COORDINATION BETWEEN GRAPHS
+        self.states = states
 
         # Connect to database (READ ONLY)
         conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
@@ -81,6 +86,11 @@ class CutoutAnalyzer():
                     d[species] = {}
 
             self.metadata_to_dict(species, row_dict['cutout_id'], row_dict)
+            if self.states is None:
+                self.states.append(row_dict['cutout_id'][:2])
+            elif row_dict['cutout_id'][:2] not in self.states:
+                self.states.append(row_dict['cutout_id'][:2])
+                print(row_dict['cutout_id'][:2])
 
     def metadata_to_dict(self, species, synthetic, row_dict):
         self.append_image_size(species, synthetic, row_dict)
@@ -117,14 +127,21 @@ class CutoutAnalyzer():
     def graph_cutout_data(self, title_info):
         file_path = from_root('analyze_images/cutouts/')
         os.makedirs(file_path, exist_ok=True)
+
+        # Grab graph colors
+        cmap = plt.get_cmap("tab20")
+        norm = mcolors.Normalize(vmin=0, vmax=len(self.states) - 1)
+        palette = {state: mcolors.to_hex(cmap(norm(i))) for i, state in enumerate(self.states)}
+
+        # Plot graphs
         for species in self.batch_image_dict:
-            scatter_plot(self.batch_image_dict[species], species, "Height V Width", file_path, title_info)
+            scatter_plot(self.batch_image_dict[species], species, "Height V Width", file_path, title_info, palette)
         for species in self.batch_num_components:
-            bar_chart_plot(self.batch_num_components[species], species, "Number of Components", file_path, title_info)
+            bar_chart_plot(self.batch_num_components[species], species, "Number of Components", file_path, title_info, palette)
         for species in self.bbox:
-            jitter_plot(self.bbox[species], species, "bbox_area_cm2", file_path, title_info)
+            jitter_plot(self.bbox[species], species, "BBOX Area (cm^2)", file_path, title_info, palette)
         for species in self.blur:
-            jitter_plot(self.blur[species], species, "blur_effect", file_path, title_info)
+            jitter_plot(self.blur[species], species, "Blur Effect", file_path, title_info, palette)
 
         # TODO EVAL USEFULNESS OF RGB GRAPHS
         # for species in self.rgb_mean_red:
@@ -139,11 +156,11 @@ class CutoutAnalyzer():
 def main(cfg: DictConfig):
     cfg = OmegaConf.create(cfg)
 
-    # Graph cutouts from local folder
-    CutoutAnalyzer("downloaded", str(from_root("data/cutouts")))
-
     # Graph all species specified in config
-    CutoutAnalyzer("all", cfg.cutout_filters.category.common_name)
+    all_cutouts = CutoutAnalyzer("all", cfg.cutout_filters.category.common_name, [])
+
+    # Graph cutouts from local folder
+    CutoutAnalyzer("downloaded", str(from_root("data/cutouts")), all_cutouts.states)
 
 if __name__ == "__main__":
     main()

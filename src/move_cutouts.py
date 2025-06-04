@@ -4,9 +4,8 @@ import logging
 import shutil
 from pathlib import Path
 from typing import List, Dict
-
+from from_root import from_root
 from omegaconf import DictConfig
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 log = logging.getLogger(__name__)
@@ -33,6 +32,10 @@ class CutoutDownloader:
         self.tertiary_storage_base = Path(cfg.paths.tertiary_longterm_storage, "semifield-cutouts")
         self.local_download_folder = Path(cfg.paths.cutoutdir)
         self.max_workers = cfg.move_cutouts.parallel_workers
+
+        self.primary_storage_base_downloads = 0
+        self.secondary_storage_base_downloads = 0
+        self.tertiary_storage_base_downloads = 0
 
         # self.s3_resource = boto3.resource('s3')
         # self.s3_resource.meta.client.meta.events.register('choose-signer.s3.*',
@@ -106,6 +109,12 @@ class CutoutDownloader:
                 try:
                     shutil.copy(storage_path, local_image_path)
                     log.debug(f"Downloaded from {storage_name} storage: {cutout_id} to {local_image_path}")
+                    if storage_name == "primary":
+                        self.primary_storage_base_downloads += 1
+                    elif storage_name == "secondary":
+                        self.secondary_storage_base_downloads += 1
+                    elif storage_name == "tertiary":
+                        self.tertiary_storage_base_downloads += 1
                     return  # Exit after successful download.
                 except IOError as e:
                     log.error(f"Error copying file from {storage_name} storage ({storage_path}) to {local_image_path} - {e}")
@@ -116,6 +125,7 @@ class CutoutDownloader:
             f"Image not found in any storage for cutout_id: {cutout_id}. Tried paths: " +
             ", ".join(f"{name}: {path}" for name, path in storages)
         )
+
     def get_unique_cutouts(self, synthetic_images: List[Dict]) -> Dict[
         str, str]:
         """
@@ -191,3 +201,16 @@ def main(cfg: DictConfig) -> None:
         downloader.process_cutouts_concurrently()
     else:
         downloader.process_cutouts_sequentially()
+
+    # echo number of downloaded files from each of the storage bases for reporting purposes
+    data = {
+        cfg.paths.primary_longterm_storage: downloader.primary_storage_base_downloads,
+        cfg.paths.secondary_longterm_storage: downloader.secondary_storage_base_downloads, 
+        cfg.paths.tertiary_longterm_storage: downloader.tertiary_storage_base_downloads
+    }
+    print("hit")
+    file_path = str(from_root("analyze_images/storage_log.json"))
+    if os.path.exists(file_path):
+        os.remove(file_path)
+    with open(file_path, "x") as f:
+        json.dump(data, f, indent=4)
