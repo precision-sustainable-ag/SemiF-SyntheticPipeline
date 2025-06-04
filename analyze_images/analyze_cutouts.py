@@ -78,7 +78,7 @@ class CutoutAnalyzer():
                         self.rgb_mean_red, self.rgb_mean_green, self.rgb_mean_blue,
                         self.rgb_std_red, self.rgb_std_green, self.rgb_std_blue]:
                 if species not in d:
-                    d[species] = {} 
+                    d[species] = {}
 
             self.metadata_to_dict(species, row_dict['cutout_id'], row_dict)
 
