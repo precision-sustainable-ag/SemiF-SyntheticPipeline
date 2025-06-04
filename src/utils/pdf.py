@@ -1,5 +1,4 @@
 import os
-from from_root import from_root
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.lib.pagesizes import letter

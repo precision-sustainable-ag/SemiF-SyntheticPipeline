@@ -109,12 +109,6 @@ class CutoutDownloader:
                 try:
                     shutil.copy(storage_path, local_image_path)
                     log.debug(f"Downloaded from {storage_name} storage: {cutout_id} to {local_image_path}")
-                    if storage_name == "primary":
-                        self.primary_storage_base_downloads += 1
-                    elif storage_name == "secondary":
-                        self.secondary_storage_base_downloads += 1
-                    elif storage_name == "tertiary":
-                        self.tertiary_storage_base_downloads += 1
                     return  # Exit after successful download.
                 except IOError as e:
                     log.error(f"Error copying file from {storage_name} storage ({storage_path}) to {local_image_path} - {e}")
@@ -202,14 +196,4 @@ def main(cfg: DictConfig) -> None:
     else:
         downloader.process_cutouts_sequentially()
 
-    # echo number of downloaded files from each of the storage bases for reporting purposes
-    data = {
-        f"primary: {cfg.paths.primary_longterm_storage}": downloader.primary_storage_base_downloads,
-        f"secondary: {cfg.paths.secondary_longterm_storage}": downloader.secondary_storage_base_downloads,
-        f"tertiary: {cfg.paths.tertiary_longterm_storage}": downloader.tertiary_storage_base_downloads
-    }
-    file_path = str(from_root("analyze_images/storage_log.json"))
-    if os.path.exists(file_path):
-        os.remove(file_path)
-    with open(file_path, "x") as f:
-        json.dump(data, f, indent=4)
+

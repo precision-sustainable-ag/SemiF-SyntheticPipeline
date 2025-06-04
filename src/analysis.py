@@ -1,53 +1,20 @@
+import os
 import sys
-import hydra
-from from_root import from_root
+import json
+import sqlite3
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from omegaconf import DictConfig, OmegaConf
 
 # repo imports
-from analyze_images.pdf import generate_pdf
-from .analyze_cutouts import CutoutAnalyzer
-
-@hydra.main(version_base="1.2", config_path=str(from_root("conf")), config_name="config")
-def main(cfg: DictConfig):
-    cfg = OmegaConf.create(cfg)
-
-    # Graph all species specified in config
-    all_cutouts = CutoutAnalyzer("all", cfg.cutout_filters.category.common_name, [])
-
-    # Graph cutouts from local folder
-    CutoutAnalyzer("downloaded", str(from_root("data/cutouts")), all_cutouts.states)
-
-    generate_pdf()
-
-if __name__ == "__main__":
-    main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-import os
-import json
-import sqlite3
-from from_root import from_root
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-
-from analyze_images.graphs import scatter_plot, bar_chart_plot, jitter_plot, pie_chart
+from utils.pdf import generate_pdf
+from utils.graphs import scatter_plot, bar_chart_plot, jitter_plot, pie_chart
 
 class CutoutAnalyzer():
-    def __init__(self, query_type, param, states):
-        self.db_path = str(from_root("data/db/agir.db"))
+    def __init__(self, query_type, param, states, cfg):
+
+        self.cfg = cfg
+        self.db_path = str(f"{cfg.paths.datadir}/db/agir.db")
 
         # Initialize dictionaries for stats
         self.batch_num_components = {}
@@ -64,10 +31,6 @@ class CutoutAnalyzer():
         # KEEP TRACK OF STATES FOR COLOR COORDINATION BETWEEN GRAPHS
         self.states = states
 
-        # READ JSON TO CREATE STORAGE PIE CHART
-        with open(str(from_root("analyze_images/storage_log.json")), "r") as f:
-            json_file = json.load(f)
-
         # Connect to database (READ ONLY)
         conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
         cursor = conn.cursor()
@@ -75,6 +38,8 @@ class CutoutAnalyzer():
         # Get column names
         cursor.execute("PRAGMA table_info(semif_cutouts);")
         columns = [col[1] for col in cursor.fetchall()]
+
+        # Find out which storage we would be getting the cutouts from
 
         if query_type == 'downloaded': # load downloaded cutout metadata
             self.load_cutout_metadata(param, cursor, columns)
@@ -166,7 +131,7 @@ class CutoutAnalyzer():
         self.rgb_std_blue[species].setdefault(synthetic, []).append(b)
 
     def graph_cutout_data(self, title_info, json_file):
-        file_path = from_root('analyze_images/cutouts/')
+        file_path = f'{self.cfg.paths.projectdir}/analyze_images/'
 
         title_info = title_info.replace(" ", "_").lower()
         os.makedirs(str(f"{file_path}/{title_info}"), exist_ok=True)
@@ -196,3 +161,14 @@ class CutoutAnalyzer():
         #     jitter_plot(self.rgb_std_blue[species], species, "std_blue")
 
         pie_chart(json_file, "Cutout Distribution Across Storages", file_path)
+
+def main(cfg: DictConfig) -> None:
+    cfg = OmegaConf.create(cfg)
+
+    # Graph all species specified in config
+    all_cutouts = CutoutAnalyzer("all", cfg.cutout_filters.category.common_name, [], cfg)
+
+    # Graph cutouts from local folder
+    CutoutAnalyzer("downloaded", cfg.paths.cutout_dir, all_cutouts.states, cfg)
+
+    generate_pdf()
