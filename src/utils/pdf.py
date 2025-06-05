@@ -3,10 +3,10 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.lib.pagesizes import letter
 
-def generate_pdf():
-    all_cutout_dir = str(from_root('analyze_images/cutouts/all_cutouts'))
-    downloaded_cutout_dir = str(from_root('analyze_images/cutouts/downloaded_cutouts'))
-    output_pdf = 'pre_synth_analysis.pdf'
+def generate_pdf(cfg):
+    all_cutout_dir = str(f"{cfg.paths.analysisdir}/all_cutouts")
+    downloaded_cutout_dir = str(f"{cfg.paths.analysisdir}/downloaded_cutouts")
+    output_pdf = str(f"{cfg.paths.analysisdir}/pre_synth_analysis.pdf")
 
     # Accepted image extensions
     extensions = {'.png', '.jpg', '.jpeg'}
@@ -44,7 +44,7 @@ def generate_pdf():
         # Move down for next row
         y_start -= (image_height + 40)
 
-    final_image = str(from_root('analyze_images/cutouts/storage_distribution.png'))
+    final_image = str(f"{cfg.paths.analysisdir}/cutout_distribution_across_storages.png")
     if os.path.exists(final_image):
         c.showPage()
         final_width = page_width - 2 * margin

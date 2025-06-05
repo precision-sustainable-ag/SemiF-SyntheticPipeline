@@ -175,4 +175,4 @@ def main(cfg: DictConfig) -> None:
     # Graph cutouts from local folder
     CutoutAnalyzer("specified_configs", None, all_cutouts.states, cfg)
 
-    generate_pdf()
+    generate_pdf(cfg)
