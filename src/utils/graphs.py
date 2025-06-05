@@ -56,12 +56,9 @@ def scatter_plot(batch_image_dict, species, file_name, file_path, title_info, pa
     plt.title(f'{species}: Height vs Width of Images by State')
     plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left')
 
-    # Save plot
-    file_name = f'{species.lower()}_{file_name.lower()}.png'
-    file_name = file_name.replace(" ", "_").lower()
-    plt.savefig(f'{file_path}/{title_info.lower()}/{file_name}', bbox_inches='tight')
-    print(f"Plot saved as {file_name}")
-    plt.close()
+    # Save the plot
+    save_plot(species, file_name, file_path, title_info)
+
 
 def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, palette):
     # Group shape counts by state (first 2 characters of batch ID)
@@ -112,11 +109,7 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
     plt.grid(axis='y')
 
     # Save the plot
-    file_name = f'{species.lower()}_{file_name.lower()}.png'
-    file_name = file_name.replace(" ", "_").lower()
-    plt.savefig(f'{file_path}/{title_info.lower()}/{file_name}', bbox_inches='tight')
-    print(f"Plot saved as {file_name}")
-    plt.close()
+    save_plot(species, file_name, file_path, title_info)
 
 '''
     The jitter plot is used to visualize the distribution of individual data points 
@@ -155,12 +148,7 @@ def jitter_plot(bbox_dict, species, file_name, file_path, title_info, palette):
     plt.ylabel("State")
     plt.grid(True, axis='x')
 
-    plt.tight_layout()
-    file_name = f'{species.lower()}_{file_name.lower()}.png'.replace(" ", "_")
-    plt.savefig(f'{file_path}/{title_info.lower()}/{file_name}', bbox_inches='tight')
-    print(f"Strip plot saved as {file_name}")
-    plt.close()
-
+    save_plot(species, file_name, file_path, title_info)
 
 def pie_chart(data_dict, file_name, file_path):
     labels = []
@@ -177,9 +165,17 @@ def pie_chart(data_dict, file_name, file_path):
     plt.title("Cutouts Downloaded per Storage Path")
     plt.axis("equal")
 
-    plt.tight_layout()
-    out_name = f'{file_name.lower()}.png'.replace(" ", "_")
-    plt.savefig(f'{file_path}/{out_name}', bbox_inches='tight')
-    print(f"Strip plot saved as {out_name}")
-    plt.close()
+    save_plot(None, file_name, file_path, None)
 
+def save_plot(species, file_name, file_path, title_info):
+    # Save plot
+    plt.tight_layout()
+    if species:
+        file_name = f'{species}_{file_name}.png'
+    file_name = file_name.replace(" ", "_").lower()
+    if title_info:
+        plt.savefig(f'{file_path}/{title_info.lower()}/{file_name}', bbox_inches='tight')
+    else:
+        plt.savefig(f'{file_path}/{file_name}', bbox_inches='tight')
+    print(f"Plot saved as {file_name}")
+    plt.close()

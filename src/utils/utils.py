@@ -227,9 +227,7 @@ def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str],
 
         # Try each storage location until the image is found and copied
         for storage_name, storage_path in storages:
-            print("checking")
             if storage_path.exists():
-                print("exists")
                 if storage_name == "primary":
                     primary_storage_base_downloads += 1
                 elif storage_name == "secondary":
