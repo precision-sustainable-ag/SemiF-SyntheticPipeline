@@ -47,7 +47,7 @@ class CutoutAnalyzer():
         self.cutout_ids = cutout_ids
 
         if query_type == 'specified_configs': # load downloaded cutout metadata
-            self.load_cutout_metadata(param, cursor, columns)
+            self.load_cutout_metadata(cursor, columns)
             self.graph_cutout_data("Downloaded Cutouts")
         elif query_type == 'specified_species': # load all data of species specified in config
             self.load_species_metadata(param, cursor, columns)
@@ -55,7 +55,7 @@ class CutoutAnalyzer():
 
         conn.close()
 
-    def load_cutout_metadata(self, images_dir, cursor, columns):
+    def load_cutout_metadata(self, cursor, columns):
 
         # Loop through specified cutouts
         for cutout_id in self.cutout_ids:
@@ -134,7 +134,7 @@ class CutoutAnalyzer():
         self.rgb_std_blue[species].setdefault(synthetic, []).append(b)
 
     def graph_cutout_data(self, title_info):
-        
+
         file_path = self.cfg.paths.analysisdir
 
         title_info = title_info.replace(" ", "_").lower()
@@ -173,6 +173,6 @@ def main(cfg: DictConfig) -> None:
     all_cutouts = CutoutAnalyzer("specified_species", cfg.cutout_filters.category.common_name, [], cfg)
 
     # Graph cutouts from local folder
-    CutoutAnalyzer("specified_configs", cfg.paths.cutout_dir, all_cutouts.states, cfg)
+    CutoutAnalyzer("specified_configs", None, all_cutouts.states, cfg)
 
     generate_pdf()
