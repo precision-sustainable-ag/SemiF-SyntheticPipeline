@@ -13,7 +13,7 @@ from utils.utils import resolve_image_storage_locations
 from utils.graphs import bar_chart_plot, jitter_plot, pie_chart
 
 class CutoutAnalyzer():
-    def __init__(self, query_type, param, states, cfg):
+    def __init__(self, query_type, species_list, states, cfg):
 
         self.cfg = cfg
         self.db_path = str(f"{cfg.paths.datadir}/db/agir.db")
@@ -28,6 +28,17 @@ class CutoutAnalyzer():
         self.rgb_std_red = {}
         self.rgb_std_green = {}
         self.rgb_std_blue = {}
+        for species in species_list:
+            species = species.upper()
+            self.batch_num_components[species] = {}
+            self.bbox[species] = {}
+            self.blur[species] = {}
+            self.rgb_mean_red[species] = {}
+            self.rgb_mean_green[species] = {}
+            self.rgb_mean_blue[species] = {}
+            self.rgb_std_red[species] = {}
+            self.rgb_std_green[species] = {}
+            self.rgb_std_blue[species] = {}
 
         # KEEP TRACK OF STATES FOR COLOR COORDINATION BETWEEN GRAPHS
         self.states = states
@@ -49,7 +60,7 @@ class CutoutAnalyzer():
             self.graph_cutout_data("Specified", storage_location_data)
         elif query_type == 'specified_species': 
             # load all data of species specified in config
-            self.load_species_metadata(param, cursor, columns)
+            self.load_species_metadata(species_list, cursor, columns)
             self.graph_cutout_data("All", None)
 
         conn.close()
@@ -74,7 +85,6 @@ class CutoutAnalyzer():
             rows = cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
-
     def query_for_metadata(self, rows, columns):
         for row in rows:
             row_dict = dict(zip(columns, row))
@@ -85,13 +95,6 @@ class CutoutAnalyzer():
                 continue
 
             species = row_dict['category']['common_name'].upper()
-
-            # Initialize species
-            for d in [self.batch_num_components, self.bbox, self.blur,
-                        self.rgb_mean_red, self.rgb_mean_green, self.rgb_mean_blue,
-                        self.rgb_std_red, self.rgb_std_green, self.rgb_std_blue]:
-                if species not in d:
-                    d[species] = {}
 
             self.metadata_to_dict(species, row_dict['cutout_id'], row_dict)
             if self.states is None:
@@ -172,6 +175,6 @@ def main(cfg: DictConfig) -> None:
     all_cutouts = CutoutAnalyzer("specified_species", cfg.cutout_filters.category.common_name, [], cfg)
 
     # Graph cutouts from local folder
-    CutoutAnalyzer("specified_configs", None, all_cutouts.states, cfg)
+    CutoutAnalyzer("specified_configs", cfg.cutout_filters.category.common_name, all_cutouts.states, cfg)
 
     generate_pdf(cfg, cfg.cutout_filters.category.common_name)

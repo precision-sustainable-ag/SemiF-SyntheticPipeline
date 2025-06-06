@@ -27,6 +27,18 @@ def generate_pdf(cfg, species_list):
     name_font_size = 12
     report_info_size = 8
 
+    page_info = {
+        "height": page_height,
+        "width": page_width,
+        "margin": margin,
+        "title_y": title_y
+    }
+
+    position_state = {
+        "distance_from_title_y": distance_from_title_y,
+        "x_offset": 0
+    }
+
     '''
         Below we set the title of the report.
     '''
@@ -34,23 +46,24 @@ def generate_pdf(cfg, species_list):
     title_font = "Helvetica-Bold"
     c.setFont(title_font, title_size)
     c.drawCentredString(title_x, title_y, title)
-    distance_from_title_y += title_size
+    position_state["distance_from_title_y"] += title_size
 
     '''
         Below we author the report.
     '''
     name = "PSA CV Team"
     c.setFont("Helvetica", name_font_size)
-    c.drawCentredString(title_x, title_y - distance_from_title_y - 4, f"Maintainer: {name}")
-    distance_from_title_y += (name_font_size+4)
+    c.drawCentredString(title_x, title_y - position_state["distance_from_title_y"] - 4, f"Maintainer: {name}")
+    position_state["distance_from_title_y"] += (name_font_size+4)
 
     '''
         Below is a brief description intended to give the reader context and insight into the graphs presented in this report.
     '''
     if len(species_list) > 1:
-        species_str = ', '.join(species_list[:-1]) + f", and {species_list[-1]}"
+        titled = [s.title() for s in species_list]
+        species_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
     else:
-        species_str = species_list[0]
+        species_str = species_list[0].title()
     subj = f"The following is a report of the {species_str} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
 
     words = subj.split()
@@ -75,13 +88,13 @@ def generate_pdf(cfg, species_list):
     # Draw each line centered
     line_spacing = 4
     for i, line in enumerate(lines):
-        y_pos = title_y - distance_from_title_y - 4 - i * (size + line_spacing)
+        y_pos = title_y - position_state["distance_from_title_y"] - 4 - i * (size + line_spacing)
         c.drawCentredString(title_x, y_pos, line)
 
-    distance_from_title_y += len(lines) * (size + line_spacing)
+    position_state["distance_from_title_y"] += len(lines) * (size + line_spacing)
 
     # Add spacing between description and images
-    distance_from_title_y += 20 
+    position_state["distance_from_title_y"] += 0.15 * inch 
 
     '''
         Below inserts metadata graphs for each species into the final report.
@@ -101,30 +114,44 @@ def generate_pdf(cfg, species_list):
 
         page_down = False
         if i != 0 and i % 2 == 0:
-            x_offset = 0
+            position_state["x_offset"] = 0
             page_down = True
 
-        last_image = False
-        # check if we are on the last image, if so add y offset for storage picture
-        if i == (num_images-1):
-            last_image = True
+        # Update flags for first image
+        flags = {
+            "page_down": page_down,
+            "last_image": False,
+            "center": False
+        }
+        place_image(all_cutout_path, c, page_info, position_state, flags)
 
-        distance_from_title_y, x_offset = place_image(all_cutout_path, c, page_height, margin, title_y, distance_from_title_y, page_down, False, x_offset)
-        distance_from_title_y, x_offset = place_image(specified_cutout_path, c, page_height, margin, title_y, distance_from_title_y, False, last_image, x_offset)
-    
+        # Update flags for second image
+        flags = {
+            "page_down": False,
+            "last_image": False,
+            "center": False
+        }
+        place_image(specified_cutout_path, c, page_info, position_state, flags)    
+
     # Load image path
     final_image = str(f"{cfg.paths.analysisdir}/Cutout Distribution Across Storages.png")
     if os.path.exists(final_image):
-        place_image(final_image, c, page_height, margin, title_y, distance_from_title_y, 0, 0, 0, 3)
+
+        # Center the last image
+        flags = {
+            "page_down": False,
+            "last_image": True,
+            "center": True
+        }
+        place_image(final_image, c, page_info, position_state, flags, 3)
 
     c.save()
     print(f"PDF saved to {output_pdf}")
 
-
-def place_image(final_image, c, page_height, margin, title_y, distance_from_title_y, page_down, last_image, x_offset, scaler=1):
+def place_image(final_image, c, page_info, position_state, flags, scaler=1):
     final_width = 2 * inch * scaler
     img = ImageReader(final_image)
-    img_width, img_height = (img.getSize())
+    img_width, img_height = img.getSize()
     aspect_ratio = img_height / img_width
 
     image_margin = 0.25 * inch
@@ -132,32 +159,26 @@ def place_image(final_image, c, page_height, margin, title_y, distance_from_titl
     # Calculate height to preserve aspect ratio
     final_height = final_width * aspect_ratio
 
-    # Check if there's enough vertical space, else start a new page
-    if (page_height-(distance_from_title_y + final_height)) < 0:
-        c.showPage()
-        distance_from_title_y = margin
+    # Calculate height to preserve aspect ratio
+    final_height = final_width * aspect_ratio
 
     # Y calculations
-    if (page_down):
-        distance_from_title_y += final_height + 0.25 * inch
-    y_pos = title_y - distance_from_title_y - final_height
-    if (last_image):
-        distance_from_title_y += final_height + 0.25 * inch
+    # Check if there's enough vertical space, else start a new page
+    if (flags.get("page_down", False)):
+        position_state["distance_from_title_y"] += final_height + 0.25 * inch
+    if (page_info["height"]-(position_state["distance_from_title_y"] + final_height)) < 0:
+        c.showPage()
+        position_state["distance_from_title_y"] = page_info["margin"]
+    if (flags.get("last_image", False)):
+        position_state["distance_from_title_y"] += final_height + 0.25 * inch
+
+    y_pos = page_info["title_y"] - position_state["distance_from_title_y"] - final_height
+
 
     # X calculations
-    x_pos = image_margin + x_offset
-    x_offset += final_width
+    x_pos = image_margin + position_state["x_offset"]
+    position_state["x_offset"] += final_width
+    if flags.get("center", False):
+        x_pos = (page_info["width"] - final_width)/2
 
     c.drawImage(final_image, x_pos, y_pos, width=final_width, height=final_height, preserveAspectRatio=True)
-
-    return distance_from_title_y, x_offset
-
-
-@hydra.main(version_base="1.2", config_path="../../conf", config_name="config")
-def main(cfg: DictConfig) -> None:
-    cfg = OmegaConf.create(cfg)
-
-    generate_pdf(cfg, cfg.cutout_filters.category.common_name)
-
-if __name__ == "__main__":
-    main()

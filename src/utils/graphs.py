@@ -67,7 +67,8 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
             binned_freqs[state] = [freq.get(sc, 0) for sc in sorted_shape_counts]
 
     # Bar chart plotting
-    bar_width = 0.8 / num_states
+    if num_states:
+        bar_width = 0.8 / num_states
     plt.figure(figsize=(6, 6))
 
     for i, state in enumerate(unique_states):
@@ -77,7 +78,6 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
 
     if logrithmic: 
         plt.yscale('log')
-
 
     plt.title(f"{title_info} {species}".title(), fontsize=25)
     plt.xlabel(file_name, fontsize=20)
@@ -111,7 +111,19 @@ def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palet
 
     df = pd.DataFrame(data)
 
-    ordered_states = sorted(df["State"].unique())
+    # Columns expected by stripplot
+    expected_cols = [file_name, "State"]
+
+    if df.empty or any(col not in df.columns for col in expected_cols):
+        # Create empty DataFrame with needed columns
+        df = pd.DataFrame(columns=expected_cols)
+        ordered_states = []
+    else:
+        if "State" in df.columns and not df["State"].empty:
+            ordered_states = sorted(df["State"].unique())
+        else:
+            ordered_states = []
+
 
     plt.figure(figsize=(6, 6))
 
@@ -154,7 +166,7 @@ def pie_chart(data_dict, file_name, file_path):
     sizes = list(data_dict.values())
     df = pd.DataFrame({
         "Path": labels,
-        "Count": sizes
+        "Image Count": sizes
     })
 
     # Use different pallette than states to avoid confusion between states and storages
@@ -165,9 +177,9 @@ def pie_chart(data_dict, file_name, file_path):
     ]
 
     plt.figure(figsize=(12, 6))
-    sns.barplot(data=df, x="Count", y="Path", palette=palette)
+    sns.barplot(data=df, x="Image Count", y="Path", palette=palette)
     plt.title("Cutouts Downloaded per Storage Path", fontsize=25)
-    plt.xlabel("Count", fontsize=20)
+    plt.xlabel("Image Count", fontsize=20)
     plt.ylabel("Storage Path", fontsize=20)
     plt.xticks(fontsize=15)
     plt.yticks(fontsize=15)
