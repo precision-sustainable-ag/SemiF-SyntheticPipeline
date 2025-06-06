@@ -10,7 +10,7 @@ from omegaconf import DictConfig, OmegaConf
 from utils.pdf import generate_pdf
 from utils.utils import read_recipe
 from utils.utils import resolve_image_storage_locations
-from utils.graphs import bar_chart_plot, jitter_plot, pie_chart
+from utils.graphs import bar_chart_plot, jitter_plot, barplot
 
 class CutoutAnalyzer():
     def __init__(self, query_type, species_list, states, cfg):
@@ -166,7 +166,7 @@ class CutoutAnalyzer():
         #     jitter_plot(self.rgb_std_blue[species], species, "std_blue")
 
         if storage_location_data:
-            pie_chart(storage_location_data, "Cutout Distribution Across Storages", file_path)
+            barplot(storage_location_data, "Cutout Distribution Across Storages", file_path)
 
 def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.create(cfg)

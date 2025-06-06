@@ -154,7 +154,7 @@ def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palet
 
     save_plot(species, file_name, file_path, title_info)
 
-def pie_chart(data_dict, file_name, file_path):
+def barplot(data_dict, file_name, file_path):
 
     labels = []
     for key in data_dict.keys():
