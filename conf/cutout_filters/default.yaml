@@ -4,11 +4,11 @@ total_images: 3
 
 background_fov_cm2: 7500 # bbot images, Assumed real-world field of view for backgrounds (in cm²)
 # background_fov_cm2: 3000  # unsplash images Assumed real-world field of view for backgrounds (in cm²)
-resize_factor: 1
+resize_factor: 0.25
 
 cuts_n_image: # Number of cutouts per image
   min: 500
-  max: 700
+  max: 1500
 
 reuse_cutouts: true  # Whether to allow reusing cutouts in multiple images
 min_visibility: 0.0  # Minimum visibility ratio required for the new cutout
@@ -24,15 +24,12 @@ morphological:
   
   bbox_area_cm2:  # Area range in cm2
     default:
-      min: 0
-      max: 1000000000
+      min: 10
+      max: 1000
     common_name_ranges: # applies to specific common names, use default if not specified here but in the common_name list
-      cereal rye:
-        min: 50
-        max: 350
-      hairy vetch:
-        min: 50
-        max: 350
+      Mustards:
+        min: 10
+        max: 1000
     
     
     # very_small: [0, 0.1]
@@ -43,31 +40,24 @@ morphological:
     # very_large: [1000, 1000000]
   
   blur_effect:  # Blur effect threshold
-    min: .35
-    max: .42
+    min: 
+    max: 
   num_components: # Number of components range
-    min: 0
-    max: 16
-
-# Resize all cutouts to their mean pixel w/l. 
-# if a number besides 1 is specified resize the 
-# cutouts so they are a factor of that mean
-resize:
-  hairy vetch: 1
-  cereal rye: 2
+    min:
+    max:
 
 category:
   # Filter settings for category attributes
   common_name:
-    # - oats
+    - oats
     - cereal rye
-    # - Crimson clover
-    # - red clover
-    # - winter pea
+    - Crimson clover
+    - red clover
+    - winter pea
     - hairy vetch
-    # - Black Oats
-    # - Winter Wheat
-    # - Mustards
+    - Black Oats
+    - Winter Wheat
+    - Mustards
     
     # - Barley
     # - Barnyardgrass
@@ -116,12 +106,12 @@ category:
     # - Yellow Foxtail
     
 common_name_weights:
-    # crimson clover: 0.15  # clover
-    # red clover: 0.15      # clover
-    # winter pea: 0.15      # peas
-    hairy vetch: 0.90     # vetch
-    # mustards: 0.15        # brassicas
-    # black oats: 0.075      # Grass
-    # oats: 0.075            # Grass
-    cereal rye: 0.10    # Grass
-    # winter wheat: 0.075    # Grass
+    crimson clover: 0.15  # clover
+    red clover: 0.15      # clover
+    winter pea: 0.15      # peas
+    hairy vetch: 0.15     # vetch
+    mustards: 0.15        # brassicas
+    black oats: 0.075      # Grass
+    oats: 0.075            # Grass
+    cereal rye: 0.075      # Grass
+    winter wheat: 0.075    # Grass
