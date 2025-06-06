@@ -133,9 +133,9 @@ def place_image(final_image, c, page_height, margin, title_y, distance_from_titl
     final_height = final_width * aspect_ratio
 
     # Check if there's enough vertical space, else start a new page
-    # if distance_from_title_y - final_height < margin:
-    #     c.showPage()
-    #     distance_from_title_y = page_height - margin
+    if (page_height-(distance_from_title_y + final_height)) < 0:
+        c.showPage()
+        distance_from_title_y = margin
 
     # Y calculations
     if (page_down):
@@ -151,3 +151,13 @@ def place_image(final_image, c, page_height, margin, title_y, distance_from_titl
     c.drawImage(final_image, x_pos, y_pos, width=final_width, height=final_height, preserveAspectRatio=True)
 
     return distance_from_title_y, x_offset
+
+
+@hydra.main(version_base="1.2", config_path="../../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    cfg = OmegaConf.create(cfg)
+
+    generate_pdf(cfg, cfg.cutout_filters.category.common_name)
+
+if __name__ == "__main__":
+    main()
