@@ -210,8 +210,6 @@ def is_rectangular(mask, threshold_percentage):
     
     return is_filled_enough, filled_percentage
 
-
-
 def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], cfg) -> None:
 
     primary_storage_base_downloads = secondary_storage_base_downloads = tertiary_storage_base_downloads = 0

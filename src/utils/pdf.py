@@ -1,10 +1,10 @@
 import os
+import hydra
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
 from omegaconf import DictConfig, OmegaConf
-import hydra
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
 def generate_pdf(cfg, species_list):
@@ -86,35 +86,48 @@ def generate_pdf(cfg, species_list):
     '''
         Below inserts metadata graphs for each species into the final report.
     '''
-    # all_cutout_dir = str(f"{cfg.paths.analysisdir}/all")
-    # downloaded_cutout_dir = str(f"{cfg.paths.analysisdir}/specified")
-    # extensions = {'.png', '.jpg', '.jpeg'}
-    # all_cutout_graphs = sorted([f for f in os.listdir(all_cutout_dir) if os.path.splitext(f)[1].lower() in extensions])
-    # downloaded_cutout_graphs = sorted([f for f in os.listdir(downloaded_cutout_dir) if os.path.splitext(f)[1].lower() in extensions])
-    # num_images = min(len(all_cutout_graphs), len(downloaded_cutout_graphs))
+    all_cutout_dir = str(f"{cfg.paths.analysisdir}/all")
+    downloaded_cutout_dir = str(f"{cfg.paths.analysisdir}/specified")
+    extensions = {'.png', '.jpg', '.jpeg'}
+    all_cutout_graphs = sorted([f for f in os.listdir(all_cutout_dir) if os.path.splitext(f)[1].lower() in extensions])
+    downloaded_cutout_graphs = sorted([f for f in os.listdir(downloaded_cutout_dir) if os.path.splitext(f)[1].lower() in extensions])
+    num_images = min(len(all_cutout_graphs), len(downloaded_cutout_graphs)) # should be the same length
 
-    # for i in range(num_images):
+    x_offset = 0
+    for i in range(num_images):
 
-    #     all_cutout_path = os.path.join(all_cutout_dir, all_cutout_graphs[i])
-    #     specified_cutout_path = os.path.join(downloaded_cutout_dir, downloaded_cutout_graphs[i])
+        all_cutout_path = os.path.join(all_cutout_dir, all_cutout_graphs[i])
+        specified_cutout_path = os.path.join(downloaded_cutout_dir, downloaded_cutout_graphs[i])
 
-    #     distance_from_title_y = place_image(all_cutout_path, c, page_height, margin, title_y, distance_from_title_y, 0, x_offset)
-    #     distance_from_title_y = place_image(specified_cutout_path, c, page_height, margin, title_y, distance_from_title_y, i, x_offset)
+        page_down = False
+        if i != 0 and i % 2 == 0:
+            x_offset = 0
+            page_down = True
 
-    # # Load image path
-    # final_image = str(f"{cfg.paths.analysisdir}/cutout_distribution_across_storages.png")
-    # if os.path.exists(final_image):
-    #     place_image(final_image, c, page_height, margin, title_y, distance_from_title_y, 0)
+        last_image = False
+        # check if we are on the last image, if so add y offset for storage picture
+        if i == (num_images-1):
+            last_image = True
+
+        distance_from_title_y, x_offset = place_image(all_cutout_path, c, page_height, margin, title_y, distance_from_title_y, page_down, False, x_offset)
+        distance_from_title_y, x_offset = place_image(specified_cutout_path, c, page_height, margin, title_y, distance_from_title_y, False, last_image, x_offset)
+    
+    # Load image path
+    final_image = str(f"{cfg.paths.analysisdir}/Cutout Distribution Across Storages.png")
+    if os.path.exists(final_image):
+        place_image(final_image, c, page_height, margin, title_y, distance_from_title_y, 0, 0, 0, 3)
 
     c.save()
     print(f"PDF saved to {output_pdf}")
 
 
-def place_image(final_image, c, page_height, margin, title_y, distance_from_title_y, i):
-    final_width = 2 * inch
+def place_image(final_image, c, page_height, margin, title_y, distance_from_title_y, page_down, last_image, x_offset, scaler=1):
+    final_width = 2 * inch * scaler
     img = ImageReader(final_image)
-    img_width, img_height = img.getSize()
+    img_width, img_height = (img.getSize())
     aspect_ratio = img_height / img_width
+
+    image_margin = 0.25 * inch
 
     # Calculate height to preserve aspect ratio
     final_height = final_width * aspect_ratio
@@ -124,33 +137,17 @@ def place_image(final_image, c, page_height, margin, title_y, distance_from_titl
     #     c.showPage()
     #     distance_from_title_y = page_height - margin
 
-    x_pos = margin
+    # Y calculations
+    if (page_down):
+        distance_from_title_y += final_height + 0.25 * inch
     y_pos = title_y - distance_from_title_y - final_height
+    if (last_image):
+        distance_from_title_y += final_height + 0.25 * inch
+
+    # X calculations
+    x_pos = image_margin + x_offset
+    x_offset += final_width
 
     c.drawImage(final_image, x_pos, y_pos, width=final_width, height=final_height, preserveAspectRatio=True)
 
-    if (spacing_pattern(i)):
-        distance_from_title_y += final_height
-
-    return distance_from_title_y
-
-def spacing_pattern(n):
-    current = 2
-    add_one = True  # Start with adding 1 next
-    while current <= n:
-        if current == n:
-            return True
-        current += 1 if add_one else 2
-        add_one = not add_one
-    return False
-
-
-
-@hydra.main(version_base="1.2", config_path="../../conf", config_name="config")
-def main(cfg: DictConfig) -> None:
-    cfg = OmegaConf.create(cfg)
-
-    generate_pdf(cfg)
-
-if __name__ == "__main__":
-    main()
+    return distance_from_title_y, x_offset

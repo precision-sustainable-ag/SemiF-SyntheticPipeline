@@ -135,7 +135,7 @@ class CutoutAnalyzer():
         title_info = title_info.replace(" ", "_").lower()
         os.makedirs(str(f"{file_path}/{title_info}"), exist_ok=True)
 
-        # Grab graph colors
+        # Grab graph colors. Used to distinguish between states.
         colors = [
             "#e6b8af",  # pinkish red
             "#b6d7a8",  # mint green

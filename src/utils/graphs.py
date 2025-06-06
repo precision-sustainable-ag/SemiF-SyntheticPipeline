@@ -1,4 +1,5 @@
 import os
+import math
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -11,14 +12,9 @@ from matplotlib.ticker import FuncFormatter
 def thousands_formatter(x, pos):
     return f'{int(x / 1000)}k'
 
-import numpy as np
-import matplotlib.pyplot as plt
-from collections import Counter
-import math
-
 def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, palette, logrithmic):
 
-    max_bars=15
+    max_bars=10
 
     # Group shape counts by state (first 2 characters of batch ID)
     grouped_data = {}
@@ -82,11 +78,13 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
     if logrithmic: 
         plt.yscale('log')
 
-    plt.xlabel("Shape Count" if len(bin_labels[0].split('-')) == 1 else "Shape Count Range")
-    plt.ylabel("Frequency")
-    plt.title(f"{species}: Frequency of Shape Counts by State")
-    plt.xticks(x, bin_labels, rotation=45)
-    plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.title(f"{title_info} {species}".title(), fontsize=25)
+    plt.xlabel(file_name, fontsize=20)
+    plt.xticks(x, bin_labels, rotation=45, fontsize=15)  
+    plt.ylabel("Frequency", fontsize=20)
+    plt.yticks(fontsize=15)
+    plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=15, title_fontsize=15)
     plt.grid(axis='y')
     plt.tight_layout()
 
@@ -99,11 +97,11 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
     along an axis by adding small random noise (jitter) to reduce overlap, making it 
     easier to see the spread and density of the data.
 '''
-def jitter_plot(bbox_dict, species, file_name, file_path, title_info, palette):
+def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palette):
 
-    # Flatten bbox_dict into a DataFrame with state info
+    # Flatten meta_data_dict into a DataFrame with state info
     data = []
-    for batch_id, values in bbox_dict.items():
+    for batch_id, values in meta_data_dict.items():
         state = batch_id[:2]
         for count in values:
             data.append({
@@ -114,6 +112,8 @@ def jitter_plot(bbox_dict, species, file_name, file_path, title_info, palette):
     df = pd.DataFrame(data)
 
     ordered_states = sorted(df["State"].unique())
+
+    plt.figure(figsize=(6, 6))
 
     sns.stripplot(
         data=df,
@@ -143,6 +143,7 @@ def jitter_plot(bbox_dict, species, file_name, file_path, title_info, palette):
     save_plot(species, file_name, file_path, title_info)
 
 def pie_chart(data_dict, file_name, file_path):
+
     labels = []
     for key in data_dict.keys():
         label_type, path = key.split(":", 1)
@@ -151,20 +152,32 @@ def pie_chart(data_dict, file_name, file_path):
         labels.append(f"{label_type.strip()}: {last_folder}")
 
     sizes = list(data_dict.values())
+    df = pd.DataFrame({
+        "Path": labels,
+        "Count": sizes
+    })
 
+    # Use different pallette than states to avoid confusion between states and storages
     palette = [
         "#8da0cb",  # soft blue
         "#fc8d62",  # warm coral
         "#66c2a5",  # soft green-teal
     ]
 
+    plt.figure(figsize=(12, 6))
+    sns.barplot(data=df, x="Count", y="Path", palette=palette)
+    plt.title("Cutouts Downloaded per Storage Path", fontsize=25)
+    plt.xlabel("Count", fontsize=20)
+    plt.ylabel("Storage Path", fontsize=20)
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.tight_layout()
 
-    plt.figure(figsize=(6, 6))
-    plt.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=90, colors=palette)
-    plt.title("Cutouts Downloaded per Storage Path")
-    plt.axis("equal")
+    # Save high-resolution image for PDF
+    output_path = f"{file_path}/{file_name}.png"
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")  # <== This controls quality and size
+    plt.close()
 
-    save_plot(None, file_name, file_path, None)
 
 def save_plot(species, file_name, file_path, title_info):
     # Save plot
