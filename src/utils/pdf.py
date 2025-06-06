@@ -112,14 +112,14 @@ def generate_pdf(cfg, species_list):
         all_cutout_path = os.path.join(all_cutout_dir, all_cutout_graphs[i])
         specified_cutout_path = os.path.join(downloaded_cutout_dir, downloaded_cutout_graphs[i])
 
-        page_down = False
+        new_line = False
         if i != 0 and i % 2 == 0:
             position_state["x_offset"] = 0
-            page_down = True
+            new_line = True
 
         # Update flags for first image
         flags = {
-            "page_down": page_down,
+            "new_line": new_line,
             "last_image": False,
             "center": False
         }
@@ -127,7 +127,7 @@ def generate_pdf(cfg, species_list):
 
         # Update flags for second image
         flags = {
-            "page_down": False,
+            "new_line": False,
             "last_image": False,
             "center": False
         }
@@ -139,7 +139,7 @@ def generate_pdf(cfg, species_list):
 
         # Center the last image
         flags = {
-            "page_down": False,
+            "new_line": False,
             "last_image": True,
             "center": True
         }
@@ -163,14 +163,21 @@ def place_image(final_image, c, page_info, position_state, flags, scaler=1):
     final_height = final_width * aspect_ratio
 
     # Y calculations
-    # Check if there's enough vertical space, else start a new page
-    if (flags.get("page_down", False)):
+    # check to see if we need to add a new line
+    if (flags.get("new_line", False)):
         position_state["distance_from_title_y"] += final_height + 0.25 * inch
+
+    # check to see if we need to move to a new page
     if (page_info["height"]-(position_state["distance_from_title_y"] + final_height)) < 0:
         c.showPage()
-        position_state["distance_from_title_y"] = page_info["margin"]
+        position_state["distance_from_title_y"] = 0
+    
+    # special case for last image, add more space
     if (flags.get("last_image", False)):
         position_state["distance_from_title_y"] += final_height + 0.25 * inch
+        if (page_info["height"]-(position_state["distance_from_title_y"] + final_height)) < 0:
+            c.showPage()
+            position_state["distance_from_title_y"] = 0
 
     y_pos = page_info["title_y"] - position_state["distance_from_title_y"] - final_height
 
@@ -182,3 +189,12 @@ def place_image(final_image, c, page_info, position_state, flags, scaler=1):
         x_pos = (page_info["width"] - final_width)/2
 
     c.drawImage(final_image, x_pos, y_pos, width=final_width, height=final_height, preserveAspectRatio=True)
+
+@hydra.main(version_base="1.2", config_path="../../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    cfg = OmegaConf.create(cfg)
+
+    generate_pdf(cfg, cfg.cutout_filters.category.common_name)
+
+if __name__ == "__main__":
+    main()
