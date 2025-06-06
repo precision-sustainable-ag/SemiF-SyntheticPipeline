@@ -5,62 +5,21 @@ import seaborn as sns
 from collections import Counter
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from matplotlib.ticker import FuncFormatter
 
-def scatter_plot(batch_image_dict, species, file_name, file_path, title_info, palette):
-    # Create lists for height, width, and state codes
-    heights = []
-    widths = []
-    state_codes = []
+# use this function to keep axis ticks in check
+def thousands_formatter(x, pos):
+    return f'{int(x / 1000)}k'
 
-    # Group images by state (first 2 characters of batch ID)
-    grouped_data = {}
-    for batch_id, sizes in batch_image_dict.items():
-        state = batch_id[:2]
-        if state not in grouped_data:
-            grouped_data[state] = []
-        grouped_data[state].extend(sizes)
+import numpy as np
+import matplotlib.pyplot as plt
+from collections import Counter
+import math
 
-    # Sorted list of unique state codes
-    unique_states = sorted(grouped_data.keys())
+def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, palette, logrithmic):
 
-    # Collect data for plotting
-    all_heights = []
-    all_widths = []
-    all_states = []
+    max_bars=15
 
-    for state, sizes in grouped_data.items():
-        for size in sizes:
-            all_heights.append(size[0])
-            all_widths.append(size[1])
-            all_states.append(state)
-
-    # Convert to numpy arrays for indexing
-    all_heights = np.array(all_heights)
-    all_widths = np.array(all_widths)
-
-    # Create scatter plot
-    plt.figure(figsize=(10, 6))
-    for state in unique_states:
-        indices = [i for i, s in enumerate(all_states) if s == state]
-        plt.scatter(
-            all_heights[indices],
-            all_widths[indices],
-            color=palette[state],
-            label=state,
-            alpha=0.7
-        )
-
-    # Add labels and title
-    plt.xlabel('Height')
-    plt.ylabel('Width')
-    plt.title(f'{species}: Height vs Width of Images by State')
-    plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left')
-
-    # Save the plot
-    save_plot(species, file_name, file_path, title_info)
-
-
-def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, palette):
     # Group shape counts by state (first 2 characters of batch ID)
     grouped_data = {}
     for batch_id, shape_counts in shape_count_dict.items():
@@ -69,11 +28,10 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
             grouped_data[state] = []
         grouped_data[state].extend(shape_counts)
 
-    # Get unique state codes
     unique_states = sorted(grouped_data.keys())
     num_states = len(unique_states)
 
-    # Collect all unique shape counts across states
+    # Collect all unique shape counts
     all_shape_counts = set()
     shape_freq_dicts = {}
 
@@ -84,32 +42,57 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
         all_shape_counts.update(freq.keys())
 
     sorted_shape_counts = sorted(all_shape_counts)
-    x = np.arange(len(sorted_shape_counts))  # x locations for shape counts
 
-    # Create a colormap
-    cmap = plt.get_cmap("tab20")
-    norm = mcolors.Normalize(vmin=0, vmax=num_states - 1)
-    state_color_map = {state: cmap(norm(i)) for i, state in enumerate(unique_states)}
+    # Binning logic if too many unique shape counts
+    if len(sorted_shape_counts) > max_bars:
+        min_val, max_val = min(sorted_shape_counts), max(sorted_shape_counts)
+        bin_width = math.ceil((max_val - min_val + 1) / max_bars)
+        bins = [(i, i + bin_width - 1) for i in range(min_val, max_val + 1, bin_width)]
 
-    bar_width = 0.8 / num_states  # total width of bars per group
+        # Generate bin labels
+        bin_labels = [f"{start}-{end}" if start != end else f"{start}" for start, end in bins]
+        x = np.arange(len(bin_labels))
 
-    plt.figure(figsize=(12, 6))
+        # Compute binned frequencies
+        binned_freqs = {}
+        for state in unique_states:
+            freq = shape_freq_dicts[state]
+            binned_freq = [0] * len(bins)
+            for i, (start, end) in enumerate(bins):
+                binned_freq[i] = sum(count for val, count in freq.items() if start <= val <= end)
+            binned_freqs[state] = binned_freq
+    else:
+        # Use raw shape counts
+        bin_labels = list(map(str, sorted_shape_counts))
+        x = np.arange(len(sorted_shape_counts))
+        binned_freqs = {}
+        for state in unique_states:
+            freq = shape_freq_dicts[state]
+            binned_freqs[state] = [freq.get(sc, 0) for sc in sorted_shape_counts]
+
+    # Bar chart plotting
+    bar_width = 0.8 / num_states
+    plt.figure(figsize=(6, 6))
 
     for i, state in enumerate(unique_states):
-        freq = shape_freq_dicts[state]
-        y = [freq.get(shape_count, 0) for shape_count in sorted_shape_counts]
+        y = binned_freqs[state]
         offset = (i - num_states / 2) * bar_width + bar_width / 2
-        plt.bar(x + offset, y, width=bar_width, label=state, color=state_color_map[state])
+        plt.bar(x + offset, y, width=bar_width, label=state, color=palette[state])
 
-    plt.xlabel("Number of Shapes")
+    if logrithmic: 
+        plt.yscale('log')
+
+    plt.xlabel("Shape Count" if len(bin_labels[0].split('-')) == 1 else "Shape Count Range")
     plt.ylabel("Frequency")
     plt.title(f"{species}: Frequency of Shape Counts by State")
-    plt.xticks(x, sorted_shape_counts)
+    plt.xticks(x, bin_labels, rotation=45)
     plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(axis='y')
+    plt.tight_layout()
 
     # Save the plot
     save_plot(species, file_name, file_path, title_info)
+
 
 '''
     The jitter plot is used to visualize the distribution of individual data points 
@@ -129,24 +112,33 @@ def jitter_plot(bbox_dict, species, file_name, file_path, title_info, palette):
             })
 
     df = pd.DataFrame(data)
-    unique_states = sorted(df["State"].unique())
 
-    plt.figure(figsize=(12, 4))
+    ordered_states = sorted(df["State"].unique())
+
     sns.stripplot(
         data=df,
         x=file_name,
         y="State",
         hue="State",
+        order=ordered_states,
         jitter=True,
         palette=palette,
         size=5,
         legend=False  
     )
 
-    plt.title(f"{species}: {title_info} {file_name}")
-    plt.xlabel(file_name)
-    plt.ylabel("State")
+    plt.title(f"{title_info} {species}".title(), fontsize=25)
+    plt.xlabel(file_name, fontsize=20)
+    plt.xticks(fontsize=15)  
+    plt.ylabel("State", fontsize=20)
+    plt.yticks(fontsize=15)  
     plt.grid(True, axis='x')
+
+    # Reformat ticks if x axis is in 1000's
+    # do this to avoid overflow in the x axis
+    xticks = plt.gca().get_xticks()
+    if len(xticks) > 1 and int(xticks[len(xticks)-1]) >= 10000:
+        plt.gca().xaxis.set_major_formatter(FuncFormatter(thousands_formatter))
 
     save_plot(species, file_name, file_path, title_info)
 
@@ -160,8 +152,15 @@ def pie_chart(data_dict, file_name, file_path):
 
     sizes = list(data_dict.values())
 
-    plt.figure(figsize=(8, 6))
-    plt.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=90)
+    palette = [
+        "#8da0cb",  # soft blue
+        "#fc8d62",  # warm coral
+        "#66c2a5",  # soft green-teal
+    ]
+
+
+    plt.figure(figsize=(6, 6))
+    plt.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=90, colors=palette)
     plt.title("Cutouts Downloaded per Storage Path")
     plt.axis("equal")
 

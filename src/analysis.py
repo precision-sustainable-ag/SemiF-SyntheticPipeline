@@ -10,7 +10,7 @@ from omegaconf import DictConfig, OmegaConf
 from utils.pdf import generate_pdf
 from utils.utils import read_recipe
 from utils.utils import resolve_image_storage_locations
-from utils.graphs import scatter_plot, bar_chart_plot, jitter_plot, pie_chart
+from utils.graphs import bar_chart_plot, jitter_plot, pie_chart
 
 class CutoutAnalyzer():
     def __init__(self, query_type, param, states, cfg):
@@ -20,7 +20,6 @@ class CutoutAnalyzer():
 
         # Initialize dictionaries for stats
         self.batch_num_components = {}
-        self.batch_image_dict = {}
         self.bbox = {}
         self.blur = {}
         self.rgb_mean_red = {}
@@ -47,11 +46,11 @@ class CutoutAnalyzer():
             storage_location_data = resolve_image_storage_locations(batch_ids, cutout_ids, cfg)
             # load downloaded cutout metadata
             self.load_cutout_metadata(cursor, columns, cutout_ids)
-            self.graph_cutout_data("Downloaded Cutouts", storage_location_data)
+            self.graph_cutout_data("Specified", storage_location_data)
         elif query_type == 'specified_species': 
             # load all data of species specified in config
             self.load_species_metadata(param, cursor, columns)
-            self.graph_cutout_data("All Cutouts", None)
+            self.graph_cutout_data("All", None)
 
         conn.close()
 
@@ -88,7 +87,7 @@ class CutoutAnalyzer():
             species = row_dict['category']['common_name'].upper()
 
             # Initialize species
-            for d in [self.batch_image_dict, self.batch_num_components, self.bbox, self.blur,
+            for d in [self.batch_num_components, self.bbox, self.blur,
                         self.rgb_mean_red, self.rgb_mean_green, self.rgb_mean_blue,
                         self.rgb_std_red, self.rgb_std_green, self.rgb_std_blue]:
                 if species not in d:
@@ -102,15 +101,11 @@ class CutoutAnalyzer():
                 print(row_dict['cutout_id'][:2])
 
     def metadata_to_dict(self, species, synthetic, row_dict):
-        self.append_image_size(species, synthetic, row_dict)
         self.append_num_components(species, synthetic, row_dict)
         self.append_bbox(species, synthetic, row_dict)
         self.append_blur(species, synthetic, row_dict)
         self.append_rgb_mean(species, synthetic, row_dict)
         self.append_rgb_std(species, synthetic, row_dict)
-
-    def append_image_size(self, species, synthetic, cutout):
-        self.batch_image_dict[species].setdefault(synthetic, []).append((cutout['cutout_height'], cutout['cutout_width']))
 
     def append_num_components(self, species, synthetic, cutout):
         self.batch_num_components[species].setdefault(synthetic, []).append(cutout['cutout_props']['num_components'])
@@ -141,15 +136,18 @@ class CutoutAnalyzer():
         os.makedirs(str(f"{file_path}/{title_info}"), exist_ok=True)
 
         # Grab graph colors
-        cmap = plt.get_cmap("tab20")
-        norm = mcolors.Normalize(vmin=0, vmax=len(self.states) - 1)
-        palette = {state: mcolors.to_hex(cmap(norm(i))) for i, state in enumerate(self.states)}
+        colors = [
+            "#e6b8af",  # pinkish red
+            "#b6d7a8",  # mint green
+            "#f9cb9c",  # peach
+            "#cfe2f3",  # pastel blue
+            "#d9d2e9",  # lavendar
+        ]
+        palette = {state: colors[i % len(colors)] for i, state in enumerate(self.states)}
 
-        # Plot graphs
-        for species in self.batch_image_dict:
-            scatter_plot(self.batch_image_dict[species], species, "Height V Width", file_path, title_info, palette)
         for species in self.batch_num_components:
-            bar_chart_plot(self.batch_num_components[species], species, "Number of Components", file_path, title_info, palette)
+            logrithmic = (title_info == 'all')
+            bar_chart_plot(self.batch_num_components[species], species, "Number of Components", file_path, title_info, palette, logrithmic)
         for species in self.bbox:
             jitter_plot(self.bbox[species], species, "BBOX Area (cm^2)", file_path, title_info, palette)
         for species in self.blur:
@@ -176,4 +174,4 @@ def main(cfg: DictConfig) -> None:
     # Graph cutouts from local folder
     CutoutAnalyzer("specified_configs", None, all_cutouts.states, cfg)
 
-    generate_pdf(cfg)
+    generate_pdf(cfg, cfg.cutout_filters.category.common_name)
