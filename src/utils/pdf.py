@@ -2,6 +2,7 @@ import os
 import hydra
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
+from utils.utils import count_all_files
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
 from omegaconf import DictConfig, OmegaConf
@@ -15,27 +16,22 @@ def generate_pdf(cfg, species_list):
     # PAGE INFO
     page_width, page_height = letter
     margin = 0.5 * inch
-    available_height = page_height - 2 * margin
 
-    # TEXT PLACEMENT INFO
-    title_x = page_width / 2
-    title_y = page_height - margin / 2
-    distance_from_title_y = 0 # keep track of how far we are away from the title
-
-    # FONT SIZES
-    title_size = 16
-    name_font_size = 12
-    report_info_size = 8
+    fonts = {
+        "title_size": 16,
+        "name_font_size": 12,
+        "report_info_size": 8
+    }
 
     page_info = {
         "height": page_height,
         "width": page_width,
         "margin": margin,
-        "title_y": title_y
+        "title_y": page_height - margin / 2
     }
 
     position_state = {
-        "distance_from_title_y": distance_from_title_y,
+        "distance_from_top_of_page": 0,
         "x_offset": 0
     }
 
@@ -44,57 +40,33 @@ def generate_pdf(cfg, species_list):
     '''
     title = "Pre-Synthesis Analysis"
     title_font = "Helvetica-Bold"
-    c.setFont(title_font, title_size)
-    c.drawCentredString(title_x, title_y, title)
-    position_state["distance_from_title_y"] += title_size
+    c.setFont(title_font, fonts["title_size"])
+    c.drawCentredString(page_width / 2, page_info["title_y"], title)
+    position_state["distance_from_top_of_page"] += fonts["title_size"]
 
     '''
         Below we author the report.
     '''
     name = "PSA CV Team"
-    c.setFont("Helvetica", name_font_size)
-    c.drawCentredString(title_x, title_y - position_state["distance_from_title_y"] - 4, f"Maintainer: {name}")
-    position_state["distance_from_title_y"] += (name_font_size+4)
+    c.setFont("Helvetica", fonts["name_font_size"])
+    c.drawCentredString(page_width / 2, page_info["title_y"] - position_state["distance_from_top_of_page"] - 4, f"Maintainer: {name}")
+    position_state["distance_from_top_of_page"] += (fonts["name_font_size"]+4)
 
     '''
         Below is a brief description intended to give the reader context and insight into the graphs presented in this report.
     '''
+    sorted_species = sorted(species_list, key=lambda s: s.lower())
     if len(species_list) > 1:
-        titled = [s.title() for s in species_list]
+        titled = [s.title() for s in sorted_species]
         species_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
     else:
         species_str = species_list[0].title()
+
     subj = f"The following is a report of the {species_str} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
-
-    words = subj.split()
-    lines = []
-    line = ""
-    max_width = page_width - 2 * margin
-    font = "Helvetica"
-    size = report_info_size
-    c.setFont(font, size)
-
-    # Wrap text
-    for word in words:
-        test_line = f"{line} {word}".strip()
-        if stringWidth(test_line, font, size) <= max_width:
-            line = test_line
-        else:
-            lines.append(line)
-            line = word
-    if line:
-        lines.append(line)
-
-    # Draw each line centered
-    line_spacing = 4
-    for i, line in enumerate(lines):
-        y_pos = title_y - position_state["distance_from_title_y"] - 4 - i * (size + line_spacing)
-        c.drawCentredString(title_x, y_pos, line)
-
-    position_state["distance_from_title_y"] += len(lines) * (size + line_spacing)
+    wrap_body_text(c, subj, position_state, page_info, fonts)
 
     # Add spacing between description and images
-    position_state["distance_from_title_y"] += 0.15 * inch 
+    position_state["distance_from_top_of_page"] += 0.15 * inch 
 
     '''
         Below inserts metadata graphs for each species into the final report.
@@ -107,15 +79,39 @@ def generate_pdf(cfg, species_list):
     num_images = min(len(all_cutout_graphs), len(downloaded_cutout_graphs)) # should be the same length
 
     x_offset = 0
+    species_overflow = True
+    num_of_images_on_line = 0
+    number_of_species = len(species_list)
+    number_of_graphs = count_all_files(all_cutout_dir)
+    graphs_per_species = int(number_of_graphs/number_of_species)
+    current_species_index = 0
     for i in range(num_images):
 
         all_cutout_path = os.path.join(all_cutout_dir, all_cutout_graphs[i])
         specified_cutout_path = os.path.join(downloaded_cutout_dir, downloaded_cutout_graphs[i])
 
         new_line = False
-        if i != 0 and i % 2 == 0:
+
+        print(f"downloaded_cutout_graphs[{i}]: {downloaded_cutout_graphs[i]}")
+
+        if (species_overflow):
+            subj = sorted_species[current_species_index]
+            current_species_index += 1
+            wrap_body_text(c, subj.title(), position_state, page_info, fonts)
+            species_overflow = False
+
+        if num_of_images_on_line == 2:
+            position_state["x_offset"] = 0
+            new_line = True      
+            num_of_images_on_line = 0
+
+        if i != 0 and i % graphs_per_species == 0:
             position_state["x_offset"] = 0
             new_line = True
+            species_overflow = True
+            num_of_images_on_line = 0
+
+        num_of_images_on_line += 1
 
         # Update flags for first image
         flags = {
@@ -159,28 +155,24 @@ def place_image(final_image, c, page_info, position_state, flags, scaler=1):
     # Calculate height to preserve aspect ratio
     final_height = final_width * aspect_ratio
 
-    # Calculate height to preserve aspect ratio
-    final_height = final_width * aspect_ratio
-
     # Y calculations
     # check to see if we need to add a new line
     if (flags.get("new_line", False)):
-        position_state["distance_from_title_y"] += final_height + 0.25 * inch
+        position_state["distance_from_top_of_page"] += final_height + 0.25 * inch
 
     # check to see if we need to move to a new page
-    if (page_info["height"]-(position_state["distance_from_title_y"] + final_height)) < 0:
+    if (page_info["height"]-(position_state["distance_from_top_of_page"] + final_height)) <= 0:
         c.showPage()
-        position_state["distance_from_title_y"] = 0
+        position_state["distance_from_top_of_page"] = 0
     
     # special case for last image, add more space
     if (flags.get("last_image", False)):
-        position_state["distance_from_title_y"] += final_height + 0.25 * inch
-        if (page_info["height"]-(position_state["distance_from_title_y"] + final_height)) < 0:
+        position_state["distance_from_top_of_page"] += final_height + 0.25 * inch
+        if (page_info["height"]-(position_state["distance_from_top_of_page"] + final_height)) <= 0:
             c.showPage()
-            position_state["distance_from_title_y"] = 0
+            position_state["distance_from_top_of_page"] = 0
 
-    y_pos = page_info["title_y"] - position_state["distance_from_title_y"] - final_height
-
+    y_pos = page_info["title_y"] - position_state["distance_from_top_of_page"] - final_height
 
     # X calculations
     x_pos = image_margin + position_state["x_offset"]
@@ -190,10 +182,38 @@ def place_image(final_image, c, page_info, position_state, flags, scaler=1):
 
     c.drawImage(final_image, x_pos, y_pos, width=final_width, height=final_height, preserveAspectRatio=True)
 
+def wrap_body_text(c, subj, position_state, page_info, fonts):
+    words = subj.split()
+    lines = []
+    line = ""
+    max_width = page_info["width"] - 2 * page_info["margin"]
+    font = "Helvetica"
+    size = fonts["report_info_size"]
+    c.setFont(font, size)
+
+    # Wrap text
+    for word in words:
+        test_line = f"{line} {word}".strip()
+        if stringWidth(test_line, font, size) <= max_width:
+            line = test_line
+        else:
+            lines.append(line)
+            line = word
+    if line:
+        lines.append(line)
+
+    # Draw each line centered
+    line_spacing = 4
+    for i, line in enumerate(lines):
+        y_pos = page_info["title_y"] - position_state["distance_from_top_of_page"] - 4 - i * (size + line_spacing)
+        c.drawCentredString(page_info["width"] / 2, y_pos, line)
+
+    position_state["distance_from_top_of_page"] += len(lines) * (size + line_spacing)
+
+
 @hydra.main(version_base="1.2", config_path="../../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.create(cfg)
-
     generate_pdf(cfg, cfg.cutout_filters.category.common_name)
 
 if __name__ == "__main__":

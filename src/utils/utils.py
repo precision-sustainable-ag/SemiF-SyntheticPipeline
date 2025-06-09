@@ -1,3 +1,4 @@
+import os
 import json
 import random
 from pathlib import Path
@@ -259,3 +260,9 @@ def read_recipe(json_file_path):
             cutout_ids.append(cutout.get("cutout_id"))
 
     return batch_ids, cutout_ids
+
+def count_all_files(dir_path):
+    total = 0
+    for root, dirs, files in os.walk(dir_path):
+        total += len(files)
+    return total
