@@ -169,6 +169,8 @@ class CutoutAnalyzer():
             barplot(storage_location_data, "Cutout Distribution Across Storages", file_path)
 
 def clear_directory(dir_path):
+    if not os.path.isdir(dir_path):
+        return
     for entry in os.listdir(dir_path):
         full_path = os.path.join(dir_path, entry)
         if os.path.isfile(full_path) or os.path.islink(full_path):
