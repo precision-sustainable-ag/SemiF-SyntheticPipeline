@@ -2,7 +2,7 @@ import os
 import hydra
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
-from utils import count_all_files
+from utils.utils import count_all_files
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
 from omegaconf import DictConfig, OmegaConf
