@@ -11,7 +11,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 
 log = logging.getLogger(__name__)
 
-def generate_pdf(cfg, species_list, num_cutouts):
+def generate_pdf(cfg, species_list, num_cutouts) -> None:
 
     # extract num cutouts into specified and all
     specified_cutouts, all_cutouts = num_cutouts
@@ -155,7 +155,7 @@ def generate_pdf(cfg, species_list, num_cutouts):
     c.save()
     log.info(f"PDF saved to {output_pdf}")
 
-def place_image(final_image, c, page_info, position_state, flags, scaler=1):
+def place_image(final_image, c, page_info, position_state, flags, scaler=1) -> None:
     final_width = 2 * inch * scaler
     img = ImageReader(final_image)
     img_width, img_height = img.getSize()
@@ -184,7 +184,7 @@ def place_image(final_image, c, page_info, position_state, flags, scaler=1):
     if (flags.get("new_line", False)):
         position_state["distance_from_top_of_page"] += final_height + 0.25 * inch
 
-def wrap_body_text(c, subj, position_state, page_info, font_size):
+def wrap_body_text(c, subj, position_state, page_info, font_size) -> None:
     words = subj.split()
     lines = []
     line = ""
@@ -216,7 +216,7 @@ def wrap_body_text(c, subj, position_state, page_info, font_size):
 
     position_state["distance_from_top_of_page"] += final_height
 
-def room_check(page_info, position_state, final_height, c):
+def room_check(page_info, position_state, final_height, c) -> None:
     if (page_info["height"]-(position_state["distance_from_top_of_page"] + final_height)) <= page_info["margin"]:
         c.showPage()
         position_state["distance_from_top_of_page"] = 0

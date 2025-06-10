@@ -12,10 +12,10 @@ from matplotlib.ticker import FuncFormatter
 log = logging.getLogger(__name__)
 
 # use this function to keep axis ticks in check
-def thousands_formatter(x, pos):
+def thousands_formatter(x, pos) -> str:
     return f'{int(x / 1000)}k'
 
-def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, palette, logrithmic):
+def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, palette, logrithmic) -> None:
 
     max_bars=10
 
@@ -100,7 +100,7 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
     along an axis by adding small random noise (jitter) to reduce overlap, making it 
     easier to see the spread and density of the data.
 '''
-def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palette):
+def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palette) -> None:
 
     # Flatten meta_data_dict into a DataFrame with state info
     data = []
@@ -157,7 +157,7 @@ def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palet
 
     save_plot(species, file_name, file_path, title_info)
 
-def barplot(data_dict, file_name, file_path):
+def barplot(data_dict, file_name, file_path) -> None:
 
     labels = []
     for key in data_dict.keys():
@@ -194,7 +194,7 @@ def barplot(data_dict, file_name, file_path):
     plt.close()
 
 
-def save_plot(species, file_name, file_path, title_info):
+def save_plot(species, file_name, file_path, title_info) -> None:
     # Save plot
     plt.tight_layout()
     if species:

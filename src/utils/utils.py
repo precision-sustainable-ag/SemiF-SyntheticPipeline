@@ -244,7 +244,7 @@ def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str],
 
     return data
 
-def read_recipe(json_file_path):
+def read_recipe(json_file_path) -> tuple[list[str], list[str]]:
     # Load your JSON file
     with open(json_file_path, "r") as f:
         data = json.load(f)
@@ -261,7 +261,7 @@ def read_recipe(json_file_path):
 
     return batch_ids, cutout_ids
 
-def count_all_files(dir_path):
+def count_all_files(dir_path) -> int:
     total = 0
     for root, dirs, files in os.walk(dir_path):
         total += len(files)

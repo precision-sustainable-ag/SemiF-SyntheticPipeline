@@ -17,7 +17,7 @@ from utils.graphs import bar_chart_plot, jitter_plot, barplot
 log = logging.getLogger(__name__)
 
 class CutoutAnalyzer():
-    def __init__(self, query_type, species_list, states, cfg):
+    def __init__(self, query_type, species_list, states, cfg) -> None:
 
         self.cfg = cfg
         self.db_path = str(f"{cfg.paths.datadir}/db/agir.db")
@@ -72,7 +72,7 @@ class CutoutAnalyzer():
 
         conn.close()
 
-    def load_cutout_metadata(self, cursor, columns, cutout_ids):
+    def load_cutout_metadata(self, cursor, columns, cutout_ids) -> None:
 
         # Loop through specified cutouts
         for cutout_id in cutout_ids:
@@ -80,7 +80,7 @@ class CutoutAnalyzer():
             rows = cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
-    def load_species_metadata(self, common_name, cursor, columns):
+    def load_species_metadata(self, common_name, cursor, columns) -> None:
 
         # Loop through all specified species cutouts
         for species in common_name:
@@ -92,7 +92,7 @@ class CutoutAnalyzer():
             rows = cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
-    def query_for_metadata(self, rows, columns):
+    def query_for_metadata(self, rows, columns) -> None:
         for row in rows:
             row_dict = dict(zip(columns, row))
             try:
@@ -111,7 +111,7 @@ class CutoutAnalyzer():
                 # log states that we are pulling data from
                 log.info(f"Cutouts pulled from: {row_dict['cutout_id'][:2]}")
 
-    def metadata_to_dict(self, species, synthetic, row_dict):
+    def metadata_to_dict(self, species, synthetic, row_dict) -> None:
         self.append_num_components(species, synthetic, row_dict)
         self.append_bbox(species, synthetic, row_dict)
         self.append_blur(species, synthetic, row_dict)
@@ -122,28 +122,28 @@ class CutoutAnalyzer():
             self.num_cutouts[species.upper()] = 0
         self.num_cutouts[species.upper()]+=1
 
-    def append_num_components(self, species, synthetic, cutout):
+    def append_num_components(self, species, synthetic, cutout) -> None:
         self.batch_num_components[species].setdefault(synthetic, []).append(cutout['cutout_props']['num_components'])
 
-    def append_bbox(self, species, synthetic, cutout):
+    def append_bbox(self, species, synthetic, cutout) -> None:
         self.bbox[species].setdefault(synthetic, []).append(cutout['cutout_props']['bbox_area_cm2'])
 
-    def append_blur(self, species, synthetic, cutout):
+    def append_blur(self, species, synthetic, cutout) -> None:
         self.blur[species].setdefault(synthetic, []).append(cutout['cutout_props']['blur_effect'])
 
-    def append_rgb_mean(self, species, synthetic, cutout):
+    def append_rgb_mean(self, species, synthetic, cutout) -> None:
         r, g, b = cutout['cutout_props'].get('cropout_rgb_mean', [None, None, None])
         self.rgb_mean_red[species].setdefault(synthetic, []).append(r)
         self.rgb_mean_green[species].setdefault(synthetic, []).append(g)
         self.rgb_mean_blue[species].setdefault(synthetic, []).append(b)
 
-    def append_rgb_std(self, species, synthetic, cutout):
+    def append_rgb_std(self, species, synthetic, cutout) -> None:
         r, g, b = cutout['cutout_props'].get('cropout_rgb_std', [None, None, None])
         self.rgb_std_red[species].setdefault(synthetic, []).append(r)
         self.rgb_std_green[species].setdefault(synthetic, []).append(g)
         self.rgb_std_blue[species].setdefault(synthetic, []).append(b)
 
-    def graph_cutout_data(self, title_info, storage_location_data):
+    def graph_cutout_data(self, title_info, storage_location_data) -> None:
 
         file_path = self.cfg.paths.analysisdir
 
@@ -180,9 +180,9 @@ class CutoutAnalyzer():
         if storage_location_data:
             barplot(storage_location_data, "Cutout Distribution Across Storages", file_path)
 
-def clear_directory(dir_path):
+def clear_directory(dir_path) -> None:
     if not os.path.isdir(dir_path):
-        return
+        return None
     for entry in os.listdir(dir_path):
         full_path = os.path.join(dir_path, entry)
         if os.path.isfile(full_path) or os.path.islink(full_path):
