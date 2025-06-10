@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import sqlite3
+import logging
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from omegaconf import DictConfig, OmegaConf
@@ -11,6 +12,9 @@ from utils.pdf import generate_pdf
 from utils.utils import read_recipe
 from utils.utils import resolve_image_storage_locations
 from utils.graphs import bar_chart_plot, jitter_plot, barplot
+
+
+log = logging.getLogger(__name__)
 
 class CutoutAnalyzer():
     def __init__(self, query_type, species_list, states, cfg):
@@ -101,7 +105,8 @@ class CutoutAnalyzer():
                 self.states.append(row_dict['cutout_id'][:2])
             elif row_dict['cutout_id'][:2] not in self.states:
                 self.states.append(row_dict['cutout_id'][:2])
-                print(row_dict['cutout_id'][:2])
+                # log states that we are pulling data from
+                log.info(f"Data pulled from: {row_dict['cutout_id'][:2]}")
 
     def metadata_to_dict(self, species, synthetic, row_dict):
         self.append_num_components(species, synthetic, row_dict)
