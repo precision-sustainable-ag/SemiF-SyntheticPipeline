@@ -11,7 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 from utils.pdf import generate_pdf
 from utils.utils import read_recipe
 from utils.utils import resolve_image_storage_locations
-from utils.graphs import bar_chart_plot, jitter_plot, barplot
+from utils.graphs import bar_chart_plot, jitter_plot, barplot, boolean_bar_chart_plot
 
 
 log = logging.getLogger(__name__)
@@ -26,6 +26,8 @@ class CutoutAnalyzer():
         self.batch_num_components = {}
         self.bbox = {}
         self.blur = {}
+        self.is_primary = {}
+        self.extends_border = {}
         self.rgb_mean_red = {}
         self.rgb_mean_green = {}
         self.rgb_mean_blue = {}
@@ -37,6 +39,8 @@ class CutoutAnalyzer():
             self.batch_num_components[species] = {}
             self.bbox[species] = {}
             self.blur[species] = {}
+            self.is_primary[species] = {}
+            self.extends_border[species] = {}
             self.rgb_mean_red[species] = {}
             self.rgb_mean_green[species] = {}
             self.rgb_mean_blue[species] = {}
@@ -117,6 +121,8 @@ class CutoutAnalyzer():
         self.append_blur(species, synthetic, row_dict)
         self.append_rgb_mean(species, synthetic, row_dict)
         self.append_rgb_std(species, synthetic, row_dict)
+        self.append_is_primary(species, synthetic, row_dict)
+        self.append_extends_border(species, synthetic, row_dict)
 
         if species.upper() not in self.num_cutouts:
             self.num_cutouts[species.upper()] = 0
@@ -130,6 +136,12 @@ class CutoutAnalyzer():
 
     def append_blur(self, species, synthetic, cutout) -> None:
         self.blur[species].setdefault(synthetic, []).append(cutout['cutout_props']['blur_effect'])
+    
+    def append_is_primary(self, species, synthetic, cutout) -> None:
+        self.is_primary[species].setdefault(synthetic, []).append(cutout['cutout_props']['is_primary'])
+
+    def append_extends_border(self, species, synthetic, cutout) -> None:
+        self.extends_border[species].setdefault(synthetic, []).append(cutout['cutout_props']['extends_border'])
 
     def append_rgb_mean(self, species, synthetic, cutout) -> None:
         r, g, b = cutout['cutout_props'].get('cropout_rgb_mean', [None, None, None])
@@ -167,6 +179,10 @@ class CutoutAnalyzer():
             jitter_plot(self.bbox[species], species, "BBOX Area (cm^2)", file_path, title_info, palette)
         for species in self.blur:
             jitter_plot(self.blur[species], species, "Blur Effect", file_path, title_info, palette)
+        for species in self.is_primary:
+            boolean_bar_chart_plot(self.is_primary[species], species, "Is Primary", file_path, title_info, palette)
+        for species in self.extends_border:
+            boolean_bar_chart_plot(self.extends_border[species], species, "Extends Border", file_path, title_info, palette)
 
         # TODO EVAL USEFULNESS OF RGB GRAPHS
         # for species in self.rgb_mean_red:

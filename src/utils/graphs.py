@@ -94,6 +94,52 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
     # Save the plot
     save_plot(species, file_name, file_path, title_info)
 
+def boolean_bar_chart_plot(boolean_count_dict, species, file_name, file_path, title_info, palette, logrithmic=False) -> None:
+
+    # Group True/False values by state (first 2 letters of batch ID)
+    grouped_data = {}
+    for batch_id, bool_list in boolean_count_dict.items():
+        state = batch_id[:2]
+        if state not in grouped_data:
+            grouped_data[state] = []
+        grouped_data[state].extend([b for b in bool_list if b in (True, False)])  # filter valid bools only
+
+    unique_states = sorted(grouped_data.keys())
+    num_states = len(unique_states)
+
+    # Define x-axis categories and bar locations
+    x_labels = ['False', 'True']
+    x = np.arange(len(x_labels))  # [0, 1]
+
+    # Count True/False per state
+    bool_freqs = {}
+    for state in unique_states:
+        freq = Counter(grouped_data[state])
+        bool_freqs[state] = [freq.get(False, 0), freq.get(True, 0)]
+
+    # Plotting
+    bar_width = 0.8 / num_states
+    plt.figure(figsize=(6, 6))
+
+    for i, state in enumerate(unique_states):
+        y = bool_freqs[state]
+        offset = (i - num_states / 2) * bar_width + bar_width / 2
+        plt.bar(x + offset, y, width=bar_width, label=state, color=palette.get(state, None))
+
+    if logrithmic:
+        plt.yscale('log')
+
+    plt.title(f"{title_info} {species}".title(), fontsize=25)
+    plt.xlabel(file_name, fontsize=20)
+    plt.xticks(x, x_labels, fontsize=15)
+    plt.ylabel("Frequency", fontsize=20)
+    plt.yticks(fontsize=15)
+    plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=15, title_fontsize=15)
+    plt.grid(axis='y')
+    plt.tight_layout()
+
+    # Save the plot
+    save_plot(species, file_name, file_path, title_info)
 
 '''
     The jitter plot is used to visualize the distribution of individual data points 
