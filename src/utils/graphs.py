@@ -1,5 +1,6 @@
 import os
 import math
+import logging
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -7,6 +8,8 @@ from collections import Counter
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.ticker import FuncFormatter
+
+log = logging.getLogger(__name__)
 
 # use this function to keep axis ticks in check
 def thousands_formatter(x, pos):

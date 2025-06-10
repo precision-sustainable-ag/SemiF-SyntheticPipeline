@@ -1,5 +1,6 @@
 import os
 import hydra
+import logging
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from utils.utils import count_all_files
@@ -7,6 +8,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
 from omegaconf import DictConfig, OmegaConf
 from reportlab.pdfbase.pdfmetrics import stringWidth
+
+log = logging.getLogger(__name__)
 
 def generate_pdf(cfg, species_list):
 
