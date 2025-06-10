@@ -104,7 +104,7 @@ def generate_pdf(cfg, species_list, num_cutouts):
                 wrap_body_text(c, species.title(), position_state, page_info, fonts["name_font_size"])
         
                 # Add size statistics for the first species
-                subj = f"{species} has {specified_cutouts[species.upper()]} total number of cutouts. Your configs extract {all_cutouts[species.upper()]} of those"
+                subj = f"{species} has {specified_cutouts[species.upper()]} total number of cutouts. Your configs specify {all_cutouts[species.upper()]} of those cutouts."
                 wrap_body_text(c, subj, position_state, page_info, fonts["report_info_size"])
 
                 current_species_index += 1
