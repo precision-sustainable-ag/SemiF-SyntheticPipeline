@@ -9,10 +9,8 @@ from omegaconf import DictConfig, OmegaConf
 
 # util imports
 from utils.pdf import generate_pdf
-from utils.utils import read_recipe
-from utils.utils import resolve_image_storage_locations
 from utils.graphs import bar_chart_plot, jitter_plot, barplot, boolean_bar_chart_plot
-
+from utils.utils import resolve_image_storage_locations, clear_directory, read_recipe
 
 log = logging.getLogger(__name__)
 
@@ -76,16 +74,20 @@ class CutoutAnalyzer():
 
         conn.close()
 
+    """
+    load_cutout_metadata: Function used to query for all metadata from cutouts in the generated recipes
+    """
     def load_cutout_metadata(self, cursor, columns, cutout_ids) -> None:
-
         # Loop through specified cutouts
         for cutout_id in cutout_ids:
             cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
             rows = cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
+    """
+    load_species_metadata: Function used to query for all metadata for all cutouts in the common_name list
+    """
     def load_species_metadata(self, common_name, cursor, columns) -> None:
-
         # Loop through all specified species cutouts
         for species in common_name:
             species_lower = species.lower()
@@ -96,6 +98,9 @@ class CutoutAnalyzer():
             rows = cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
+    """
+    query_for_metadata: Function grabs all metadata for a given cutout_id
+    """
     def query_for_metadata(self, rows, columns) -> None:
         for row in rows:
             row_dict = dict(zip(columns, row))
@@ -115,46 +120,41 @@ class CutoutAnalyzer():
                 # log states that we are pulling data from
                 log.info(f"Cutouts pulled from: {row_dict['cutout_id'][:2]}")
 
-    def metadata_to_dict(self, species, synthetic, row_dict) -> None:
-        self.append_num_components(species, synthetic, row_dict)
-        self.append_bbox(species, synthetic, row_dict)
-        self.append_blur(species, synthetic, row_dict)
-        self.append_rgb_mean(species, synthetic, row_dict)
-        self.append_rgb_std(species, synthetic, row_dict)
-        self.append_is_primary(species, synthetic, row_dict)
-        self.append_extends_border(species, synthetic, row_dict)
+    """
+    metadata_to_dict: Function takes metadata and stores them in dictionaries to be passed in to graphing functions using Function graph_cutout_data
+    """
+    def metadata_to_dict(self, species, synthetic, cutout) -> None:
 
-        if species.upper() not in self.num_cutouts:
-            self.num_cutouts[species.upper()] = 0
-        self.num_cutouts[species.upper()]+=1
+        prop_map = {
+            'num_components': self.batch_num_components,
+            'bbox_area_cm2': self.bbox,
+            'blur_effect': self.blur,
+            'is_primary': self.is_primary,
+            'extends_border': self.extends_border,
+        }
+        for prop, target_dict in prop_map.items():
+            val = cutout['cutout_props'].get(prop)
+            target_dict[species].setdefault(synthetic, []).append(val)
 
-    def append_num_components(self, species, synthetic, cutout) -> None:
-        self.batch_num_components[species].setdefault(synthetic, []).append(cutout['cutout_props']['num_components'])
+        # TODO Eval usefulness of RGB metadata
+        # # Handle RGB means
+        # r, g, b = cutout['cutout_props'].get('cropout_rgb_mean', [None, None, None])
+        # self.rgb_mean_red[species].setdefault(synthetic, []).append(r)
+        # self.rgb_mean_green[species].setdefault(synthetic, []).append(g)
+        # self.rgb_mean_blue[species].setdefault(synthetic, []).append(b)
+        # # Handle RGB std
+        # r, g, b = cutout['cutout_props'].get('cropout_rgb_std', [None, None, None])
+        # self.rgb_std_red[species].setdefault(synthetic, []).append(r)
+        # self.rgb_std_green[species].setdefault(synthetic, []).append(g)
+        # self.rgb_std_blue[species].setdefault(synthetic, []).append(b)
 
-    def append_bbox(self, species, synthetic, cutout) -> None:
-        self.bbox[species].setdefault(synthetic, []).append(cutout['cutout_props']['bbox_area_cm2'])
+        # Track cutout count
+        self.num_cutouts.setdefault(species.upper(), 0)
+        self.num_cutouts[species.upper()] += 1
 
-    def append_blur(self, species, synthetic, cutout) -> None:
-        self.blur[species].setdefault(synthetic, []).append(cutout['cutout_props']['blur_effect'])
-    
-    def append_is_primary(self, species, synthetic, cutout) -> None:
-        self.is_primary[species].setdefault(synthetic, []).append(cutout['cutout_props']['is_primary'])
-
-    def append_extends_border(self, species, synthetic, cutout) -> None:
-        self.extends_border[species].setdefault(synthetic, []).append(cutout['cutout_props']['extends_border'])
-
-    def append_rgb_mean(self, species, synthetic, cutout) -> None:
-        r, g, b = cutout['cutout_props'].get('cropout_rgb_mean', [None, None, None])
-        self.rgb_mean_red[species].setdefault(synthetic, []).append(r)
-        self.rgb_mean_green[species].setdefault(synthetic, []).append(g)
-        self.rgb_mean_blue[species].setdefault(synthetic, []).append(b)
-
-    def append_rgb_std(self, species, synthetic, cutout) -> None:
-        r, g, b = cutout['cutout_props'].get('cropout_rgb_std', [None, None, None])
-        self.rgb_std_red[species].setdefault(synthetic, []).append(r)
-        self.rgb_std_green[species].setdefault(synthetic, []).append(g)
-        self.rgb_std_blue[species].setdefault(synthetic, []).append(b)
-
+    """
+    graph_cutout_data: Function takes metadata dictionaries and passes them into graphing functions
+    """
     def graph_cutout_data(self, title_info, storage_location_data) -> None:
 
         file_path = self.cfg.paths.analysisdir
@@ -195,22 +195,6 @@ class CutoutAnalyzer():
 
         if storage_location_data:
             barplot(storage_location_data, "Cutout Distribution Across Storages", file_path)
-
-def clear_directory(dir_path) -> None:
-    if not os.path.isdir(dir_path):
-        return None
-    for entry in os.listdir(dir_path):
-        full_path = os.path.join(dir_path, entry)
-        if os.path.isfile(full_path) or os.path.islink(full_path):
-            os.remove(full_path)
-        elif os.path.isdir(full_path):
-            # Recursively remove contents
-            for root, dirs, files in os.walk(full_path, topdown=False):
-                for f in files:
-                    os.remove(os.path.join(root, f))
-                for d in dirs:
-                    os.rmdir(os.path.join(root, d))
-            os.rmdir(full_path)
 
 def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.create(cfg)

@@ -266,3 +266,19 @@ def count_all_files(dir_path) -> int:
     for root, dirs, files in os.walk(dir_path):
         total += len(files)
     return total
+
+def clear_directory(dir_path) -> None:
+    if not os.path.isdir(dir_path):
+        return None
+    for entry in os.listdir(dir_path):
+        full_path = os.path.join(dir_path, entry)
+        if os.path.isfile(full_path) or os.path.islink(full_path):
+            os.remove(full_path)
+        elif os.path.isdir(full_path):
+            # Recursively remove contents
+            for root, dirs, files in os.walk(full_path, topdown=False):
+                for f in files:
+                    os.remove(os.path.join(root, f))
+                for d in dirs:
+                    os.rmdir(os.path.join(root, d))
+            os.rmdir(full_path)
