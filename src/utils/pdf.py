@@ -148,7 +148,7 @@ def generate_pdf(cfg, species_list):
         place_image(final_image, c, page_info, position_state, flags, 3)
 
     c.save()
-    print(f"PDF saved to {output_pdf}")
+    log.info(f"PDF saved to {output_pdf}")
 
 def place_image(final_image, c, page_info, position_state, flags, scaler=1):
     final_width = 2 * inch * scaler

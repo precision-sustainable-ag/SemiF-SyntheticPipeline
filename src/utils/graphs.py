@@ -201,5 +201,5 @@ def save_plot(species, file_name, file_path, title_info):
         plt.savefig(f'{file_path}/{title_info.lower()}/{file_name}', bbox_inches='tight')
     else:
         plt.savefig(f'{file_path}/{file_name}', bbox_inches='tight')
-    print(f"Plot saved as {file_name}")
+    log.info(f"Plot saved as {file_name}")
     plt.close()
