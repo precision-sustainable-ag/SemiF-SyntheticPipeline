@@ -47,6 +47,9 @@ class CutoutAnalyzer():
         # KEEP TRACK OF STATES FOR COLOR COORDINATION BETWEEN GRAPHS
         self.states = states
 
+        # KEEP TRACK OF NUMBER OF CUTOUTS
+        self.num_cutouts = {}
+
         # Connect to database (READ ONLY)
         conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
         cursor = conn.cursor()
@@ -106,7 +109,7 @@ class CutoutAnalyzer():
             elif row_dict['cutout_id'][:2] not in self.states:
                 self.states.append(row_dict['cutout_id'][:2])
                 # log states that we are pulling data from
-                log.info(f"Data pulled from: {row_dict['cutout_id'][:2]}")
+                log.info(f"Cutouts pulled from: {row_dict['cutout_id'][:2]}")
 
     def metadata_to_dict(self, species, synthetic, row_dict):
         self.append_num_components(species, synthetic, row_dict)
@@ -114,6 +117,10 @@ class CutoutAnalyzer():
         self.append_blur(species, synthetic, row_dict)
         self.append_rgb_mean(species, synthetic, row_dict)
         self.append_rgb_std(species, synthetic, row_dict)
+
+        if species.upper() not in self.num_cutouts:
+            self.num_cutouts[species.upper()] = 0
+        self.num_cutouts[species.upper()]+=1
 
     def append_num_components(self, species, synthetic, cutout):
         self.batch_num_components[species].setdefault(synthetic, []).append(cutout['cutout_props']['num_components'])
@@ -199,6 +206,9 @@ def main(cfg: DictConfig) -> None:
     all_cutouts = CutoutAnalyzer("specified_species", cfg.cutout_filters.category.common_name, [], cfg)
 
     # Graph cutouts from local folder
-    CutoutAnalyzer("specified_configs", cfg.cutout_filters.category.common_name, all_cutouts.states, cfg)
+    specified_cutouts = CutoutAnalyzer("specified_configs", cfg.cutout_filters.category.common_name, all_cutouts.states, cfg)
 
-    generate_pdf(cfg, cfg.cutout_filters.category.common_name)
+    # Total num of cutouts
+    num_cutouts = all_cutouts.num_cutouts, specified_cutouts.num_cutouts
+
+    generate_pdf(cfg, cfg.cutout_filters.category.common_name, num_cutouts)

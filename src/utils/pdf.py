@@ -11,7 +11,10 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 
 log = logging.getLogger(__name__)
 
-def generate_pdf(cfg, species_list):
+def generate_pdf(cfg, species_list, num_cutouts):
+
+    # extract num cutouts into specified and all
+    specified_cutouts, all_cutouts = num_cutouts
 
     output_pdf = str(f"{cfg.paths.analysisdir}/pre_synth_analysis.pdf")
     c = canvas.Canvas(output_pdf, pagesize=letter)
@@ -91,15 +94,21 @@ def generate_pdf(cfg, species_list):
     number_of_graphs = count_all_files(all_cutout_dir)
     graphs_per_species = int(number_of_graphs/number_of_species)
 
-    # Add the first species heading
     current_species_index = 0
-    subj = sorted_species[current_species_index]
-    current_species_index += 1
-    wrap_body_text(c, subj.title(), position_state, page_info, fonts["name_font_size"])
-
-
     for i in range(num_images):
+    
+        # Add heading for the next batch of graphs for the next species
+        if i % graphs_per_species == 0:
+            if current_species_index < len(sorted_species):
+                species = sorted_species[current_species_index]
+                wrap_body_text(c, species.title(), position_state, page_info, fonts["name_font_size"])
         
+                # Add size statistics for the first species
+                subj = f"{species} has {specified_cutouts[species.upper()]} total number of cutouts. Your configs extract {all_cutouts[species.upper()]} of those"
+                wrap_body_text(c, subj, position_state, page_info, fonts["report_info_size"])
+
+                current_species_index += 1
+
         # Load next couptle of graphs to place on pdf
         all_cutout_path = os.path.join(all_cutout_dir, all_cutout_graphs[i])
         specified_cutout_path = os.path.join(downloaded_cutout_dir, downloaded_cutout_graphs[i])
@@ -133,13 +142,6 @@ def generate_pdf(cfg, species_list):
         }
         place_image(specified_cutout_path, c, page_info, position_state, flags)    
 
-        # Add heading for the next batch of graphs for the next species
-        if i % graphs_per_species == (graphs_per_species-1):
-            if current_species_index < len(sorted_species):
-                subj = sorted_species[current_species_index]
-                current_species_index += 1
-                wrap_body_text(c, subj.title(), position_state, page_info, fonts["name_font_size"])
-
     # Place final image (storage distriubtion). Do this seperately as its a unique graph
     final_image = str(f"{cfg.paths.analysisdir}/Cutout Distribution Across Storages.png")
     if os.path.exists(final_image):
@@ -165,9 +167,7 @@ def place_image(final_image, c, page_info, position_state, flags, scaler=1):
     final_height = final_width * aspect_ratio
 
     # check to see if we need to move to a new page
-    if (page_info["height"]-(position_state["distance_from_top_of_page"] + final_height)) <= 0:
-        c.showPage()
-        position_state["distance_from_top_of_page"] = 0
+    room_check(page_info, position_state, final_height, c)
 
     y_pos = page_info["title_y"] - position_state["distance_from_top_of_page"] - final_height
 
@@ -208,9 +208,18 @@ def wrap_body_text(c, subj, position_state, page_info, font_size):
     for i, line in enumerate(lines):
         y_pos = page_info["title_y"] - position_state["distance_from_top_of_page"] - 4 - i * (font_size + line_spacing)
         c.drawCentredString(page_info["width"] / 2, y_pos, line)
+    
+    final_height = len(lines) * (font_size + line_spacing)
 
-    position_state["distance_from_top_of_page"] += len(lines) * (font_size + line_spacing)
+    # check to see if we need to move to a new page
+    room_check(page_info, position_state, final_height, c)
 
+    position_state["distance_from_top_of_page"] += final_height
+
+def room_check(page_info, position_state, final_height, c):
+    if (page_info["height"]-(position_state["distance_from_top_of_page"] + final_height)) <= page_info["margin"]:
+        c.showPage()
+        position_state["distance_from_top_of_page"] = 0
 
 @hydra.main(version_base="1.2", config_path="../../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
