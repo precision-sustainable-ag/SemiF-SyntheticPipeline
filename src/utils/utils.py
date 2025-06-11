@@ -7,6 +7,8 @@ from typing import List, Tuple
 import cv2
 import numpy as np
 import pandas as pd
+import sqlite3
+
 
 
 def filter_area(df, lower, upper):
@@ -213,9 +215,13 @@ def is_rectangular(mask, threshold_percentage):
 
 def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], cfg) -> None:
 
+    data = {}
+
     primary_storage_base_downloads = secondary_storage_base_downloads = tertiary_storage_base_downloads = 0
     for batch_id, cutout_id in zip(batch_ids, cutout_ids):
         image_filename = f"{cutout_id}.png"
+
+        species = query_for_cutout_metadata(cutout_id, cfg)
 
         # List of storage locations in order of preference.
         storages = [
@@ -225,24 +231,64 @@ def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str],
         ]
 
         # Try each storage location until the image is found and copied
+        primary_storage_base_downloads = 0
+        secondary_storage_base_downloads = 0
+        tertiary_storage_base_downloads = 0
         for storage_name, storage_path in storages:
             if storage_path.exists():
                 if storage_name == "primary":
-                    primary_storage_base_downloads += 1
+                    primary_storage_base_downloads = 1
                 elif storage_name == "secondary":
-                    secondary_storage_base_downloads += 1
+                    secondary_storage_base_downloads = 1
                 elif storage_name == "tertiary":
-                    tertiary_storage_base_downloads += 1
+                    tertiary_storage_base_downloads = 1
                 break  # Exit .
 
-    # echo number of downloaded files from each of the storage bases for reporting purposes
-    data = {
-        f"primary: {cfg.paths.primary_longterm_storage}": primary_storage_base_downloads,
-        f"secondary: {cfg.paths.secondary_longterm_storage}": secondary_storage_base_downloads,
-        f"tertiary: {cfg.paths.tertiary_longterm_storage}": tertiary_storage_base_downloads
-    }
+        if species not in data:
+            data[species] =  {
+                f"primary: {cfg.paths.primary_longterm_storage}": 0,
+                f"secondary: {cfg.paths.secondary_longterm_storage}": 0,
+                f"tertiary: {cfg.paths.tertiary_longterm_storage}": 0
+            }
+
+        data[species][f"primary: {cfg.paths.primary_longterm_storage}"] += primary_storage_base_downloads
+        data[species][f"secondary: {cfg.paths.secondary_longterm_storage}"] += secondary_storage_base_downloads
+        data[species][f"tertiary: {cfg.paths.tertiary_longterm_storage}"] += tertiary_storage_base_downloads
 
     return data
+
+def query_for_cutout_metadata(cutout_id, cfg):
+
+    # Connect to database (READ ONLY)
+    conn = sqlite3.connect(f"file:{str(f'{cfg.paths.datadir}/db/agir.db')}?mode=ro", uri=True)
+    cursor = conn.cursor()
+
+    # Get column names
+    cursor.execute("PRAGMA table_info(semif_cutouts);")
+    columns = [col[1] for col in cursor.fetchall()]
+
+    # Fetch the single row with the given cutout_id
+    cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
+    row = cursor.fetchone()
+
+    if row is None:
+        raise ValueError(f"No entry found for cutout_id: {cutout_id}")
+
+    # Turn the row into a dictionary
+    row_dict = dict(zip(columns, row))
+
+    # Attempt to parse JSON fields
+    try:
+        row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
+        row_dict['category'] = json.loads(row_dict['category'])
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to parse JSON fields for cutout_id {cutout_id}: {e}")
+
+    # Extract species
+    species = row_dict['category']['common_name'].upper()
+
+    return species
+
 
 def read_recipe(json_file_path) -> tuple[list[str], list[str]]:
     # Load your JSON file

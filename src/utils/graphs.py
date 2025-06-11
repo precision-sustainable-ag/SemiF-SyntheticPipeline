@@ -203,7 +203,7 @@ def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palet
 
     save_plot(species, file_name, file_path, title_info)
 
-def barplot(data_dict, file_name, file_path) -> None:
+def barplot(data_dict, file_name, file_path, storage_location_path, species) -> None:
 
     labels = []
     for key in data_dict.keys():
@@ -227,7 +227,7 @@ def barplot(data_dict, file_name, file_path) -> None:
 
     plt.figure(figsize=(12, 6))
     sns.barplot(data=df, x="Image Count", y="Path", palette=palette)
-    plt.title("Cutouts Downloaded per Storage Path", fontsize=25)
+    plt.title(f"Specified Cutout Paths For {species.title()}", fontsize=25)
     plt.xlabel("Image Count", fontsize=20)
     plt.ylabel("Storage Path", fontsize=20)
     plt.xticks(fontsize=15)
@@ -235,8 +235,8 @@ def barplot(data_dict, file_name, file_path) -> None:
     plt.tight_layout()
 
     # Save high-resolution image for PDF
-    output_path = f"{file_path}/{file_name}.png"
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")  # <== This controls quality and size
+    output_path = f"{file_path}/{storage_location_path}/{file_name} {species}.png"
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")  # <== This controls quaspecieslity and size
     plt.close()
 
 

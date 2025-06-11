@@ -11,7 +11,10 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 
 log = logging.getLogger(__name__)
 
-def generate_pdf(cfg, species_list, num_cutouts) -> None:
+def generate_pdf(cfg, num_cutouts) -> None:
+
+    # extract species
+    species_list = cfg.cutout_filters.category.common_name
 
     # extract num cutouts into specified and all
     specified_cutouts, all_cutouts = num_cutouts
@@ -84,9 +87,12 @@ def generate_pdf(cfg, species_list, num_cutouts) -> None:
     # Load in the image (graph) paths
     all_cutout_dir = str(f"{cfg.paths.analysisdir}/all")
     downloaded_cutout_dir = str(f"{cfg.paths.analysisdir}/specified")
+    storage_graph_dir = str(f"{cfg.paths.analysisdir}/storage_location")
     all_cutout_graphs = sorted([f for f in os.listdir(all_cutout_dir) if os.path.splitext(f)[1].lower() == '.png'])
     downloaded_cutout_graphs = sorted([f for f in os.listdir(downloaded_cutout_dir) if os.path.splitext(f)[1].lower() == '.png'])
+    storage_graphs = sorted([f for f in os.listdir(storage_graph_dir) if os.path.splitext(f)[1].lower() == '.png'])
     num_images = min(len(all_cutout_graphs), len(downloaded_cutout_graphs)) # should be the same length
+
 
     # Calculate how many graphs each species has
     num_of_images_on_line = 0
@@ -123,43 +129,29 @@ def generate_pdf(cfg, species_list, num_cutouts) -> None:
         if num_of_images_on_line == 2:
             new_line = True      
             num_of_images_on_line = 0
-        if i != 0 and i % graphs_per_species == (graphs_per_species-1):
+
+
+        # Place first couple of images
+        place_image(all_cutout_path, c, page_info, position_state, False)
+        # Place second couple of images
+        place_image(specified_cutout_path, c, page_info, position_state, new_line)    
+
+        # Place storage graphs
+        if i % graphs_per_species == (graphs_per_species-1):
+            if (current_species_index-1<len(storage_graphs)):
+                storage_graph_paths = os.path.join(storage_graph_dir, storage_graphs[current_species_index-1])
+                place_image(storage_graph_paths, c, page_info, position_state, True, (2,2))    
             position_state["x_offset"] = 0
-            new_line = True
             num_of_images_on_line = 0
-
-        # Update flags for first image
-        flags = {
-            "new_line": False,
-            "center": False
-        }
-        place_image(all_cutout_path, c, page_info, position_state, flags)
-
-        # Update flags for second image
-        flags = {
-            "new_line": new_line,
-            "center": False
-        }
-        place_image(specified_cutout_path, c, page_info, position_state, flags)    
-
-    # Place final image (storage distriubtion). Do this seperately as its a unique graph
-    final_image = str(f"{cfg.paths.analysisdir}/Cutout Distribution Across Storages.png")
-    if os.path.exists(final_image):
-        # Center the last image
-        flags = {
-            "new_line": False,
-            "center": True
-        }
-        place_image(final_image, c, page_info, position_state, flags, 3)
 
     c.save()
     log.info(f"PDF saved to {output_pdf}")
 
-def place_image(final_image, c, page_info, position_state, flags, scaler=1) -> None:
-    final_width = 2 * inch * scaler
+def place_image(final_image, c, page_info, position_state, new_line, scaler=(1,1)) -> None:
+    final_width = 2 * inch * scaler[0]
     img = ImageReader(final_image)
     img_width, img_height = img.getSize()
-    aspect_ratio = img_height / img_width
+    aspect_ratio = img_height / img_width * (scaler[1]/scaler[0])
 
     image_margin = 0.25 * inch
 
@@ -174,14 +166,12 @@ def place_image(final_image, c, page_info, position_state, flags, scaler=1) -> N
     # X calculations
     x_pos = image_margin + position_state["x_offset"]
     position_state["x_offset"] += final_width
-    if flags.get("center", False):
-        x_pos = (page_info["width"] - final_width)/2
 
     c.drawImage(final_image, x_pos, y_pos, width=final_width, height=final_height, preserveAspectRatio=True)
 
     # Y calculations
     # check to see if we need to add a new line
-    if (flags.get("new_line", False)):
+    if (new_line):
         position_state["distance_from_top_of_page"] += final_height + 0.25 * inch
 
 def wrap_body_text(c, subj, position_state, page_info, font_size) -> None:
@@ -223,8 +213,17 @@ def room_check(page_info, position_state, final_height, c) -> None:
 
 @hydra.main(version_base="1.2", config_path="../../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
+
+    all_cutouts = {}
+    specified_cutouts = {}
+    for species in cfg.cutout_filters.category.common_name:
+        species = species.upper()
+        all_cutouts[species] = (0,0)
+        specified_cutouts[species] = (0,0)
+    num_cutouts = specified_cutouts, all_cutouts
+
     cfg = OmegaConf.create(cfg)
-    generate_pdf(cfg, cfg.cutout_filters.category.common_name)
+    generate_pdf(cfg, num_cutouts)
 
 if __name__ == "__main__":
     main()

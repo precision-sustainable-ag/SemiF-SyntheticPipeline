@@ -193,8 +193,10 @@ class CutoutAnalyzer():
         #     jitter_plot(self.rgb_std_green[species], species, "std_green")
         #     jitter_plot(self.rgb_std_blue[species], species, "std_blue")
 
+        os.makedirs(str(f"{file_path}/storage_location"), exist_ok=True)
         if storage_location_data:
-            barplot(storage_location_data, "Cutout Distribution Across Storages", file_path)
+            for species in storage_location_data:
+                barplot(storage_location_data[species], "Cutout Distribution Across Storages", file_path, 'storage_location', species)
 
 def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.create(cfg)
@@ -211,4 +213,4 @@ def main(cfg: DictConfig) -> None:
     # Total num of cutouts
     num_cutouts = all_cutouts.num_cutouts, specified_cutouts.num_cutouts
 
-    generate_pdf(cfg, cfg.cutout_filters.category.common_name, num_cutouts)
+    generate_pdf(cfg, num_cutouts)
