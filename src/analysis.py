@@ -8,7 +8,7 @@ import matplotlib.colors as mcolors
 from omegaconf import DictConfig, OmegaConf
 
 # util imports
-from utils.pdf import generate_pdf
+from utils.pdf import PDFDrafter
 from utils.graphs import bar_chart_plot, jitter_plot, barplot, boolean_bar_chart_plot
 from utils.utils import resolve_image_storage_locations, clear_directory, read_recipe
 
@@ -74,20 +74,20 @@ class CutoutAnalyzer():
 
         conn.close()
 
-    """
-    load_cutout_metadata: Function used to query for all metadata from cutouts in the generated recipes
-    """
     def load_cutout_metadata(self, cursor, columns, cutout_ids) -> None:
+        """
+            load_cutout_metadata: Function used to query for all metadata from cutouts in the generated recipes
+        """
         # Loop through specified cutouts
         for cutout_id in cutout_ids:
             cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
             rows = cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
-    """
-    load_species_metadata: Function used to query for all metadata for all cutouts in the common_name list
-    """
     def load_species_metadata(self, common_name, cursor, columns) -> None:
+        """
+            load_species_metadata: Function used to query for all metadata for all cutouts in the common_name list
+        """
         # Loop through all specified species cutouts
         for species in common_name:
             species_lower = species.lower()
@@ -98,10 +98,10 @@ class CutoutAnalyzer():
             rows = cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
-    """
-    query_for_metadata: Function grabs all metadata for a given cutout_id
-    """
     def query_for_metadata(self, rows, columns) -> None:
+        """
+            query_for_metadata: Function grabs all metadata for a given cutout_id
+        """
         for row in rows:
             row_dict = dict(zip(columns, row))
             try:
@@ -120,11 +120,10 @@ class CutoutAnalyzer():
                 # log states that we are pulling data from
                 log.info(f"Cutouts pulled from: {row_dict['cutout_id'][:2]}")
 
-    """
-    metadata_to_dict: Function takes metadata and stores them in dictionaries to be passed in to graphing functions using Function graph_cutout_data
-    """
     def metadata_to_dict(self, species, synthetic, cutout) -> None:
-
+        """
+            metadata_to_dict: Function takes metadata and stores them in dictionaries to be passed in to graphing functions using Function graph_cutout_data
+        """
         prop_map = {
             'num_components': self.batch_num_components,
             'bbox_area_cm2': self.bbox,
@@ -136,7 +135,7 @@ class CutoutAnalyzer():
             val = cutout['cutout_props'].get(prop)
             target_dict[species].setdefault(synthetic, []).append(val)
 
-        # TODO Eval usefulness of RGB metadata
+        # NOTE: Commented out because not interested in it at this moment
         # # Handle RGB means
         # r, g, b = cutout['cutout_props'].get('cropout_rgb_mean', [None, None, None])
         # self.rgb_mean_red[species].setdefault(synthetic, []).append(r)
@@ -152,11 +151,10 @@ class CutoutAnalyzer():
         self.num_cutouts.setdefault(species.upper(), 0)
         self.num_cutouts[species.upper()] += 1
 
-    """
-    graph_cutout_data: Function takes metadata dictionaries and passes them into graphing functions
-    """
     def graph_cutout_data(self, title_info, storage_location_data) -> None:
-
+        """
+            graph_cutout_data: Function takes metadata dictionaries and passes them into graphing functions
+        """
         file_path = self.cfg.paths.analysisdir
 
         title_info = title_info.replace(" ", "_").lower()
@@ -164,11 +162,11 @@ class CutoutAnalyzer():
 
         # Grab graph colors. Used to distinguish between states.
         colors = [
-            "#e6b8af",  # pinkish red
-            "#b6d7a8",  # mint green
-            "#f9cb9c",  # peach
-            "#cfe2f3",  # pastel blue
-            "#d9d2e9",  # lavendar
+            "#d9a89e",  #  pinkish red
+            "#aacc97",  #  mint green
+            "#e9bc8f",  #  peach
+            "#bfd1dd",  #  pastel blue
+            "#c7c0d8",  #  lavender
         ]
         palette = {state: colors[i % len(colors)] for i, state in enumerate(self.states)}
 
@@ -213,4 +211,4 @@ def main(cfg: DictConfig) -> None:
     # Total num of cutouts
     num_cutouts = all_cutouts.num_cutouts, specified_cutouts.num_cutouts
 
-    generate_pdf(cfg, num_cutouts)
+    PDFDrafter(cfg, num_cutouts)

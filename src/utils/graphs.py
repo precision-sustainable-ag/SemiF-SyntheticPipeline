@@ -226,7 +226,7 @@ def barplot(data_dict, file_name, file_path, storage_location_path, species) -> 
     ]
 
     plt.figure(figsize=(12, 6))
-    sns.barplot(data=df, x="Image Count", y="Path", palette=palette)
+    sns.barplot(data=df, x="Image Count", y="Path", hue="Path", palette=palette)
     plt.title(f"Specified Cutout Paths For {species.title()}", fontsize=25)
     plt.xlabel("Image Count", fontsize=20)
     plt.ylabel("Storage Path", fontsize=20)
@@ -234,11 +234,7 @@ def barplot(data_dict, file_name, file_path, storage_location_path, species) -> 
     plt.yticks(fontsize=15)
     plt.tight_layout()
 
-    # Save high-resolution image for PDF
-    output_path = f"{file_path}/{storage_location_path}/{file_name} {species}.png"
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")  # <== This controls quaspecieslity and size
-    plt.close()
-
+    save_plot(species, file_name, file_path, storage_location_path)
 
 def save_plot(species, file_name, file_path, title_info) -> None:
     # Save plot
@@ -248,7 +244,5 @@ def save_plot(species, file_name, file_path, title_info) -> None:
     file_name = file_name.replace(" ", "_").lower()
     if title_info:
         plt.savefig(f'{file_path}/{title_info.lower()}/{file_name}', bbox_inches='tight')
-    else:
-        plt.savefig(f'{file_path}/{file_name}', bbox_inches='tight')
-    log.info(f"Plot saved as {file_path}/{file_name}")
+    log.info(f"Plot saved as {file_path}/{title_info.lower()}/{file_name}")
     plt.close()
