@@ -649,8 +649,8 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
                 # Resize cutout
                 img = resize_image(img, cutout_scaling_factor)
 
-                if img.shape[2] == 4:
-                    img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
+                # if img.shape[2] == 4:
+                    # img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
 
                 shared_data[cutout_path] = img
             images.append(shared_data[cutout_path])
