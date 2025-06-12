@@ -1,10 +1,7 @@
 import os
-import sys
 import json
 import sqlite3
 import logging
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 from omegaconf import DictConfig, OmegaConf
 
 # util imports
