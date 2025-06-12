@@ -593,21 +593,8 @@ def resize_image(img: np.ndarray, resize_scale: float) -> np.ndarray:
     resized_img = cv2.resize(img, new_size, interpolation=cv2.INTER_LINEAR)
     return resized_img
     
-
-def resize_to_target_pixels(image, target_pixels):
-    h, w = image.shape[:2]
-    original_pixels = w * h
-
-    # Calculate scale factor to get close to target pixel count
-    scale_factor = (target_pixels / original_pixels) ** 0.5
-    new_w = max(1, int(w * scale_factor))
-    new_h = max(1, int(h * scale_factor))
-
-    resized_image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    return resized_image
-
 # def process_recipe(cfg: DictConfig, json_file: Path) -> None:
-def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict, resize_area) -> None:
+def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
     """
     Process a single recipe for synthetic image generation.
 
@@ -661,11 +648,6 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict, resize_area
 
                 # Resize cutout
                 img = resize_image(img, cutout_scaling_factor)
-                if cutout_metadata['category']['common_name'].lower() in resize_area:
-                    pixel_resize = resize_area[cutout_metadata['category']['common_name'].lower()]
-                    print(pixel_resize)
-                    mask = resize_to_target_pixels(mask, pixel_resize)
-                    img = resize_to_target_pixels(img, pixel_resize)
 
                 if img.shape[2] == 4:
                     img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
@@ -689,7 +671,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict, resize_area
     except Exception as exc:
         log.exception(f"Failed to process synthetic image {recipe['synthetic_image_id']}: {exc}")
 
-def main(cfg: DictConfig, resize_area) -> None:
+def main(cfg: DictConfig) -> None:
     log.info("Starting synthetic image generation.")
     json_recipe_path = Path(cfg.paths.projectdir,"recipes", f"{cfg.project_name}_{cfg.sub_name}.json")
     # Load the JSON once and share the data between processes
@@ -711,7 +693,7 @@ def main(cfg: DictConfig, resize_area) -> None:
             max_workers = cfg.synthesize.parallel_workers  # Dynamic worker count
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
-                    executor.submit(process_recipe, cfg, recipe, shared_data, resize_area)
+                    executor.submit(process_recipe, cfg, recipe, shared_data)
                     for recipe in synthetic_images
                 ]
 
@@ -725,7 +707,7 @@ def main(cfg: DictConfig, resize_area) -> None:
             # Sequential processing for debugging
             for recipe in synthetic_images:
                 try:
-                    process_recipe(cfg, recipe, shared_data, resize_area)
+                    process_recipe(cfg, recipe, shared_data)
                     log.info(f"Processed recipe {recipe['synthetic_image_id']}")
                 except Exception as exc:
                     log.exception(f"Failed to process recipe: {exc}")
