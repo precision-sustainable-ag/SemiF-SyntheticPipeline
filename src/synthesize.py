@@ -667,7 +667,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict, resize_area
                     mask = resize_to_target_pixels(mask, pixel_resize)
                     img = resize_to_target_pixels(img, pixel_resize)
 
-                if img.shape[2] == 4 and not exg_clean:
+                if img.shape[2] == 4:
                     img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
 
                 shared_data[cutout_path] = img
