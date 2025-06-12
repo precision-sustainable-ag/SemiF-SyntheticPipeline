@@ -260,7 +260,7 @@ def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str],
 def query_for_cutout_metadata(cutout_id, cfg):
 
     # Connect to database (READ ONLY)
-    conn = sqlite3.connect(f"file:{str(f'{cfg.paths.datadir}/db/agir.db')}?mode=ro", uri=True)
+    conn = sqlite3.connect(f"file:{cfg.paths.sql_database}?mode=ro", uri=True)
     cursor = conn.cursor()
 
     # Get column names
