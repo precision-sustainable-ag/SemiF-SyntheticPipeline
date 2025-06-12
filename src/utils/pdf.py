@@ -1,6 +1,7 @@
 import os
 import hydra
 import logging
+import datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from utils.utils import count_all_files
@@ -24,7 +25,8 @@ class PDFDrafter():
         self.specified_cutouts, self.all_cutouts = num_cutouts
 
         # Set up canvas/pdf
-        self.output_pdf = str(f"{cfg.paths.analysisdir}/pre_synth_analysis.pdf")
+        self.date_time = datetime.datetime.now()
+        self.output_pdf = str(f"{cfg.paths.analysisdir}/pre_synth_analysis_{self.date_time}.pdf")
         self.pdf = canvas.Canvas(self.output_pdf, pagesize=letter)
 
         # PAGE INFO
@@ -39,6 +41,7 @@ class PDFDrafter():
             "size": {
                 "title": 16,
                 "author": 12,
+                "time": 10,
                 "body": 8
             },
             "styles": {
@@ -140,6 +143,14 @@ class PDFDrafter():
         self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["author"])
         self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, author)
         self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["author"]+4)
+
+        '''
+            Below we add the date to the report
+        '''
+        date = str(datetime.date.today())
+        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["time"])
+        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, date)
+        self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["time"]+4)
 
         '''
             Below is a brief description intended to give the reader context and insight into the graphs presented in this report.
