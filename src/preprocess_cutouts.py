@@ -60,11 +60,24 @@ class CutoutManipulator():
         scaled_image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
         return scaled_image
 
+    def resize_cutouts():
+
+        background_path = Path(self.cfg.paths.backgrounddir, recipe['background_image_id'])
+        background_fov_cm2 = self.cfg.cutout_filters.background_fov_cm2  # Real-world FoV for background
+
+        background_image = cv2.imread(str(background_path), cv2.IMREAD_COLOR)
+        bg_height, bg_width = background_image.shape[:2]
+        pixel_cm_ratio = (bg_width * bg_height) / background_fov_cm2
+
+        # Calculate real-world scaling for the cutout
+        cutout_area = cutout_metadata['cutout_props']['bbox_area_cm2']
+        cutout_pixel_area = cutout_area * pixel_cm_ratio
+        cutout_scaling_factor = math.sqrt(cutout_pixel_area / (img.shape[1] * img.shape[0]))
+
+        # Resize cutout
+        img = resize_image(img, cutout_scaling_factor)
+
 def main(cfg: DictConfig) -> None:
     log.info("Reached cutout preprocessing task")
 
-    if cfg.cutout_filters.cutout_preprocessing:
-        CutoutManipulator(cfg)
-    else:
-        log.warning("Specified preprocess_cutouts in pipeline but configed to false in cutout_filters")
-        log.warning("Skippning this step")
+    CutoutManipulator(cfg)
