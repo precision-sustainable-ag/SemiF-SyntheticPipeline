@@ -57,17 +57,17 @@ class CutoutAnalyzer():
         cursor.execute("PRAGMA table_info(semif_cutouts);")
         columns = [col[1] for col in cursor.fetchall()]
 
-        if query_type == 'specified_configs': 
+        if query_type == 'specified': 
             # Find out which storage we would be getting the cutouts from
             batch_ids, cutout_ids = read_recipe(f"{cfg.paths.recipesdir}/{cfg.project_name}_{cfg.sub_name}.json")
             storage_location_data = resolve_image_storage_locations(batch_ids, cutout_ids, cfg)
             # load downloaded cutout metadata
             self.load_cutout_metadata(cursor, columns, cutout_ids)
-            self.graph_cutout_data("Specified", storage_location_data)
-        elif query_type == 'specified_species': 
+            self.graph_cutout_data(query_type, storage_location_data)
+        elif query_type == 'all': 
             # load all data of species specified in config
             self.load_species_metadata(species_list, cursor, columns)
-            self.graph_cutout_data("All", None)
+            self.graph_cutout_data(query_type, None)
 
         conn.close()
 
@@ -196,16 +196,23 @@ class CutoutAnalyzer():
 def main(cfg: DictConfig) -> None:
     cfg = OmegaConf.create(cfg)
 
-    # clear analysis directory, ensure clean pdf generation
-    clear_directory(cfg.paths.analysisdir)
+    directory_for_graphs_of_all_cutouts = "all"
+    directory_for_graphs_of_specified_cutouts = "specified"
+    directory_for_graphs_of_storages = 'storage_location'
 
     # Graph all species specified in config
-    all_cutouts = CutoutAnalyzer("specified_species", cfg.cutout_filters.category.common_name, [], cfg)
+    all_cutouts = CutoutAnalyzer(directory_for_graphs_of_all_cutouts, cfg.cutout_filters.category.common_name, [], cfg)
 
     # Graph cutouts from local folder
-    specified_cutouts = CutoutAnalyzer("specified_configs", cfg.cutout_filters.category.common_name, all_cutouts.states, cfg)
+    specified_cutouts = CutoutAnalyzer(directory_for_graphs_of_specified_cutouts, cfg.cutout_filters.category.common_name, all_cutouts.states, cfg)
 
     # Total num of cutouts
     num_cutouts = all_cutouts.num_cutouts, specified_cutouts.num_cutouts
 
+    # Create PDF from graphs
     PDFDrafter(cfg, num_cutouts)
+
+    # Delete graphs
+    clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_all_cutouts}")
+    clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_specified_cutouts}")
+    clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_storages}")

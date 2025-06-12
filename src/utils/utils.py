@@ -328,3 +328,5 @@ def clear_directory(dir_path) -> None:
                 for d in dirs:
                     os.rmdir(os.path.join(root, d))
             os.rmdir(full_path)
+    os.rmdir(dir_path)
+
