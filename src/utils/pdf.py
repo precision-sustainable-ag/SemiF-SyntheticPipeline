@@ -12,7 +12,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 log = logging.getLogger(__name__)
 
 class PDFDrafter():
-    def __init__(self, cfg, num_cutouts):
+    def __init__(self, cfg, num_cutouts) -> None:
 
         self.cfg = cfg
 
@@ -56,11 +56,11 @@ class PDFDrafter():
         self.build_body_of_pdf()
         self.save_pdf()
 
-    def save_pdf(self):
+    def save_pdf(self) -> None:
         self.pdf.save()
         log.info(f"PDF saved to {self.output_pdf}")
 
-    def build_body_of_pdf(self):
+    def build_body_of_pdf(self) -> None:
         '''
             Below inserts metadata graphs for each species into the final report.
         '''
@@ -124,7 +124,7 @@ class PDFDrafter():
                 num_of_images_on_line = 0
 
 
-    def initialize_title_author_and_description(self):
+    def initialize_title_author_and_description(self) -> None:
         '''
             Below we set the title of the report.
         '''
@@ -154,7 +154,7 @@ class PDFDrafter():
         # Add spacing between description and images
         self.position_state["offset_from_top_of_page"] += 0.15 * inch  
 
-    def place_image(self, image, new_line, scaler=(1,1)):
+    def place_image(self, image, new_line, scaler=(1,1)) -> None:
         final_width = 2 * inch * scaler[0]
         img = ImageReader(image)
         img_width, img_height = img.getSize()
@@ -181,7 +181,7 @@ class PDFDrafter():
         if (new_line):
             self.position_state["offset_from_top_of_page"] += final_height + 0.25 * inch
         
-    def wrap_text(self, string, font_style, font_size):
+    def wrap_text(self, string, font_style, font_size) -> None:
         """
             This function allows you to pass in any string, font style, and font size and it will 
             ensure that it fits properly on the page. The function forces center aligned.

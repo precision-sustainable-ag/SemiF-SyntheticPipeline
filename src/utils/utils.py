@@ -213,7 +213,7 @@ def is_rectangular(mask, threshold_percentage):
     
     return is_filled_enough, filled_percentage
 
-def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], cfg) -> None:
+def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], cfg) -> dict[str, dict[str, int]]:
 
     data = {}
 
@@ -257,7 +257,7 @@ def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str],
 
     return data
 
-def query_for_cutout_metadata(cutout_id, cfg):
+def query_for_cutout_metadata(cutout_id, cfg) -> str:
 
     # Connect to database (READ ONLY)
     conn = sqlite3.connect(f"file:{cfg.paths.sql_database}?mode=ro", uri=True)
