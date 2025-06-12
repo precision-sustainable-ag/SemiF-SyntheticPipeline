@@ -1,6 +1,6 @@
 # Settings
 
-total_images: 400
+total_images: 4
 
 background_fov_cm2: 3000 # bbot images, Assumed real-world field of view for backgrounds (in cm²)
 # background_fov_cm2: 3000  # unsplash images Assumed real-world field of view for backgrounds (in cm²)
@@ -49,12 +49,9 @@ morphological:
     min: 0
     max: 16
 
-# Resize all cutouts to their mean pixel w/l. 
-# if a number besides 1 is specified resize the 
-# cutouts so they are a factor of that mean
-resize:
-  hairy vetch: 1
-  cereal rye: 2
+cutout_preprocessing: true
+scale:
+  cereal rye: 5
 
 category:
   # Filter settings for category attributes

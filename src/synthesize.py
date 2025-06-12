@@ -22,7 +22,6 @@ import cv2
 import numpy as np
 from omegaconf import DictConfig
 
-# from utils.utils import mask2polygon_holes, normalize_coordinates
 
 log = logging.getLogger(__name__)
 
@@ -634,7 +633,15 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         images = []
         cutout_data = [(cutout['cutout_id'], cutout) for cutout in recipe['cutouts']]
         for cutout_id, cutout_metadata in cutout_data:
-            cutout_path = Path(cfg.paths.cutoutdir, f"{cutout_id}.png")
+            cutout_path = None
+            preprocessed_path = Path(cfg.paths.preprocessed_cutoutdir, f"{cutout_id}.png")
+            original_path = Path(cfg.paths.cutoutdir, f"{cutout_id}.png")
+
+            if preprocessed_path.exists():
+                cutout_path = preprocessed_path
+            else:
+                cutout_path = original_path
+
             if cutout_path not in shared_data:
                 log.debug(f"Loading cutout image {cutout_path}")
                 img = cv2.imread(str(cutout_path), cv2.IMREAD_UNCHANGED)
@@ -647,7 +654,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
                 cutout_scaling_factor = math.sqrt(cutout_pixel_area / (img.shape[1] * img.shape[0]))
 
                 # Resize cutout
-                img = resize_image(img, cutout_scaling_factor)
+                # img = resize_image(img, cutout_scaling_factor)
 
                 if img.shape[2] == 4:
                     img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
