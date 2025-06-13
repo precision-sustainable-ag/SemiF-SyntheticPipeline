@@ -24,6 +24,10 @@ move_cutouts:
   parallel: True
   parallel_workers: 8
 
+preprocess_cutouts:
+  exg:
+    - Hairy Vetch  
+
 synthesize:
   parallel: false
   parallel_workers: 4
