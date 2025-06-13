@@ -46,10 +46,6 @@ morphological:
     min:
     max:
 
-
-scale:
-  cereal rye: 5
-
 category:
   # Filter settings for category attributes
   common_name:
