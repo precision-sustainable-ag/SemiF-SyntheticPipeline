@@ -213,50 +213,6 @@ def is_rectangular(mask, threshold_percentage):
     
     return is_filled_enough, filled_percentage
 
-def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], cfg) -> dict[str, dict[str, int]]:
-
-    data = {}
-
-    primary_storage_base_downloads = secondary_storage_base_downloads = tertiary_storage_base_downloads = 0
-    for batch_id, cutout_id in zip(batch_ids, cutout_ids):
-        image_filename = f"{cutout_id}.png"
-
-        species = query_for_cutout_metadata(cutout_id, cfg)
-
-        # List of storage locations in order of preference.
-        storages = [
-            ("primary", Path(Path(cfg.paths.primary_longterm_storage, "semifield-cutouts"), batch_id, image_filename)),
-            ("secondary", Path(Path(cfg.paths.secondary_longterm_storage, "semifield-cutouts"), batch_id, image_filename)),
-            ("tertiary", Path(Path(cfg.paths.tertiary_longterm_storage, "semifield-cutouts"), batch_id, image_filename))
-        ]
-
-        # Try each storage location until the image is found and copied
-        primary_storage_base_downloads = 0
-        secondary_storage_base_downloads = 0
-        tertiary_storage_base_downloads = 0
-        for storage_name, storage_path in storages:
-            if storage_path.exists():
-                if storage_name == "primary":
-                    primary_storage_base_downloads = 1
-                elif storage_name == "secondary":
-                    secondary_storage_base_downloads = 1
-                elif storage_name == "tertiary":
-                    tertiary_storage_base_downloads = 1
-                break  # Exit .
-
-        if species not in data:
-            data[species] =  {
-                f"primary: {cfg.paths.primary_longterm_storage}": 0,
-                f"secondary: {cfg.paths.secondary_longterm_storage}": 0,
-                f"tertiary: {cfg.paths.tertiary_longterm_storage}": 0
-            }
-
-        data[species][f"primary: {cfg.paths.primary_longterm_storage}"] += primary_storage_base_downloads
-        data[species][f"secondary: {cfg.paths.secondary_longterm_storage}"] += secondary_storage_base_downloads
-        data[species][f"tertiary: {cfg.paths.tertiary_longterm_storage}"] += tertiary_storage_base_downloads
-
-    return data
-
 def query_for_cutout_metadata(cutout_id, cfg) -> str:
 
     # Connect to database (READ ONLY)
