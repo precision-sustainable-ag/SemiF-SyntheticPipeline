@@ -3,7 +3,7 @@ import json
 import random
 from pathlib import Path
 from typing import List, Tuple
-
+from omegaconf import DictConfig
 import cv2
 import numpy as np
 import pandas as pd
@@ -213,7 +213,7 @@ def is_rectangular(mask, threshold_percentage):
     
     return is_filled_enough, filled_percentage
 
-def query_for_cutout_metadata(cutout_id, cfg) -> str:
+def query_for_cutout_metadata(cutout_id: str, cfg: DictConfig) -> str:
 
     # Connect to database (READ ONLY)
     conn = sqlite3.connect(f"file:{cfg.paths.sql_database}?mode=ro", uri=True) 
@@ -246,7 +246,7 @@ def query_for_cutout_metadata(cutout_id, cfg) -> str:
     return species
 
 
-def read_recipe(json_file_path) -> tuple[list[str], list[str]]:
+def read_recipe(json_file_path: str) -> tuple[list[str], list[str]]:
     # Load your JSON file
     with open(json_file_path, "r") as f:
         data = json.load(f)
@@ -263,13 +263,13 @@ def read_recipe(json_file_path) -> tuple[list[str], list[str]]:
 
     return batch_ids, cutout_ids
 
-def count_all_files(dir_path) -> int:
+def count_all_files(dir_path: str) -> int:
     total = 0
     for root, dirs, files in os.walk(dir_path):
         total += len(files)
     return total
 
-def clear_directory(dir_path) -> None:
+def clear_directory(dir_path: str) -> None:
     if not os.path.isdir(dir_path):
         return None
     for entry in os.listdir(dir_path):
