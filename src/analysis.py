@@ -12,10 +12,13 @@ from utils.graphs import bar_chart_plot, jitter_plot, barplot, boolean_bar_chart
 log = logging.getLogger(__name__)
 
 class CutoutAnalyzer():
-    def __init__(self, query_type, species_list, states, cfg) -> None:
+    def __init__(self, query_type, states, cfg) -> None:
 
         self.cfg = cfg
         self.db_path = str(cfg.paths.datadir)
+
+        # Extract list of common names
+        species_list = cfg.cutout_filters.category.common_name
 
         # Initialize dictionaries for stats
         self.batch_num_components = {}
@@ -245,10 +248,10 @@ def main(cfg: DictConfig) -> None:
     directory_for_graphs_of_storages = 'storage_location'
 
     # Graph all species specified in config
-    all_cutouts = CutoutAnalyzer(directory_for_graphs_of_all_cutouts, cfg.cutout_filters.category.common_name, [], cfg)
+    all_cutouts = CutoutAnalyzer(directory_for_graphs_of_all_cutouts, [], cfg)
 
     # Graph cutouts from local folder
-    specified_cutouts = CutoutAnalyzer(directory_for_graphs_of_specified_cutouts, cfg.cutout_filters.category.common_name, all_cutouts.states, cfg)
+    specified_cutouts = CutoutAnalyzer(directory_for_graphs_of_specified_cutouts, all_cutouts.states, cfg)
 
     # Total num of cutouts
     num_cutouts = all_cutouts.num_cutouts, specified_cutouts.num_cutouts
