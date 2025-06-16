@@ -247,6 +247,11 @@ def main(cfg: DictConfig) -> None:
     directory_for_graphs_of_specified_cutouts = "specified"
     directory_for_graphs_of_storages = 'storage_location'
 
+    if not cfg.cutout_filters.category.common_name:
+        log.error("No species specified for analysis")
+        log.error("Species can be specified in cutout_filters under common_name")
+        return
+
     # Graph all species specified in config
     all_cutouts = CutoutAnalyzer(directory_for_graphs_of_all_cutouts, [], cfg)
 
