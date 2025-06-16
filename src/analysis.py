@@ -12,7 +12,7 @@ from utils.graphs import bar_chart_plot, jitter_plot, barplot, boolean_bar_chart
 log = logging.getLogger(__name__)
 
 class CutoutAnalyzer():
-    def __init__(self, query_type, states, cfg) -> None:
+    def __init__(self, analysis_type, states, cfg) -> None:
 
         self.cfg = cfg
         self.db_path = str(cfg.paths.datadir)
@@ -60,17 +60,17 @@ class CutoutAnalyzer():
         cursor.execute("PRAGMA table_info(semif_cutouts);")
         columns = [col[1] for col in cursor.fetchall()]
 
-        if query_type == 'specified': 
+        if analysis_type == 'specified': 
             # Find out which storage we would be getting the cutouts from
             batch_ids, cutout_ids = read_recipe(f"{cfg.paths.recipesdir}/{cfg.project_name}_{cfg.sub_name}.json")
             storage_location_data = resolve_image_storage_locations(batch_ids, cutout_ids, cfg)
             # load downloaded cutout metadata
             self.load_cutout_metadata(cursor, columns, cutout_ids)
-            self.graph_cutout_data(query_type, storage_location_data)
-        elif query_type == 'all': 
+            self.graph_cutout_data(analysis_type, storage_location_data)
+        elif analysis_type == 'all': 
             # load all data of species specified in config
             self.load_species_metadata(species_list, cursor, columns)
-            self.graph_cutout_data(query_type, None)
+            self.graph_cutout_data(analysis_type, None)
 
         conn.close()
 
