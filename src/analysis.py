@@ -15,7 +15,7 @@ class CutoutAnalyzer():
     def __init__(self, query_type, species_list, states, cfg) -> None:
 
         self.cfg = cfg
-        self.db_path = str(f"{cfg.paths.datadir}/db/agir.db")
+        self.db_path = str(cfg.paths.datadir)
 
         # Initialize dictionaries for stats
         self.batch_num_components = {}
