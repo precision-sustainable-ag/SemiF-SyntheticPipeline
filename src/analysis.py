@@ -12,7 +12,7 @@ from utils.graphs import bar_chart_plot, jitter_plot, barplot, boolean_bar_chart
 log = logging.getLogger(__name__)
 
 class CutoutAnalyzer():
-    def __init__(self, analysis_type, states, cfg) -> None:
+    def __init__(self, analysis_type: str, states: list[str], cfg: DictConfig) -> None:
 
         self.cfg = cfg
         self.db_path = str(cfg.paths.datadir)
@@ -74,7 +74,7 @@ class CutoutAnalyzer():
 
         conn.close()
 
-    def load_cutout_metadata(self, cursor, columns, cutout_ids) -> None:
+    def load_cutout_metadata(self, cursor: sqlite3.Cursor, columns: list[str], cutout_ids: list[str]) -> None:
         """
             load_cutout_metadata: Function used to query for all metadata from cutouts in the generated recipes
         """
@@ -84,7 +84,7 @@ class CutoutAnalyzer():
             rows = cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
-    def load_species_metadata(self, common_name, cursor, columns) -> None:
+    def load_species_metadata(self, common_name: list[str], cursor: sqlite3.Cursor, columns: list[str]) -> None:
         """
             load_species_metadata: Function used to query for all metadata for all cutouts in the common_name list
         """
@@ -98,7 +98,7 @@ class CutoutAnalyzer():
             rows = cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
-    def query_for_metadata(self, rows, columns) -> None:
+    def query_for_metadata(self, rows: list[tuple], columns: list[str]) -> None:
         """
             query_for_metadata: Function grabs all metadata for a given cutout_id
         """
@@ -120,7 +120,7 @@ class CutoutAnalyzer():
                 # log states that we are pulling data from
                 log.info(f"Cutouts pulled from: {row_dict['cutout_id'][:2]}")
 
-    def metadata_to_dict(self, species, synthetic, cutout) -> None:
+    def metadata_to_dict(self, species: str, synthetic: str, cutout: dict) -> None:
         """
             metadata_to_dict: Function takes metadata and stores them in dictionaries to be passed in to graphing functions using Function graph_cutout_data
         """
@@ -151,7 +151,7 @@ class CutoutAnalyzer():
         self.num_cutouts.setdefault(species.upper(), 0)
         self.num_cutouts[species.upper()] += 1
 
-    def graph_cutout_data(self, title_info, storage_location_data) -> None:
+    def graph_cutout_data(self, title_info: str, storage_location_data: dict[str, dict[str, int]] | None) -> None:
         """
             graph_cutout_data: Function takes metadata dictionaries and passes them into graphing functions
         """
@@ -196,7 +196,7 @@ class CutoutAnalyzer():
             for species in storage_location_data:
                 barplot(storage_location_data[species], "Cutout Distribution Across Storages", file_path, 'storage_location', species)
 
-def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], cfg) -> dict[str, dict[str, int]]:
+def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], cfg: DictConfig) -> dict[str, dict[str, int]]:
 
     data = {}
 

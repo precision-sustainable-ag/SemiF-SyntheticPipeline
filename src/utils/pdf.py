@@ -13,7 +13,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 log = logging.getLogger(__name__)
 
 class PDFDrafter():
-    def __init__(self, cfg, num_cutouts) -> None:
+    def __init__(self, cfg: DictConfig, tuple[dict[str, tuple[int, int]], dict[str, tuple[int, int]]]) -> None:
 
         self.cfg = cfg
 
@@ -165,7 +165,7 @@ class PDFDrafter():
         # Add spacing between description and images
         self.position_state["offset_from_top_of_page"] += 0.15 * inch  
 
-    def place_image(self, image, new_line, scaler=(1,1)) -> None:
+    def place_image(self, image: str, new_line: bool, scaler: tuple[int, int] = (1, 1)) -> None:
         final_width = 2 * inch * scaler[0]
         img = ImageReader(image)
         img_width, img_height = img.getSize()
@@ -192,7 +192,7 @@ class PDFDrafter():
         if (new_line):
             self.position_state["offset_from_top_of_page"] += final_height + 0.25 * inch
         
-    def wrap_text(self, string, font_style, font_size) -> None:
+    def wrap_text(self, string: str, font_style: str, font_size: int) -> None:
         """
             This function allows you to pass in any string, font style, and font size and it will 
             ensure that it fits properly on the page. The function forces center aligned.
@@ -227,7 +227,7 @@ class PDFDrafter():
 
         self.position_state["offset_from_top_of_page"] += final_height
 
-    def evaluate_room_on_page(self, height):
+    def evaluate_room_on_page(self, height: float) -> None:
         """
             The function will determine if an inserition can fit on a page based on its height. If it cannot it will 
             move the pdf to the next page and reset the position state to the top of the page.

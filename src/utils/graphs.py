@@ -11,11 +11,18 @@ from matplotlib.ticker import FuncFormatter
 log = logging.getLogger(__name__)
 
 # use this function to keep axis ticks in check
-def thousands_formatter(x, pos) -> str:
+def thousands_formatter(x: float, pos: int) -> str:
     return f'{int(x / 1000)}k'
 
-def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, palette, logrithmic) -> None:
-
+def bar_chart_plot(
+    shape_count_dict: dict[str, list[int | None]],
+    species: str,
+    file_name: str,
+    file_path: str,
+    title_info: str,
+    palette: dict[str, str],
+    logrithmic: bool
+) -> None:
     max_bars=10
 
     # Group shape counts by state (first 2 characters of batch ID)
@@ -73,11 +80,10 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
         bar_width = 0.8 / num_states
     plt.figure(figsize=(6, 6))
 
-    colors = get_palette_colors(unique_states, palette)
     for i, state in enumerate(unique_states):
         y = binned_freqs[state]
         offset = (i - num_states / 2) * bar_width + bar_width / 2
-        plt.bar(x + offset, y, width=bar_width, label=state, color=colors[state])
+        plt.bar(x + offset, y, width=bar_width, label=state, color=palette[state])
 
     if logrithmic: 
         plt.yscale('log')
@@ -94,8 +100,15 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
     # Save the plot
     save_plot(species, file_name, file_path, title_info)
 
-def boolean_bar_chart_plot(boolean_count_dict, species, file_name, file_path, title_info, palette, logrithmic=False) -> None:
-
+def boolean_bar_chart_plot(
+    boolean_count_dict: dict[str, list[bool | None]],
+    species: str,
+    file_name: str,
+    file_path: str,
+    title_info: str,
+    palette: dict[str, str],
+    logrithmic: bool = False
+) -> None:
     # Group True/False values by state (first 2 letters of batch ID)
     grouped_data = {}
     for batch_id, bool_list in boolean_count_dict.items():
@@ -121,11 +134,10 @@ def boolean_bar_chart_plot(boolean_count_dict, species, file_name, file_path, ti
     bar_width = 0.8 / num_states
     plt.figure(figsize=(6, 6))
 
-    colors = get_palette_colors(unique_states, palette)
     for i, state in enumerate(unique_states):
         y = bool_freqs[state]
         offset = (i - num_states / 2) * bar_width + bar_width / 2
-        plt.bar(x + offset, y, width=bar_width, label=state, color=colors[state])
+        plt.bar(x + offset, y, width=bar_width, label=state, color=palette[state])
 
     if logrithmic:
         plt.yscale('log')
@@ -147,8 +159,14 @@ def boolean_bar_chart_plot(boolean_count_dict, species, file_name, file_path, ti
     along an axis by adding small random noise (jitter) to reduce overlap, making it 
     easier to see the spread and density of the data.
 '''
-def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palette) -> None:
-
+def jitter_plot(
+    meta_data_dict: dict[str, list[int | float | None]],
+    species: str,
+    file_name: str,
+    file_path: str,
+    title_info: str,
+    palette: dict[str, str],
+) -> None:
     # Flatten meta_data_dict into a DataFrame with state info
     data = []
     for batch_id, values in meta_data_dict.items():
@@ -184,7 +202,7 @@ def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palet
         hue="State",
         order=ordered_states,
         jitter=True,
-        colors = get_palette_colors(ordered_states, palette),
+        colors = palette,
         size=5,
         legend=False  
     )
@@ -204,8 +222,13 @@ def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palet
 
     save_plot(species, file_name, file_path, title_info)
 
-def barplot(data_dict, file_name, file_path, storage_location_path, species) -> None:
-
+def barplot(
+    data_dict: dict[str, int],
+    file_name: str,
+    file_path: str,
+    storage_location_path: str,
+    species: str
+) -> None:
     labels = []
     for key in data_dict.keys():
         label_type, path = key.split(":", 1)
@@ -238,25 +261,12 @@ def barplot(data_dict, file_name, file_path, storage_location_path, species) -> 
 
     save_plot(species, file_name, file_path, storage_location_path)
 
-from itertools import cycle
-
-def get_palette_colors(keys, palette):
-    """
-    Returns a dict mapping each key to a color.
-    If palette is a list and has fewer colors than keys, it cycles through.
-    If palette is a dict, it uses it directly, filling in missing keys with cycled colors.
-    """
-    if isinstance(palette, dict):
-        base_colors = list(palette.values())
-    else:
-        base_colors = list(palette)
-
-    color_cycle = cycle(base_colors)
-    color_map = {key: palette.get(key, next(color_cycle)) if isinstance(palette, dict) else next(color_cycle) for key in keys}
-    return color_map
-
-
-def save_plot(species, file_name, file_path, title_info) -> None:
+def save_plot(
+    species: str,
+    file_name: str,
+    file_path: str,
+    title_info: str
+) -> None:
     # Save plot
     plt.tight_layout()
     if species:
