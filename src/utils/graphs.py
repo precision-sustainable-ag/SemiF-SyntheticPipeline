@@ -73,10 +73,11 @@ def bar_chart_plot(shape_count_dict, species, file_name, file_path, title_info, 
         bar_width = 0.8 / num_states
     plt.figure(figsize=(6, 6))
 
+    colors = get_palette_colors(unique_states, palette)
     for i, state in enumerate(unique_states):
         y = binned_freqs[state]
         offset = (i - num_states / 2) * bar_width + bar_width / 2
-        plt.bar(x + offset, y, width=bar_width, label=state, color=palette[state])
+        plt.bar(x + offset, y, width=bar_width, label=state, color=colors[state])
 
     if logrithmic: 
         plt.yscale('log')
@@ -120,10 +121,11 @@ def boolean_bar_chart_plot(boolean_count_dict, species, file_name, file_path, ti
     bar_width = 0.8 / num_states
     plt.figure(figsize=(6, 6))
 
+    colors = get_palette_colors(unique_states, palette)
     for i, state in enumerate(unique_states):
         y = bool_freqs[state]
         offset = (i - num_states / 2) * bar_width + bar_width / 2
-        plt.bar(x + offset, y, width=bar_width, label=state, color=palette.get(state, None))
+        plt.bar(x + offset, y, width=bar_width, label=state, color=colors[state])
 
     if logrithmic:
         plt.yscale('log')
@@ -182,7 +184,7 @@ def jitter_plot(meta_data_dict, species, file_name, file_path, title_info, palet
         hue="State",
         order=ordered_states,
         jitter=True,
-        palette=palette,
+        colors = get_palette_colors(ordered_states, palette),
         size=5,
         legend=False  
     )
@@ -218,6 +220,7 @@ def barplot(data_dict, file_name, file_path, storage_location_path, species) -> 
     })
 
     # Use different pallette than states to avoid confusion between states and storages
+    # Only three storages so not worried about repeats
     palette = [
         "#8da0cb",  # soft blue
         "#fc8d62",  # warm coral
@@ -234,6 +237,24 @@ def barplot(data_dict, file_name, file_path, storage_location_path, species) -> 
     plt.tight_layout()
 
     save_plot(species, file_name, file_path, storage_location_path)
+
+from itertools import cycle
+
+def get_palette_colors(keys, palette):
+    """
+    Returns a dict mapping each key to a color.
+    If palette is a list and has fewer colors than keys, it cycles through.
+    If palette is a dict, it uses it directly, filling in missing keys with cycled colors.
+    """
+    if isinstance(palette, dict):
+        base_colors = list(palette.values())
+    else:
+        base_colors = list(palette)
+
+    color_cycle = cycle(base_colors)
+    color_map = {key: palette.get(key, next(color_cycle)) if isinstance(palette, dict) else next(color_cycle) for key in keys}
+    return color_map
+
 
 def save_plot(species, file_name, file_path, title_info) -> None:
     # Save plot
