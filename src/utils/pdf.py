@@ -55,15 +55,11 @@ class PDFDrafter():
             "offset_from_left_of_page": 0
         }
 
-        self.initialize_title_author_and_description()
-        self.build_body_of_pdf()
-        self.save_pdf()
-
     def save_pdf(self) -> None:
         self.pdf.save()
         log.info(f"PDF saved to {self.output_pdf}")
 
-    def build_body_of_pdf(self) -> None:
+    def add_graphs_to_pdf(self) -> None:
         '''
             Below inserts metadata graphs for each species into the final report.
         '''
@@ -127,11 +123,10 @@ class PDFDrafter():
                 num_of_images_on_line = 0
 
 
-    def initialize_title_author_and_description(self) -> None:
+    def initialize_title_author_and_description(self, title: str, author: str) -> None:
         '''
             Below we set the title of the report.
         '''
-        title = "Pre-Synthesis Analysis" # config here
         self.pdf.setFont(self.fonts["styles"]["bold"], self.fonts["size"]["title"])
         self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"], title)
         self.position_state["offset_from_top_of_page"] += self.fonts["size"]["title"]
@@ -139,8 +134,7 @@ class PDFDrafter():
         '''
             Below we author the report.
         '''
-        author = "Maintainer: PSA CV Team" # config here
-        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["author"])
+         self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["author"])
         self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, author)
         self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["author"]+4)
 
@@ -155,12 +149,6 @@ class PDFDrafter():
         '''
             Below is a brief description intended to give the reader context and insight into the graphs presented in this report.
         '''
-        if len(self.sorted_species) > 1:
-            titled = [s.title() for s in self.sorted_species]
-            species_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
-        else:
-            species_str = self.sorted_species[0].title()
-        subj = f"The following is a report of the {species_str} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
         self.wrap_text(subj, self.fonts["styles"]["normal"], self.fonts["size"]["body"])
         # Add spacing between description and images
         self.position_state["offset_from_top_of_page"] += 0.15 * inch  

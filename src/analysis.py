@@ -262,7 +262,26 @@ def main(cfg: DictConfig) -> None:
     num_cutouts = all_cutouts.num_cutouts, specified_cutouts.num_cutouts
 
     # Create PDF from graphs
-    PDFDrafter(cfg, num_cutouts)
+    report = PDFDrafter(cfg, num_cutouts)
+
+    # Title
+    title = "Pre-Synthesis Analysis"
+
+    # Author
+    author = "Maintainer: PSA CV Team"
+
+    # Description
+    sorted_species = sorted(species_list, key=lambda s: s.lower())
+    if len(sorted_species) > 1:
+        titled = [s.title() for s in sorted_species]
+        species_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
+    else:
+        species_str = sorted_species[0].title()
+    description = f"The following is a report of the {species_str} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
+
+    report.initialize_title_author_and_description(title, author, description)
+    report.add_graphs_to_pdf()
+    report.save_pdf()
 
     # Delete graphs
     clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_all_cutouts}")
