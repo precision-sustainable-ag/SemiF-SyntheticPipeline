@@ -660,6 +660,14 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
                     log.error(f"Failed to load cutout image {cutout_path}. Skipping.")
                     continue
 
+                # Calculate real-world scaling for the cutout
+                cutout_area = cutout_metadata['cutout_props']['bbox_area_cm2']
+                cutout_pixel_area = cutout_area * pixel_cm_ratio
+                cutout_scaling_factor = math.sqrt(cutout_pixel_area / (img.shape[1] * img.shape[0]))
+
+                # Resize cutout
+                img = resize_image(img, cutout_scaling_factor)
+                    
                 if img.shape[2] == 4:
                     img = img[:, :, :3]  # Ensure image has three channels if alpha is not needed
 
