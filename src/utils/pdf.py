@@ -180,12 +180,12 @@ class PDFDrafter():
         if (new_line):
             self.position_state["offset_from_top_of_page"] += final_height + 0.25 * inch
         
-    def wrap_text(self, string: str, font_style: str, font_size: int) -> None:
+    def wrap_text(self, sentances: str, font_style: str, font_size: int) -> None:
         """
             This function allows you to pass in any string, font style, and font size and it will 
             ensure that it fits properly on the page. The function forces center aligned.
         """
-        words = string.split()
+        words = sentances.split()
         lines = []
         line = ""
         max_width = self.page_info["width"] - 2 * self.page_info["margin"]
