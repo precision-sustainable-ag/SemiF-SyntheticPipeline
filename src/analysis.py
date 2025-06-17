@@ -38,7 +38,7 @@ class CutoutAnalyzer():
             self.blur[species] = {}
             self.is_primary[species] = {}
             self.extends_border[species] = {}
-            self.num_cutouts.setdefault(species.upper(), 0)
+            self.num_cutouts[species] = 0
 
         # KEEP TRACK OF STATES FOR COLOR COORDINATION BETWEEN GRAPHS
         self.states = states
