@@ -22,6 +22,9 @@ class CutoutAnalyzer():
         # Extract list of common names
         species_list = cfg.cutout_filters.category.common_name
 
+        # KEEP TRACK OF NUMBER OF CUTOUTS
+        self.num_cutouts = {}
+
         # Initialize dictionaries for stats
         self.batch_num_components = {}
         self.bbox = {}
@@ -35,12 +38,10 @@ class CutoutAnalyzer():
             self.blur[species] = {}
             self.is_primary[species] = {}
             self.extends_border[species] = {}
+            self.num_cutouts.setdefault(species.upper(), 0)
 
         # KEEP TRACK OF STATES FOR COLOR COORDINATION BETWEEN GRAPHS
         self.states = states
-
-        # KEEP TRACK OF NUMBER OF CUTOUTS
-        self.num_cutouts = {}
 
         # Connect to database (READ ONLY)
         conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
@@ -126,7 +127,6 @@ class CutoutAnalyzer():
             target_dict[species].setdefault(synthetic, []).append(val)
 
         # Track cutout count
-        self.num_cutouts.setdefault(species.upper(), 0)
         self.num_cutouts[species.upper()] += 1
 
     def graph_cutout_data(self, title_info: str, storage_location_data: dict[str, dict[str, int]] | None) -> None:
