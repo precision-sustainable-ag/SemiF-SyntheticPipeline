@@ -153,9 +153,9 @@ class PDFDrafter():
         # Add spacing between description and images
         self.position_state["offset_from_top_of_page"] += 0.15 * inch  
 
-    def place_image(self, image: str, new_line: bool, image_scaler_width_and_height: tuple[int, int] = (1, 1)) -> None:
+    def place_image(self, image_path: str, new_line: bool, image_scaler_width_and_height: tuple[int, int] = (1, 1)) -> None:
         final_width = 2 * inch * image_scaler_width_and_height[0]
-        img = ImageReader(image)
+        img = ImageReader(image_path)
         img_width, img_height = img.getSize()
         aspect_ratio = img_height / img_width * (image_scaler_width_and_height[1]/image_scaler_width_and_height[0])
 
