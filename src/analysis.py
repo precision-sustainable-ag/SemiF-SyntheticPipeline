@@ -26,12 +26,6 @@ class CutoutAnalyzer():
         self.blur = {}
         self.is_primary = {}
         self.extends_border = {}
-        self.rgb_mean_red = {}
-        self.rgb_mean_green = {}
-        self.rgb_mean_blue = {}
-        self.rgb_std_red = {}
-        self.rgb_std_green = {}
-        self.rgb_std_blue = {}
         for species in species_list:
             species = species.upper()
             self.batch_num_components[species] = {}
@@ -39,12 +33,6 @@ class CutoutAnalyzer():
             self.blur[species] = {}
             self.is_primary[species] = {}
             self.extends_border[species] = {}
-            self.rgb_mean_red[species] = {}
-            self.rgb_mean_green[species] = {}
-            self.rgb_mean_blue[species] = {}
-            self.rgb_std_red[species] = {}
-            self.rgb_std_green[species] = {}
-            self.rgb_std_blue[species] = {}
 
         # KEEP TRACK OF STATES FOR COLOR COORDINATION BETWEEN GRAPHS
         self.states = states
@@ -135,18 +123,6 @@ class CutoutAnalyzer():
             val = cutout['cutout_props'].get(prop)
             target_dict[species].setdefault(synthetic, []).append(val)
 
-        # NOTE: Commented out because not interested in it at this moment
-        # # Handle RGB means
-        # r, g, b = cutout['cutout_props'].get('cropout_rgb_mean', [None, None, None])
-        # self.rgb_mean_red[species].setdefault(synthetic, []).append(r)
-        # self.rgb_mean_green[species].setdefault(synthetic, []).append(g)
-        # self.rgb_mean_blue[species].setdefault(synthetic, []).append(b)
-        # # Handle RGB std
-        # r, g, b = cutout['cutout_props'].get('cropout_rgb_std', [None, None, None])
-        # self.rgb_std_red[species].setdefault(synthetic, []).append(r)
-        # self.rgb_std_green[species].setdefault(synthetic, []).append(g)
-        # self.rgb_std_blue[species].setdefault(synthetic, []).append(b)
-
         # Track cutout count
         self.num_cutouts.setdefault(species.upper(), 0)
         self.num_cutouts[species.upper()] += 1
@@ -181,15 +157,6 @@ class CutoutAnalyzer():
             boolean_bar_chart_plot(self.is_primary[species], species, "Is Primary", file_path, title_info, palette)
         for species in self.extends_border:
             boolean_bar_chart_plot(self.extends_border[species], species, "Extends Border", file_path, title_info, palette)
-
-        # TODO EVAL USEFULNESS OF RGB GRAPHS
-        # for species in self.rgb_mean_red:
-        #     jitter_plot(self.rgb_mean_red[species], species, "mean_red")
-        #     jitter_plot(self.rgb_mean_green[species], species, "mean_green")
-        #     jitter_plot(self.rgb_mean_blue[species], species, "mean_blue")
-        #     jitter_plot(self.rgb_std_red[species], species, "std_red")
-        #     jitter_plot(self.rgb_std_green[species], species, "std_green")
-        #     jitter_plot(self.rgb_std_blue[species], species, "std_blue")
 
         os.makedirs(str(f"{file_path}/storage_location"), exist_ok=True)
         if storage_location_data:
