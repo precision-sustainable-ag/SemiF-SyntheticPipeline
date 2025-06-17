@@ -143,7 +143,10 @@ class CutoutAnalyzer():
             "#e9bc8f",  #  peach
             "#bfd1dd",  #  pastel blue
             "#c7c0d8",  #  lavender
+            "#f7d794",  #  pastel apricot
+            "#a8dadc",  #  pastel aqua
         ]
+
         palette = {state: colors[i % len(colors)] for i, state in enumerate(self.states)}
 
         for species in self.batch_num_components:
