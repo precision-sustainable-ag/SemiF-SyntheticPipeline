@@ -131,7 +131,8 @@ def boolean_horizontal_bar_chart_plot(
         bool_freqs[state] = [freq.get(False, 0), freq.get(True, 0)]
 
     # Plotting
-    bar_width = 0.8 / num_states
+    if num_states:
+        bar_width = 0.8 / num_states
     plt.figure(figsize=(6, 6))
 
     for i, state in enumerate(unique_states):
