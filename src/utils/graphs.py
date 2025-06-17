@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 def thousands_formatter(x: float, pos: int) -> str:
     return f'{int(x / 1000)}k'
 
-def bar_chart_plot(
+def horizontal_bar_chart_plot(
     shape_count_dict: dict[str, list[int | None]],
     species: str,
     file_name: str,
@@ -100,7 +100,7 @@ def bar_chart_plot(
     # Save the plot
     save_plot(species, file_name, file_path, title_info)
 
-def boolean_bar_chart_plot(
+def boolean_horizontal_bar_chart_plot(
     boolean_count_dict: dict[str, list[bool | None]],
     species: str,
     file_name: str,
@@ -202,7 +202,7 @@ def jitter_plot(
         hue="State",
         order=ordered_states,
         jitter=True,
-        colors = palette,
+        palette=palette,
         size=5,
         legend=False  
     )
@@ -222,7 +222,7 @@ def jitter_plot(
 
     save_plot(species, file_name, file_path, title_info)
 
-def barplot(
+def vertical_bar_chart_plot(
     data_dict: dict[str, int],
     file_name: str,
     file_path: str,
@@ -251,7 +251,7 @@ def barplot(
     ]
 
     plt.figure(figsize=(12, 6))
-    sns.barplot(data=df, x="Image Count", y="Path", hue="Path", palette=palette)
+    sns.barplot(data=df, x="Image Count", y="Path", hue="Path", dodge=False, palette=palette)
     plt.title(f"Specified Cutout Paths For {species.title()}", fontsize=25)
     plt.xlabel("Image Count", fontsize=20)
     plt.ylabel("Storage Path", fontsize=20)

@@ -2,12 +2,14 @@ import os
 import json
 import sqlite3
 import logging
+from pathlib import Path
 from omegaconf import DictConfig, OmegaConf
+
 
 # util imports
 from utils.pdf import PDFDrafter
-from utils.utils import clear_directory, read_recipe
-from utils.graphs import bar_chart_plot, jitter_plot, barplot, boolean_bar_chart_plot
+from utils.utils import clear_directory, read_recipe, query_for_cutout_metadata
+from utils.graphs import horizontal_bar_chart_plot, jitter_plot, vertical_bar_chart_plot, boolean_horizontal_bar_chart_plot
 
 log = logging.getLogger(__name__)
 
@@ -15,7 +17,7 @@ class CutoutAnalyzer():
     def __init__(self, analysis_type: str, states: list[str], cfg: DictConfig) -> None:
 
         self.cfg = cfg
-        self.db_path = str(cfg.paths.datadir)
+        self.db_path = str(cfg.paths.sql_database)
 
         # Extract list of common names
         species_list = cfg.cutout_filters.category.common_name
@@ -151,20 +153,20 @@ class CutoutAnalyzer():
 
         for species in self.batch_num_components:
             logrithmic = (title_info == 'all')
-            bar_chart_plot(self.batch_num_components[species], species, "Number of Components", file_path, title_info, palette, logrithmic)
+            horizontal_bar_chart_plot(self.batch_num_components[species], species, "Number of Components", file_path, title_info, palette, logrithmic)
         for species in self.bbox:
             jitter_plot(self.bbox[species], species, "BBOX Area (cm^2)", file_path, title_info, palette)
         for species in self.blur:
             jitter_plot(self.blur[species], species, "Blur Effect", file_path, title_info, palette)
         for species in self.is_primary:
-            boolean_bar_chart_plot(self.is_primary[species], species, "Is Primary", file_path, title_info, palette)
+            boolean_horizontal_bar_chart_plot(self.is_primary[species], species, "Is Primary", file_path, title_info, palette)
         for species in self.extends_border:
-            boolean_bar_chart_plot(self.extends_border[species], species, "Extends Border", file_path, title_info, palette)
+            boolean_horizontal_bar_chart_plot(self.extends_border[species], species, "Extends Border", file_path, title_info, palette)
 
         os.makedirs(str(f"{file_path}/storage_location"), exist_ok=True)
         if storage_location_data:
             for species in storage_location_data:
-                barplot(storage_location_data[species], "Cutout Distribution Across Storages", file_path, 'storage_location', species)
+                vertical_bar_chart_plot(storage_location_data[species], "Cutout Distribution Across Storages", file_path, 'storage_location', species)
 
 def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], cfg: DictConfig) -> dict[str, dict[str, int]]:
 
@@ -241,7 +243,7 @@ def main(cfg: DictConfig) -> None:
     author = "Maintainer: PSA CV Team"
 
     # Description
-    sorted_species = sorted(species_list, key=lambda s: s.lower())
+    sorted_species = sorted(cfg.cutout_filters.category.common_name, key=lambda s: s.lower())
     if len(sorted_species) > 1:
         titled = [s.title() for s in sorted_species]
         species_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"

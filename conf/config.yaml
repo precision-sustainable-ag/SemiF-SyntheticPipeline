@@ -16,8 +16,8 @@ tasks:
   # - json_to_mongo # Deprecated
   - create_recipes
   - analysis
-  # - move_cutouts
-  # - synthesize
+  - move_cutouts
+  - synthesize
 
 move_cutouts:
   parallel: True

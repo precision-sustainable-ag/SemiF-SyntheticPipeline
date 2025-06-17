@@ -13,7 +13,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 log = logging.getLogger(__name__)
 
 class PDFDrafter():
-    def __init__(self, cfg: DictConfig, tuple[dict[str, tuple[int, int]], dict[str, tuple[int, int]]]) -> None:
+    def __init__(self, cfg: DictConfig, num_cutouts: tuple[dict[str, int], dict[str, int]]) -> None:
 
         self.cfg = cfg
 
@@ -123,7 +123,7 @@ class PDFDrafter():
                 num_of_images_on_line = 0
 
 
-    def initialize_title_author_and_description(self, title: str, author: str) -> None:
+    def initialize_title_author_and_description(self, title: str, author: str, description : str) -> None:
         '''
             Below we set the title of the report.
         '''
@@ -134,7 +134,7 @@ class PDFDrafter():
         '''
             Below we author the report.
         '''
-         self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["author"])
+        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["author"])
         self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, author)
         self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["author"]+4)
 
@@ -149,7 +149,7 @@ class PDFDrafter():
         '''
             Below is a brief description intended to give the reader context and insight into the graphs presented in this report.
         '''
-        self.wrap_text(subj, self.fonts["styles"]["normal"], self.fonts["size"]["body"])
+        self.wrap_text(description, self.fonts["styles"]["normal"], self.fonts["size"]["body"])
         # Add spacing between description and images
         self.position_state["offset_from_top_of_page"] += 0.15 * inch  
 
