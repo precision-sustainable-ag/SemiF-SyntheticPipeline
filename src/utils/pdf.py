@@ -173,7 +173,7 @@ class PDFDrafter():
         x_pos = image_margin + self.position_state["offset_from_left_of_page"]
         self.position_state["offset_from_left_of_page"] += final_width
 
-        self.pdf.drawImage(image, x_pos, y_pos, width=final_width, height=final_height, preserveAspectRatio=True)
+        self.pdf.drawImage(image_path, x_pos, y_pos, width=final_width, height=final_height, preserveAspectRatio=True)
 
         # Y calculations
         # check to see if we need to add a new line
