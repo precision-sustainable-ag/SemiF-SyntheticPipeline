@@ -78,12 +78,14 @@ def horizontal_bar_chart_plot(
     # Bar chart plotting
     if num_states:
         bar_width = 0.8 / num_states
-    plt.figure(figsize=(6, 6))
+        for i, state in enumerate(unique_states):
+            y = binned_freqs[state]
+            offset = (i - num_states / 2) * bar_width + bar_width / 2
+            plt.bar(x + offset, y, width=bar_width, label=state, color=palette.get(state, "gray"))
 
-    for i, state in enumerate(unique_states):
-        y = binned_freqs[state]
-        offset = (i - num_states / 2) * bar_width + bar_width / 2
-        plt.bar(x + offset, y, width=bar_width, label=state, color=palette[state])
+        plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=15, title_fontsize=15)
+    else:
+        log.warning("No states to plot. Creating empty plot without legend.")
 
     if logrithmic: 
         plt.yscale('log')
@@ -93,7 +95,6 @@ def horizontal_bar_chart_plot(
     plt.xticks(x, bin_labels, rotation=45, fontsize=15)  
     plt.ylabel("Frequency", fontsize=20)
     plt.yticks(fontsize=15)
-    plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=15, title_fontsize=15)
     plt.grid(axis='y')
     plt.tight_layout()
 
@@ -133,27 +134,32 @@ def boolean_horizontal_bar_chart_plot(
     # Plotting
     if num_states:
         bar_width = 0.8 / num_states
+
     plt.figure(figsize=(6, 6))
 
-    for i, state in enumerate(unique_states):
-        y = bool_freqs[state]
-        offset = (i - num_states / 2) * bar_width + bar_width / 2
-        plt.bar(x + offset, y, width=bar_width, label=state, color=palette[state])
+    if num_states:
+        bar_width = 0.8 / num_states
+        for i, state in enumerate(unique_states):
+            y = bool_freqs[state]
+            offset = (i - num_states / 2) * bar_width + bar_width / 2
+            plt.bar(x + offset, y, width=bar_width, label=state, color=palette.get(state, "gray"))
+        plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=15, title_fontsize=15)
+    else:
+        log.warning("No states to plot. Creating empty plot.")
 
     if logrithmic:
         plt.yscale('log')
 
     plt.title(f"{title_info} {species}".title(), fontsize=25)
     plt.xlabel(file_name, fontsize=20)
-    plt.xticks(x, x_labels, fontsize=15)
+    plt.xticks(x, ['False', 'True'], fontsize=15)
     plt.ylabel("Frequency", fontsize=20)
     plt.yticks(fontsize=15)
-    plt.legend(title="States", bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=15, title_fontsize=15)
     plt.grid(axis='y')
     plt.tight_layout()
 
-    # Save the plot
     save_plot(species, file_name, file_path, title_info)
+
 
 '''
     The jitter plot is used to visualize the distribution of individual data points 

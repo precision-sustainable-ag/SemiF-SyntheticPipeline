@@ -55,7 +55,7 @@ class CutoutAnalyzer():
         if analysis_type == 'specified': 
             # Find out which storage we would be getting the cutouts from
             batch_ids, cutout_ids = read_recipe(f"{cfg.paths.recipesdir}/{cfg.project_name}_{cfg.sub_name}.json")
-            storage_location_data = resolve_image_storage_locations(batch_ids, cutout_ids, cfg)
+            storage_location_data = resolve_image_storage_locations(batch_ids, cutout_ids, sorted_species, cfg)
             # load downloaded cutout metadata
             self.load_cutout_metadata(cursor, columns, cutout_ids)
             self.graph_cutout_data(analysis_type, storage_location_data)
@@ -169,11 +169,21 @@ class CutoutAnalyzer():
             for species in storage_location_data:
                 vertical_bar_chart_plot(storage_location_data[species], "Cutout Distribution Across Storages", file_path, 'storage_location', species)
 
-def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], cfg: DictConfig) -> dict[str, dict[str, int]]:
+def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], all_species: list[str], cfg: DictConfig) -> dict[str, dict[str, int]]:
 
     data = {}
 
     primary_storage_base_downloads = secondary_storage_base_downloads = tertiary_storage_base_downloads = 0
+
+    for species in all_species:
+        species = species.upper()
+        data[species] =  {
+            f"primary: {cfg.paths.primary_longterm_storage}": 0,
+            f"secondary: {cfg.paths.secondary_longterm_storage}": 0,
+            f"tertiary: {cfg.paths.tertiary_longterm_storage}": 0
+        }
+        print(f"have: {species}")
+
     for batch_id, cutout_id in zip(batch_ids, cutout_ids):
         image_filename = f"{cutout_id}.png"
 
@@ -200,13 +210,7 @@ def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str],
                     tertiary_storage_base_downloads = 1
                 break  # Exit .
 
-        if species not in data:
-            data[species] =  {
-                f"primary: {cfg.paths.primary_longterm_storage}": 0,
-                f"secondary: {cfg.paths.secondary_longterm_storage}": 0,
-                f"tertiary: {cfg.paths.tertiary_longterm_storage}": 0
-            }
-
+        print(f"need: {species} ")
         data[species][f"primary: {cfg.paths.primary_longterm_storage}"] += primary_storage_base_downloads
         data[species][f"secondary: {cfg.paths.secondary_longterm_storage}"] += secondary_storage_base_downloads
         data[species][f"tertiary: {cfg.paths.tertiary_longterm_storage}"] += tertiary_storage_base_downloads
@@ -237,11 +241,8 @@ def main(cfg: DictConfig) -> None:
     # Create PDF from graphs
     report = PDFDrafter(cfg, num_cutouts)
 
-    # Title
-    title = "Pre-Synthesis Analysis"
-
-    # Author
-    author = "Maintainer: PSA CV Team"
+    # Heading
+    heading = "Analysis of Cutouts"
 
     # Description
     species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
@@ -253,11 +254,11 @@ def main(cfg: DictConfig) -> None:
         species_str = sorted_species[0].title()
     description = f"The following is a report of the {species_str} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
 
-    report.initialize_title_author_and_description(title, author, description)
+    report.initialize_heading_and_description(heading, description)
     report.add_graphs_to_pdf()
     report.save_pdf()
 
     # Delete graphs
-    clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_all_cutouts}")
-    clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_specified_cutouts}")
-    clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_storages}")
+    # clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_all_cutouts}")
+    # clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_specified_cutouts}")
+    # clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_storages}")

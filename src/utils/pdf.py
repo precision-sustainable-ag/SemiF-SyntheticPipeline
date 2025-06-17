@@ -39,8 +39,9 @@ class PDFDrafter():
         # FONT INFO
         self.fonts = {
             "size": {
-                "title": 16,
-                "author": 12,
+                "title": 20,
+                "author": 14,
+                "heading": 12,
                 "time": 10,
                 "body": 8
             },
@@ -54,6 +55,12 @@ class PDFDrafter():
             "offset_from_top_of_page": 0,
             "offset_from_left_of_page": 0
         }
+
+        # Title
+        self.title = "Pre-Synthesis Analysis"
+
+        # Author
+        self.author = "Maintainer: PSA CV Team"
 
     def save_pdf(self) -> None:
         self.pdf.save()
@@ -123,19 +130,19 @@ class PDFDrafter():
                 num_of_images_on_line = 0
 
 
-    def initialize_title_author_and_description(self, title: str, author: str, description : str) -> None:
+    def initialize_heading_and_description(self, heading: str, description : str) -> None:
         '''
             Below we set the title of the report.
         '''
         self.pdf.setFont(self.fonts["styles"]["bold"], self.fonts["size"]["title"])
-        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"], title)
+        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"], self.title)
         self.position_state["offset_from_top_of_page"] += self.fonts["size"]["title"]
 
         '''
             Below we author the report.
         '''
         self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["author"])
-        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, author)
+        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, self.author)
         self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["author"]+4)
 
         '''
@@ -145,6 +152,15 @@ class PDFDrafter():
         self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["time"])
         self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, date)
         self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["time"]+4)
+
+        '''
+            Below we add the heading for this section of the report
+        '''
+        date = str(datetime.date.today())
+        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["heading"])
+        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, heading)
+        self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["heading"]+4)
+
 
         '''
             Below is a brief description intended to give the reader context and insight into the graphs presented in this report.
