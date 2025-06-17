@@ -17,8 +17,8 @@ class PDFDrafter():
 
         self.cfg = cfg
 
-        # Extract species and sort them alphabetically
-        species_list = cfg.cutout_filters.category.common_name
+        # Extract species and sort them alphabetically, ignore duplicates
+        species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
         self.sorted_species = sorted(species_list, key=lambda s: s.lower())
 
         # Extract num cutouts into specified and all
@@ -230,7 +230,8 @@ class PDFDrafter():
 def main(cfg: DictConfig) -> None:
     all_cutouts = {}
     specified_cutouts = {}
-    for species in cfg.cutout_filters.category.common_name:
+    species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
+    for species in species_list:
         species = species.upper()
         all_cutouts[species] = (0,0)
         specified_cutouts[species] = (0,0)

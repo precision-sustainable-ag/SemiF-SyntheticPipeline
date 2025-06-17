@@ -20,7 +20,8 @@ class CutoutAnalyzer():
         self.db_path = str(cfg.paths.sql_database)
 
         # Extract list of common names
-        species_list = cfg.cutout_filters.category.common_name
+        species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
+        sorted_species = sorted(species_list, key=lambda s: s.lower())
 
         # KEEP TRACK OF NUMBER OF CUTOUTS
         self.num_cutouts = {}
@@ -31,7 +32,7 @@ class CutoutAnalyzer():
         self.blur = {}
         self.is_primary = {}
         self.extends_border = {}
-        for species in species_list:
+        for species in sorted_species:
             species = species.upper()
             self.batch_num_components[species] = {}
             self.bbox[species] = {}
@@ -60,7 +61,7 @@ class CutoutAnalyzer():
             self.graph_cutout_data(analysis_type, storage_location_data)
         elif analysis_type == 'all': 
             # load all data of species specified in config
-            self.load_species_metadata(species_list, cursor, columns)
+            self.load_species_metadata(sorted_species, cursor, columns)
             self.graph_cutout_data(analysis_type, None)
 
         conn.close()
@@ -243,7 +244,8 @@ def main(cfg: DictConfig) -> None:
     author = "Maintainer: PSA CV Team"
 
     # Description
-    sorted_species = sorted(cfg.cutout_filters.category.common_name, key=lambda s: s.lower())
+    species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
+    sorted_species = sorted(species_list, key=lambda s: s.lower())
     if len(sorted_species) > 1:
         titled = [s.title() for s in sorted_species]
         species_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
