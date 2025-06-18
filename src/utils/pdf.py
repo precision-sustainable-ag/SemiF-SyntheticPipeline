@@ -25,7 +25,7 @@ class PDFDrafter():
         self.specified_cutouts, self.all_cutouts = num_cutouts
 
         # Set up canvas/pdf
-        date_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.date_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.output_pdf = str(f"{cfg.paths.analysisdir}/pre_synth_analysis_{self.date_time}.pdf")
         self.pdf = canvas.Canvas(self.output_pdf, pagesize=letter)
 
