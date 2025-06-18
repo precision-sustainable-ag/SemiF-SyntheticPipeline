@@ -258,8 +258,11 @@ def read_recipe(json_file_path: str) -> tuple[list[str], list[str]]:
     # Loop through the synthetic images and their cutouts
     for image in data.get("synthetic_images", []):
         for cutout in image.get("cutouts", []):
-            batch_ids.append(cutout.get("batch_id"))
-            cutout_ids.append(cutout.get("cutout_id"))
+            cutout_id = cutout.get("cutout_id")
+            batch_id = cutout.get("batch_id")
+            if cutout_id not in cutout_ids:
+                batch_ids.append(batch_id)
+                cutout_ids.append(cutout_id)
 
     return batch_ids, cutout_ids
 

@@ -182,7 +182,6 @@ def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str],
             f"secondary: {cfg.paths.secondary_longterm_storage}": 0,
             f"tertiary: {cfg.paths.tertiary_longterm_storage}": 0
         }
-        print(f"have: {species}")
 
     for batch_id, cutout_id in zip(batch_ids, cutout_ids):
         image_filename = f"{cutout_id}.png"
@@ -210,7 +209,6 @@ def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str],
                     tertiary_storage_base_downloads = 1
                 break  # Exit .
 
-        print(f"need: {species} ")
         data[species][f"primary: {cfg.paths.primary_longterm_storage}"] += primary_storage_base_downloads
         data[species][f"secondary: {cfg.paths.secondary_longterm_storage}"] += secondary_storage_base_downloads
         data[species][f"tertiary: {cfg.paths.tertiary_longterm_storage}"] += tertiary_storage_base_downloads
@@ -259,6 +257,6 @@ def main(cfg: DictConfig) -> None:
     report.save_pdf()
 
     # Delete graphs
-    # clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_all_cutouts}")
-    # clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_specified_cutouts}")
-    # clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_storages}")
+    clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_all_cutouts}")
+    clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_specified_cutouts}")
+    clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_storages}")
