@@ -10,6 +10,9 @@ def main(cfg: DictConfig) -> None:
 
     analysis_subtasks = cfg.tasks.analysis
 
+    log.info("Reached analysis.py")
+    log.info("Going through subtasks under analysis")
+
     for sub_task_name in analysis_subtasks:
         try:
             task = get_method(f"{sub_task_name}.main")

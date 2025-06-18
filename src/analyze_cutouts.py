@@ -216,6 +216,9 @@ def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str],
     return data
 
 def main(cfg: DictConfig) -> None:
+
+    log.info("Reached analyze_cutouts subtask of analysis")
+
     cfg = OmegaConf.create(cfg)
 
     directory_for_graphs_of_all_cutouts = "all"
