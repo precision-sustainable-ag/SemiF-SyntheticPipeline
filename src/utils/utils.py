@@ -261,8 +261,8 @@ def read_recipe(json_file_path: str) -> tuple[list[str], list[str]]:
             cutout_id = cutout.get("cutout_id")
             batch_id = cutout.get("batch_id")
             if cutout_id not in cutout_ids:
-                batch_ids.append(batch_id)
                 cutout_ids.append(cutout_id)
+                batch_ids.append(batch_id)
 
     return batch_ids, cutout_ids
 
