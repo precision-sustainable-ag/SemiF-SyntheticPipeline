@@ -13,7 +13,7 @@ TASK_REGISTRY = {
     "analyze_cutouts": analyze_cutouts,
 }
 
-@hydra.main(version_base="1.3", config_path="../conf", config_name="config")
+@hydra.main(version_base="1.2", config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     """ Main entry point for the application """
     
