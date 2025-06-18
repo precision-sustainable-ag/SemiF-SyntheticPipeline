@@ -15,12 +15,6 @@ dependencies:
   # - scipy
   - tqdm
   - albumentations
-
-  # used for graphical analysis
-  - matplotlib
-  - reportlab
-  - pandas
-  - seaborn
   - pip:
       # In case any specific packages need to be installed via pip
       # - opencv-python-headless  # Optional: for headless systems without GUI

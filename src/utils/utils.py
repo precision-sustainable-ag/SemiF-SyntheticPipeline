@@ -1,11 +1,12 @@
-import os
 import json
 import random
 from pathlib import Path
 from typing import List, Tuple
+
 import cv2
 import numpy as np
 import pandas as pd
+
 
 def filter_area(df, lower, upper):
     filtered_dfs = []
@@ -208,47 +209,3 @@ def is_rectangular(mask, threshold_percentage):
     is_filled_enough = filled_percentage >= threshold_percentage
     
     return is_filled_enough, filled_percentage
-
-def read_recipe(json_file_path: str) -> tuple[list[str], list[str]]:
-    # Load your JSON file
-    with open(json_file_path, "r") as f:
-        data = json.load(f)
-
-    # Initialize empty lists to store batch_id and cutout_id
-    batch_ids = []
-    cutout_ids = []
-
-    # Loop through the synthetic images and their cutouts
-    for image in data.get("synthetic_images", []):
-        for cutout in image.get("cutouts", []):
-            cutout_id = cutout.get("cutout_id")
-            batch_id = cutout.get("batch_id")
-            if cutout_id not in cutout_ids:
-                cutout_ids.append(cutout_id)
-                batch_ids.append(batch_id)
-
-    return batch_ids, cutout_ids
-
-def count_all_files(dir_path: str) -> int:
-    total = 0
-    for root, dirs, files in os.walk(dir_path):
-        total += len(files)
-    return total
-
-def clear_directory(dir_path: str) -> None:
-    if not os.path.isdir(dir_path):
-        return None
-    for entry in os.listdir(dir_path):
-        full_path = os.path.join(dir_path, entry)
-        if os.path.isfile(full_path) or os.path.islink(full_path):
-            os.remove(full_path)
-        elif os.path.isdir(full_path):
-            # Recursively remove contents
-            for root, dirs, files in os.walk(full_path, topdown=False):
-                for f in files:
-                    os.remove(os.path.join(root, f))
-                for d in dirs:
-                    os.rmdir(os.path.join(root, d))
-            os.rmdir(full_path)
-    os.rmdir(dir_path)
-

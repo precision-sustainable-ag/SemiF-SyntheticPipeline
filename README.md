@@ -55,11 +55,9 @@ project_name: pm3d
 sub_name: test
 
 tasks:
-  create_recipes:
-  analysis: 
-    - analyze_cutouts
-  move_cutouts: 
-  synthesize: 
+  - create_recipes
+  - move_cutouts
+  - synthesize
 
 move_cutouts:
   parallel: True
@@ -113,16 +111,7 @@ Generates synthetic image recipes by selecting cutouts and assigning them to bac
   }
   ```
 
-### **2. Analysis** (`analysis.py`)
-Handles the analsis of the generated recipe before commiting to pulling cutouts and generating synthetic images. 
-
-#### **2.1 Analyze Cutouts** (`analyze_cutouts.py`)
-Generates a report on the metadata of the cutouts specified in your recipe and compares it to the metadata of all cutouts for the given species.
-
-#### Output:
-- `projects/<project>/<name>/analysis/report<date>.pdf`
-
-### **3. Move Cutouts** (`move_cutouts.py`)
+### **2. Move Cutouts** (`move_cutouts.py`)
 Moves cutout images from long-term storage to a local directory.
 
 #### Includes:
@@ -133,7 +122,7 @@ Moves cutout images from long-term storage to a local directory.
 #### Output:
 - `data/cutouts/*.png` (Downloaded cutout images)
 
-### **4. Synthesize** (`synthesize.py`)
+### **3. Synthesize** (`synthesize.py`)
 Generates synthetic images by overlaying cutouts onto backgrounds.
 
 #### Includes:
