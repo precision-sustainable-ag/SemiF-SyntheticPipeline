@@ -17,7 +17,7 @@ def run_SYNTH(cfg: DictConfig) -> None:
     cfg = OmegaConf.create(cfg)
     log.info(f"Starting task {','.join(cfg.tasks)}")
     
-    for tsk in cfg.tasks:
+    for tsk in cfg.tasks.keys():
         try:
             task = get_method(f"{tsk}.main")
             task(cfg)
