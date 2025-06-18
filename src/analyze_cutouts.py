@@ -8,7 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 
 # util imports
 from utils.pdf import PDFDrafter
-from utils.utils import clear_directory, read_recipe, query_for_cutout_metadata
+from utils.utils import clear_directory, read_recipe
 from utils.graphs import horizontal_bar_chart_plot, jitter_plot, vertical_bar_chart_plot, boolean_horizontal_bar_chart_plot
 
 log = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class CutoutAnalyzer():
         if analysis_type == 'specified': 
             # Find out which storage we would be getting the cutouts from
             batch_ids, cutout_ids = read_recipe(f"{cfg.paths.recipesdir}/{cfg.project_name}_{cfg.sub_name}.json")
-            storage_location_data = resolve_image_storage_locations(batch_ids, cutout_ids, sorted_species, cfg)
+            storage_location_data = self.resolve_image_storage_locations(batch_ids, cutout_ids, sorted_species, cursor)
             # load downloaded cutout metadata
             self.load_cutout_metadata(cursor, columns, cutout_ids)
             self.graph_cutout_data(analysis_type, storage_location_data)
@@ -111,6 +111,34 @@ class CutoutAnalyzer():
                 self.states.append(row_dict['cutout_id'][:2])
                 # log states that we are pulling data from
                 log.info(f"Cutouts pulled from: {row_dict['cutout_id'][:2]}")
+
+    def query_for_cutout_metadata(self,cutout_id: str,cursor: sqlite3.Cursor) -> str:
+
+        # Get column names
+        cursor.execute("PRAGMA table_info(semif_cutouts);")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        # Fetch the single row with the given cutout_id
+        cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
+        row = cursor.fetchone()
+
+        if row is None:
+            raise ValueError(f"No entry found for cutout_id: {cutout_id}")
+
+        # Turn the row into a dictionary
+        row_dict = dict(zip(columns, row))
+
+        # Attempt to parse JSON fields
+        try:
+            row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
+            row_dict['category'] = json.loads(row_dict['category'])
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse JSON fields for cutout_id {cutout_id}: {e}")
+
+        # Extract species
+        species = row_dict['category']['common_name'].upper()
+
+        return species
 
     def metadata_to_dict(self, species: str, synthetic: str, cutout: dict) -> None:
         """
@@ -169,51 +197,51 @@ class CutoutAnalyzer():
             for species in storage_location_data:
                 vertical_bar_chart_plot(storage_location_data[species], "Cutout Distribution Across Storages", file_path, 'storage_location', species)
 
-def resolve_image_storage_locations(batch_ids: list[str], cutout_ids: list[str], all_species: list[str], cfg: DictConfig) -> dict[str, dict[str, int]]:
+    def resolve_image_storage_locations(self,batch_ids: list[str], cutout_ids: list[str], all_species: list[str],cursor: sqlite3.Cursor) -> dict[str, dict[str, int]]:
 
-    data = {}
+        data = {}
 
-    primary_storage_base_downloads = secondary_storage_base_downloads = tertiary_storage_base_downloads = 0
+        primary_storage_base_downloads = secondary_storage_base_downloads = tertiary_storage_base_downloads = 0
 
-    for species in all_species:
-        species = species.upper()
-        data[species] =  {
-            f"primary: {cfg.paths.primary_longterm_storage}": 0,
-            f"secondary: {cfg.paths.secondary_longterm_storage}": 0,
-            f"tertiary: {cfg.paths.tertiary_longterm_storage}": 0
-        }
+        for species in all_species:
+            species = species.upper()
+            data[species] =  {
+                f"primary: {self.cfg.paths.primary_longterm_storage}": 0,
+                f"secondary: {self.cfg.paths.secondary_longterm_storage}": 0,
+                f"tertiary: {self.cfg.paths.tertiary_longterm_storage}": 0
+            }
 
-    for batch_id, cutout_id in zip(batch_ids, cutout_ids):
-        image_filename = f"{cutout_id}.png"
+        for batch_id, cutout_id in zip(batch_ids, cutout_ids):
+            image_filename = f"{cutout_id}.png"
 
-        species = query_for_cutout_metadata(cutout_id, cfg)
+            species = self.query_for_cutout_metadata(cutout_id,cursor)
 
-        # List of storage locations in order of preference.
-        storages = [
-            ("primary", Path(Path(cfg.paths.primary_longterm_storage, "semifield-cutouts"), batch_id, image_filename)),
-            ("secondary", Path(Path(cfg.paths.secondary_longterm_storage, "semifield-cutouts"), batch_id, image_filename)),
-            ("tertiary", Path(Path(cfg.paths.tertiary_longterm_storage, "semifield-cutouts"), batch_id, image_filename))
-        ]
+            # List of storage locations in order of preference.
+            storages = [
+                ("primary", Path(Path(self.cfg.paths.primary_longterm_storage, "semifield-cutouts"), batch_id, image_filename)),
+                ("secondary", Path(Path(self.cfg.paths.secondary_longterm_storage, "semifield-cutouts"), batch_id, image_filename)),
+                ("tertiary", Path(Path(self.cfg.paths.tertiary_longterm_storage, "semifield-cutouts"), batch_id, image_filename))
+            ]
 
-        # Try each storage location until the image is found and copied
-        primary_storage_base_downloads = 0
-        secondary_storage_base_downloads = 0
-        tertiary_storage_base_downloads = 0
-        for storage_name, storage_path in storages:
-            if storage_path.exists():
-                if storage_name == "primary":
-                    primary_storage_base_downloads = 1
-                elif storage_name == "secondary":
-                    secondary_storage_base_downloads = 1
-                elif storage_name == "tertiary":
-                    tertiary_storage_base_downloads = 1
-                break  # Exit .
+            # Try each storage location until the image is found and copied
+            primary_storage_base_downloads = 0
+            secondary_storage_base_downloads = 0
+            tertiary_storage_base_downloads = 0
+            for storage_name, storage_path in storages:
+                if storage_path.exists():
+                    if storage_name == "primary":
+                        primary_storage_base_downloads = 1
+                    elif storage_name == "secondary":
+                        secondary_storage_base_downloads = 1
+                    elif storage_name == "tertiary":
+                        tertiary_storage_base_downloads = 1
+                    break  # Exit .
 
-        data[species][f"primary: {cfg.paths.primary_longterm_storage}"] += primary_storage_base_downloads
-        data[species][f"secondary: {cfg.paths.secondary_longterm_storage}"] += secondary_storage_base_downloads
-        data[species][f"tertiary: {cfg.paths.tertiary_longterm_storage}"] += tertiary_storage_base_downloads
+            data[species][f"primary: {self.cfg.paths.primary_longterm_storage}"] += primary_storage_base_downloads
+            data[species][f"secondary: {self.cfg.paths.secondary_longterm_storage}"] += secondary_storage_base_downloads
+            data[species][f"tertiary: {self.cfg.paths.tertiary_longterm_storage}"] += tertiary_storage_base_downloads
 
-    return data
+        return data
 
 def main(cfg: DictConfig) -> None:
 
