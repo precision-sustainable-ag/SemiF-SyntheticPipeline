@@ -629,12 +629,32 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         
         # background = shared_data[background_path]  # Get the pre-loaded background image
         background, pixel_cm_ratio = shared_data[background_path]
+
+        # add species that we requesting preprocessing to a list
+        species_that_preprocessing_was_requested_for = []
+        for species_list in cfg.preprocess_cutouts.values():
+            species_that_preprocessing_was_requested_for.extend([species.lower() for species in species_list])
         
         # Process the cutouts and check if they are in shared_data
         images = []
         cutout_data = [(cutout['cutout_id'], cutout) for cutout in recipe['cutouts']]
         for cutout_id, cutout_metadata in cutout_data:
             cutout_path = Path(cfg.paths.cutoutdir, f"{cutout_id}.png")
+
+            # Original cutout path, and preprocessed cutout paths
+            preprocessed_path = Path(cfg.paths.preprocessed_cutoutdir, f"{cutout_id}.png")
+            original_path = Path(cfg.paths.cutoutdir, f"{cutout_id}.png")
+
+            # set cutout path to original cutout path (not preprocessed)
+            cutout_path = original_path
+
+            # If we are requesting preprocessed images for this species 
+            # and the preprocessed image exists in the preprocessed cutout paths
+            # load the preprocesed image instead of the original
+            if cutout_metadata['category']['common_name'].lower() in species_that_preprocessing_was_requested_for:
+                if preprocessed_path.exists():
+                    cutout_path = preprocessed_path
+
             if cutout_path not in shared_data:
                 log.debug(f"Loading cutout image {cutout_path}")
                 img = cv2.imread(str(cutout_path), cv2.IMREAD_UNCHANGED)

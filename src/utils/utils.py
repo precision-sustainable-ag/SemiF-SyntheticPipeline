@@ -1,11 +1,12 @@
 import os
+import cv2
 import json
 import random
-from pathlib import Path
-from typing import List, Tuple
-import cv2
+import sqlite3
 import numpy as np
 import pandas as pd
+from pathlib import Path
+from typing import List, Tuple
 
 def filter_area(df, lower, upper):
     filtered_dfs = []
@@ -252,3 +253,30 @@ def clear_directory(dir_path: str) -> None:
             os.rmdir(full_path)
     os.rmdir(dir_path)
 
+def query_for_cutout_metadata(cutout_id: str,cursor: sqlite3.Cursor) -> str:
+
+        # Get column names
+        cursor.execute("PRAGMA table_info(semif_cutouts);")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        # Fetch the single row with the given cutout_id
+        cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
+        row = cursor.fetchone()
+
+        if row is None:
+            raise ValueError(f"No entry found for cutout_id: {cutout_id}")
+
+        # Turn the row into a dictionary
+        row_dict = dict(zip(columns, row))
+
+        # Attempt to parse JSON fields
+        try:
+            row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
+            row_dict['category'] = json.loads(row_dict['category'])
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse JSON fields for cutout_id {cutout_id}: {e}")
+
+        # Extract species
+        species = row_dict['category']['common_name'].upper()
+
+        return species

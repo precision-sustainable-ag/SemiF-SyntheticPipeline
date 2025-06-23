@@ -5,10 +5,9 @@ import logging
 from pathlib import Path
 from omegaconf import DictConfig, OmegaConf
 
-
 # util imports
 from utils.pdf import PDFDrafter
-from utils.utils import clear_directory, read_recipe
+from utils.utils import clear_directory, read_recipe, query_for_cutout_metadata
 from utils.graphs import horizontal_bar_chart_plot, jitter_plot, vertical_bar_chart_plot, boolean_horizontal_bar_chart_plot
 
 log = logging.getLogger(__name__)
@@ -112,33 +111,6 @@ class CutoutAnalyzer():
                 # log states that we are pulling data from
                 log.info(f"Cutouts pulled from: {row_dict['cutout_id'][:2]}")
 
-    def query_for_cutout_metadata(self,cutout_id: str,cursor: sqlite3.Cursor) -> str:
-
-        # Get column names
-        cursor.execute("PRAGMA table_info(semif_cutouts);")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        # Fetch the single row with the given cutout_id
-        cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
-        row = cursor.fetchone()
-
-        if row is None:
-            raise ValueError(f"No entry found for cutout_id: {cutout_id}")
-
-        # Turn the row into a dictionary
-        row_dict = dict(zip(columns, row))
-
-        # Attempt to parse JSON fields
-        try:
-            row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
-            row_dict['category'] = json.loads(row_dict['category'])
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse JSON fields for cutout_id {cutout_id}: {e}")
-
-        # Extract species
-        species = row_dict['category']['common_name'].upper()
-
-        return species
 
     def metadata_to_dict(self, species: str, synthetic: str, cutout: dict) -> None:
         """
@@ -214,7 +186,7 @@ class CutoutAnalyzer():
         for batch_id, cutout_id in zip(batch_ids, cutout_ids):
             image_filename = f"{cutout_id}.png"
 
-            species = self.query_for_cutout_metadata(cutout_id,cursor)
+            species = query_for_cutout_metadata(cutout_id,cursor)
 
             # List of storage locations in order of preference.
             storages = [
