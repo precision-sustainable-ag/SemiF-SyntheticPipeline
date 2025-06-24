@@ -22,8 +22,6 @@ tasks:
     - analyze_preprocessed_cutouts
   synthesize: 
 
-analysis_tasks:
-
 move_cutouts:
   parallel: True
   parallel_workers: 8
