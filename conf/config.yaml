@@ -15,19 +15,26 @@ sub_name: mixed
 tasks:
   # - json_to_mongo # Deprecated
   create_recipes:
-  analysis: 
-    - analyze_cutouts
   move_cutouts: 
   preprocess_cutouts:
+  analysis:
+    - analyze_cutouts
+    - analyze_preprocessed_cutouts
   synthesize: 
+
+analysis_tasks:
 
 move_cutouts:
   parallel: True
   parallel_workers: 8
 
+# For each preprocessing step, specify the species 
+# it should be applied to. Pass in your params to the species
+# dictionary. If no params are required pass in None
 preprocess_cutouts:
-  exg:
-    - Hairy Vetch  
+  remove_soil: # applies exg filter
+    # species: percentage of exg
+    Hairy Vetch: 52.1
 
 synthesize:
   parallel: false
