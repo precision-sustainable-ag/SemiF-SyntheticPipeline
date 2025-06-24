@@ -6,11 +6,13 @@ from omegaconf import DictConfig, OmegaConf
 log = logging.getLogger(__name__)
 
 # Import the task functions
-from src.analyze_cutouts import main as analyze_cutouts
+from src.analyze.analyze_cutouts import main as analyze_cutouts
+from src.analyze.analyze_preprocessed_cutouts import main as analyze_preprocessed_cutouts
 
 # Define a registry of tasks
 TASK_REGISTRY = {
     "analyze_cutouts": analyze_cutouts,
+    "analyze_preprocessed_cutouts": analyze_preprocessed_cutouts
 }
 
 @hydra.main(version_base="1.2", config_path="../conf", config_name="config")
