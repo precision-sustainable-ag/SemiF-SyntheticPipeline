@@ -115,21 +115,54 @@ class PDFDrafter():
                 new_line = True      
                 num_of_images_on_line = 0
 
-            # Place first couple of images
-            self.place_image(all_cutout_path, False)
-            # Place second couple of images
-            self.place_image(specified_cutout_path, new_line)    
+            # Place first couple of images, pass in 0 because all of them are the same size
+            self.place_image(all_cutout_path, False, 0)
+            # Place second couple of images, pass in 0 because all of them are the same size
+            self.place_image(specified_cutout_path, new_line, 0)    
 
             # Place storage graphs
             if i % graphs_per_species == (graphs_per_species-1):
                 if (current_species_index-1<len(storage_graphs)):
                     storage_graph_paths = os.path.join(storage_graph_dir, storage_graphs[current_species_index-1])
-                    self.place_image(storage_graph_paths, True, (2,2))    
+                    self.place_image(storage_graph_paths, True, (2,2), 0)    
                 self.position_state["offset_from_left_of_page"] = 0
                 num_of_images_on_line = 0
 
-    def compare_cutouts(self):
-        pass
+    def compare_cutouts(self, compare_cutout_dict: dict[tuple[str, list]]):
+        for species in compare_cutout_dict.keys():
+            description, cutouts_to_compare = compare_cutout_dict[species]
+
+            self.wrap_text(description, self.fonts["styles"]["normal"], self.fonts["size"]["heading"])
+
+            cutouts_to_compare = compare_cutout_dict[species][1]
+
+            i = 0
+            max_height = first_height = second_height = 0
+            for cutout_id in cutouts_to_compare:
+                i+=1
+                new_line=False
+                # Configed to allow 2 comparisons per line
+                if i==2:
+                    # add new line
+                    new_line=True
+
+                # Place original image
+                first_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/{cutout_id}.png"), False, max_height)
+                max_height = max(first_height, max_height, second_height)
+                second_height = self.place_image(str(f"{self.cfg.paths.preprocessed_cutoutdir}/{cutout_id}.png"), new_line, max_height)  
+
+                # Configed to allow 2 comparisons per line
+                if i==2:
+                    # Move back to the right side of the page
+                    self.position_state["offset_from_left_of_page"] = 0
+                    i=0
+                    max_height = 0
+                    first_height = 0
+                    second_height = 0
+
+
+
+
 
     def initialize_heading_and_description(self, heading: str, description : str) -> None:
         '''
@@ -170,7 +203,7 @@ class PDFDrafter():
         # Add spacing between description and images
         self.position_state["offset_from_top_of_page"] += 0.15 * inch  
 
-    def place_image(self, image_path: str, new_line: bool, image_scaler_width_and_height: tuple[int, int] = (1, 1)) -> None:
+    def place_image(self, image_path: str, new_line: bool, last_image_height: float, image_scaler_width_and_height: tuple[int, int] = (1, 1)) -> float:
         final_width = 2 * inch * image_scaler_width_and_height[0]
         img = ImageReader(image_path)
         img_width, img_height = img.getSize()
@@ -195,7 +228,10 @@ class PDFDrafter():
         # Y calculations
         # check to see if we need to add a new line
         if (new_line):
-            self.position_state["offset_from_top_of_page"] += final_height + 0.25 * inch
+            padded_height = last_image_height if last_image_height>final_height else final_height
+            self.position_state["offset_from_top_of_page"] += padded_height + 0.25 * inch
+
+        return final_height
         
     def wrap_text(self, sentances: str, font_style: str, font_size: int) -> None:
         """

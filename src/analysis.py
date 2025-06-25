@@ -1,3 +1,4 @@
+import os
 import hydra
 import logging
 from hydra.utils import get_method
@@ -22,7 +23,9 @@ def main(cfg: DictConfig) -> None:
     analysis_subtasks = cfg.tasks.analysis
 
     log.info("Reached analysis.py")
-    log.info("Going through subtasks under analysis")
+
+    file_path = cfg.paths.analysisdir
+    os.makedirs(str(file_path), exist_ok=True)
 
     if cfg.tasks.analysis : 
         for sub_task_name in analysis_subtasks:
