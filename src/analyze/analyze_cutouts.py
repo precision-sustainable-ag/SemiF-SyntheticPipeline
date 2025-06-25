@@ -240,23 +240,18 @@ def main(cfg: DictConfig) -> None:
     num_cutouts = all_cutouts.num_cutouts, specified_cutouts.num_cutouts
 
     # Create PDF from graphs
-    report = PDFDrafter(cfg, num_cutouts)
+    report = PDFDrafter(cfg)
 
     # Heading
     heading = "Analysis of Cutouts"
 
     # Description
     species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
-    sorted_species = sorted(species_list, key=lambda s: s.lower())
-    if len(sorted_species) > 1:
-        titled = [s.title() for s in sorted_species]
-        species_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
-    else:
-        species_str = sorted_species[0].title()
-    description = f"The following is a report of the {species_str} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
+    species_list = report.add_gramar_and_capitlization_to_string(species_list)
+    description = f"The following is a report of the {species_list} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
 
     report.initialize_heading_and_description(heading, description)
-    report.add_graphs_to_pdf()
+    report.add_graphs_to_pdf(num_cutouts)
     report.save_pdf()
 
     # Delete graphs
