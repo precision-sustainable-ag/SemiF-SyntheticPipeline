@@ -83,7 +83,7 @@ class PreprocessAnalyzer():
         for species in species_list:  
             species = species.upper()
             formatted_preprocess = [
-                f"{preprocess.title().replace('_', ' ')} at {params} percent" if preprocess.title() == "Remove_Soil"
+                f"{preprocess.title().replace('_', ' ')} at {params}%" if preprocess.title() == "Remove_Soil"
                 else f"{preprocess.title().replace('_', ' ')} with params {params}"
                 for preprocess, params in species_processes_dictionary[species]
             ]
