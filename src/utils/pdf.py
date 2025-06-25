@@ -277,7 +277,7 @@ class PDFDrafter():
             self.pdf.showPage()
             self.position_state["offset_from_top_of_page"] = 0
     
-    def add_gramar_and_capitlization_to_string(self, list_to_fix: str) -> str:
+    def add_grammar_and_capitlization_to_string(self, list_to_fix: str) -> str:
         sorted_list = sorted(list_to_fix, key=lambda s: s.lower())
         if len(sorted_list) > 1:
             titled = [s.title() for s in sorted_list]
