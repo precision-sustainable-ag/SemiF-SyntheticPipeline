@@ -3,7 +3,6 @@ import cv2
 import sqlite3
 import logging
 import numpy as np
-from pathlib import Path
 from omegaconf import DictConfig
 from utils.utils import query_for_cutout_metadata
 
@@ -116,7 +115,7 @@ class CutoutProcessor():
             if species in species_processes_dictionary.keys():
                 img = cv2.imread(str(f"{self.cutout_path}/{cutout}.png"), cv2.IMREAD_UNCHANGED)
                 if img is None:
-                    raise FileNotFoundError(f"Could not read image: {input_path}")
+                    raise FileNotFoundError(f"Could not read image: {str(f"{self.cutout_path}/{cutout}.png")}")
 
                 cutout_image_dictionary[cutout] = (img, species_processes_dictionary[species])
 

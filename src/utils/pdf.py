@@ -95,7 +95,7 @@ class PDFDrafter():
                     self.wrap_text(species.title(), self.fonts["styles"]["normal"], self.fonts["size"]["author"])
             
                     # Add size statistics for the first species
-                    subj = f"{species.title()} has {self.specified_cutouts[species.upper()]} total number of cutouts. Your configs specify {all_cutouts[species.upper()]} of those cutouts."
+                    subj = f"{species.title()} has {specified_cutouts[species.upper()]} total number of cutouts. Your configs specify {all_cutouts[species.upper()]} of those cutouts."
                     self.wrap_text(subj, self.fonts["styles"]["normal"], self.fonts["size"]["body"])
 
                     current_species_index += 1
@@ -124,7 +124,7 @@ class PDFDrafter():
             if i % graphs_per_species == (graphs_per_species-1):
                 if (current_species_index-1<len(storage_graphs)):
                     storage_graph_paths = os.path.join(storage_graph_dir, storage_graphs[current_species_index-1])
-                    self.place_image(storage_graph_paths, True, (2,2), 0)    
+                    self.place_image(storage_graph_paths, True, 0, (2,2))    
                 self.position_state["offset_from_left_of_page"] = 0
                 num_of_images_on_line = 0
 
