@@ -126,6 +126,9 @@ class PreprocessAnalyzer():
 
 def main(cfg: DictConfig) -> None:    
 
+    log.info("Reached analyze_preprocessed_cutouts subtask of analysis")
+
+
     # Create PDF from graphs
     report = PDFDrafter(cfg)
     analyzer = PreprocessAnalyzer(cfg)
