@@ -58,10 +58,10 @@ class PreprocessAnalyzer():
         # Make description string
         technique_or_techniques = "techniques" if (len(preprocesses_list) > 1) else "technique"
         description = (
-            f"The following is a report of the {preprocesses_str} preprocessing {technique_or_techniques}, "
-            f"exacted on the species {species_str}. The aim is to display the cutouts before and after preprocessing, "
-            f"allowing the user to see the effects the preprocessing has on the cutouts. A small sample is shown from "
-            f"each of the species. This sample was chosen based on the IoU between the original and preprocessed cutout. "
+            f"This report presents the results of applying {technique_or_techniques} preprocessing to the species {species_str}, "
+            f"as outlined in {preprocesses_str}. It includes visual comparisons of cutouts before and after preprocessing, "
+            f"highlighting the impact of the techniques applied. A representative sample from each species is shown, selected "
+            f"based on the Intersection over Union (IoU) between the original and preprocessed cutouts to best illustrate the changes."
         )
         return description, species_list
 
