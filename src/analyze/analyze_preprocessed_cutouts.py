@@ -46,8 +46,8 @@ class PreprocessAnalyzer():
             f"This report details the application of {technique_or_techniques} preprocessing to the species {species_str}, "
             f"as specified in {preprocesses_str}. It features side-by-side visual comparisons of cutouts before and after preprocessing, "
             f"demonstrating the effects of the applied techniques. A representative sample from each species is included, "
-            f"carefully chosen based on metadata distribution—for example, if bbox ranges from 0 to 1000, "
-            f"cutouts with bbox like 200, 400, and 800 are selected to reflect this spread."
+            f"carefully chosen based on metadata distribution—for example, if bbox ranges from 0 to 600, "
+            f"cutouts with bbox 100,200,300,..,600 are selected to reflect this spread."
         )
         return description, species_list
 
