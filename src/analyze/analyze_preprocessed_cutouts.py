@@ -42,7 +42,7 @@ class PreprocessAnalyzer():
 
         # Grab list of preprocesses
         preprocesses_list = list(set(preprocess.lower().replace('_', ' ') for preprocess in self.cfg.preprocess_cutouts.keys()))
-        preprocesses_str = report.add_grammar_and_capitlization_to_string(preprocesses_list)
+        preprocesses_str = report.add_grammar_and_capitlization_to_list(preprocesses_list)
         
         # Grab list of species
         seen = set()
@@ -53,7 +53,7 @@ class PreprocessAnalyzer():
                 if species not in seen:
                     seen.add(species)
                     species_list.append(species)
-        species_str = report.add_grammar_and_capitlization_to_string(species_list)
+        species_str = report.add_grammar_and_capitlization_to_list(species_list)
 
         # Make description string
         technique_or_techniques = "techniques" if (len(preprocesses_list) > 1) else "technique"

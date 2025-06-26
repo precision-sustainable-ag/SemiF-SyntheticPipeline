@@ -160,10 +160,6 @@ class PDFDrafter():
                     first_height = 0
                     second_height = 0
 
-
-
-
-
     def initialize_heading_and_description(self, heading: str, description : str) -> None:
         '''
             Below we set the title of the report.
@@ -277,7 +273,7 @@ class PDFDrafter():
             self.pdf.showPage()
             self.position_state["offset_from_top_of_page"] = 0
     
-    def add_grammar_and_capitlization_to_string(self, list_to_fix: str) -> str:
+    def add_grammar_and_capitlization_to_list(self, list_to_fix: str) -> str:
         sorted_list = sorted(list_to_fix, key=lambda s: s.lower())
         if len(sorted_list) > 1:
             titled = [s.title() for s in sorted_list]
