@@ -3,8 +3,11 @@ import cv2
 import sqlite3
 import logging
 import numpy as np
+from tqdm import tqdm
 from omegaconf import DictConfig
+
 from utils.utils import query_for_cutout_metadata
+from utils.pdf import add_grammar_and_capitlization_to_list
 
 log = logging.getLogger(__name__)
 
@@ -35,13 +38,10 @@ class CutoutProcessor():
         pre_processed_cutout_path = cfg.paths.preprocessed_cutoutdir
         os.makedirs(str(pre_processed_cutout_path), exist_ok=True)
 
-        # List of preprocess functions
-        preprocess_functions = {
-            'remove_soil': self.remove_soil
-        }
+        log.info(f"Preprocessing requested for {len(cutout_image_dictionary)} cutouts")
 
-        # Loop through cutout_image_dictionary, perform the appropriate transformations for each cutout
-        for cutout_id in cutout_image_dictionary.keys():
+        # Loop through cutout_image_dictionary with a progress bar
+        for cutout_id in tqdm(cutout_image_dictionary.keys(), desc="Preprocessing cutouts"):
             # extract images and list of preprocesses specified for the cutouts species
             image, preprocesses_and_params = cutout_image_dictionary[cutout_id]
 
@@ -102,7 +102,12 @@ class CutoutProcessor():
                 if species not in species_processes_dictionary:
                     species_processes_dictionary[species] = []
 
-                species_processes_dictionary[species].append((preprocess,params))   
+                species_processes_dictionary[species].append((preprocess,params)) 
+
+        for species in species_processes_dictionary:
+            preprocesses,_ = species_processes_dictionary[species]
+            preprocess_str = add_grammar_and_capitlization_to_list(preprocesses)
+            log.info(f"{species.title()} had {preprocesses} requested") 
         
         # Loop through all cutouts downloaded. If a cutout is downloaded and its species has had
         # a preprocess requested for it load it into the dicionary with its images and the process
