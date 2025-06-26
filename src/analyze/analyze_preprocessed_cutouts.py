@@ -1,15 +1,15 @@
 import os
 import cv2
-import json
 import random
 import sqlite3
 import logging
 import numpy as np
-from pathlib import Path
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
 from utils.pdf import PDFDrafter
 from utils.utils import query_for_cutout_metadata
+
+log = logging.getLogger(__name__)
 
 class PreprocessAnalyzer():
     def __init__(self, cfg: DictConfig) -> None:
