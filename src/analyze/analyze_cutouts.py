@@ -45,48 +45,48 @@ class CutoutAnalyzer():
 
         # Connect to database (READ ONLY)
         conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
-        cursor = conn.cursor()
+        self.cursor = conn.cursor()
 
         # Get column names
-        cursor.execute("PRAGMA table_info(semif_cutouts);")
-        columns = [col[1] for col in cursor.fetchall()]
+        self.cursor.execute("PRAGMA table_info(semif_cutouts);")
+        columns = [col[1] for col in self.cursor.fetchall()]
 
         if analysis_type == 'specified': 
             # Find out which storage we would be getting the cutouts from
             batch_ids, cutout_ids = read_recipe(f"{cfg.paths.recipesdir}/{cfg.project_name}_{cfg.sub_name}.json")
-            storage_location_data = self.resolve_image_storage_locations(batch_ids, cutout_ids, sorted_species, cursor)
+            storage_location_data = self.resolve_image_storage_locations(batch_ids, cutout_ids, sorted_species)
             # load downloaded cutout metadata
-            self.load_cutout_metadata(cursor, columns, cutout_ids)
+            self.load_cutout_metadata(columns, cutout_ids)
             self.graph_cutout_data(analysis_type, storage_location_data)
         elif analysis_type == 'all': 
             # load all data of species specified in config
-            self.load_species_metadata(sorted_species, cursor, columns)
+            self.load_species_metadata(sorted_species, columns)
             self.graph_cutout_data(analysis_type, None)
 
         conn.close()
 
-    def load_cutout_metadata(self, cursor: sqlite3.Cursor, columns: list[str], cutout_ids: list[str]) -> None:
+    def load_cutout_metadata(self, columns: list[str], cutout_ids: list[str]) -> None:
         """
             load_cutout_metadata: Function used to query for all metadata from cutouts in the generated recipes
         """
         # Loop through specified cutouts
         for cutout_id in cutout_ids:
-            cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
-            rows = cursor.fetchall()
+            self.cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
+            rows = self.cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
-    def load_species_metadata(self, common_name: list[str], cursor: sqlite3.Cursor, columns: list[str]) -> None:
+    def load_species_metadata(self, common_name: list[str], columns: list[str]) -> None:
         """
             load_species_metadata: Function used to query for all metadata for all cutouts in the common_name list
         """
         # Loop through all specified species cutouts
         for species in common_name:
             species_lower = species.lower()
-            cursor.execute(
+            self.cursor.execute(
                 "SELECT * FROM semif_cutouts WHERE LOWER(json_extract(category, '$.common_name')) = ?",
                 (species_lower,)
             )
-            rows = cursor.fetchall()
+            rows = self.cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
     def query_for_metadata(self, rows: list[tuple], columns: list[str]) -> None:
@@ -169,7 +169,7 @@ class CutoutAnalyzer():
             for species in storage_location_data:
                 vertical_bar_chart_plot(storage_location_data[species], "Cutout Distribution Across Storages", file_path, 'storage_location', species)
 
-    def resolve_image_storage_locations(self,batch_ids: list[str], cutout_ids: list[str], all_species: list[str],cursor: sqlite3.Cursor) -> dict[str, dict[str, int]]:
+    def resolve_image_storage_locations(self,batch_ids: list[str], cutout_ids: list[str], all_species: list[str]) -> dict[str, dict[str, int]]:
 
         data = {}
 
@@ -186,7 +186,7 @@ class CutoutAnalyzer():
         for batch_id, cutout_id in zip(batch_ids, cutout_ids):
             image_filename = f"{cutout_id}.png"
 
-            species = query_for_cutout_metadata(cutout_id,cursor)
+            species = query_for_cutout_metadata(cutout_id,self.cursor)
 
             # List of storage locations in order of preference.
             storages = [
