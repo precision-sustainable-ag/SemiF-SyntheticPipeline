@@ -16,6 +16,10 @@ class CutoutProcessor():
 
         self.cfg = cfg
         self.preprocess_cutouts = cfg.preprocess_cutouts
+
+        self.common_names = [
+            name.upper() for name in self.cfg.cutout_filters.category.common_name
+        ]
         db_path = str(cfg.paths.sql_database)
 
         # Connect to database (READ ONLY)
@@ -33,13 +37,7 @@ class CutoutProcessor():
         cutout_image_dictionary = {}
         cutout_image_dictionary = self.load_cutout_id_image_dictionary()
         
-        # Create directory to store preprocess cutouts if it dosent exist
-        # Path where we will store processed images
-        pre_processed_cutout_path = cfg.paths.preprocessed_cutoutdir
-        os.makedirs(str(pre_processed_cutout_path), exist_ok=True)
-
         log.info(f"Preprocessing requested for {len(cutout_image_dictionary)} cutouts")
-
         # Loop through cutout_image_dictionary with a progress bar
         for cutout_id in tqdm(cutout_image_dictionary.keys(), desc="Preprocessing cutouts"):
             # extract images and list of preprocesses specified for the cutouts species
@@ -54,7 +52,7 @@ class CutoutProcessor():
                     raise ValueError(f"Unknown process: {process_name}")
 
             # save the preprocessed image
-            self.save_image(str(f"{pre_processed_cutout_path}/{cutout_id}.png"), image)
+            self.save_image(str(f"{self.cutout_path}/{cutout_id}.png"), image)
 
     def remove_soil(self, image: np.ndarray, exg_threshold_percent: float = 20) -> np.ndarray:
         # Convert to float32 for ExG calculation
@@ -102,28 +100,34 @@ class CutoutProcessor():
                 if species not in species_processes_dictionary:
                     species_processes_dictionary[species] = []
 
-                species_processes_dictionary[species].append((preprocess,params)) 
+                if species in self.common_names:
+                    species_processes_dictionary[species].append((preprocess,params)) 
+                else:
+                    log.warning(f"Requested preprocessing for {species} but did not specify in cfg.cutout_filters.category.common_name")
+                    log.warning("Skipping this species")
 
-        for species in species_processes_dictionary:
-            preprocesses,_ = species_processes_dictionary[species]
-            preprocess_str = add_grammar_and_capitlization_to_list(preprocesses)
-            log.info(f"{species.title()} had {preprocesses} requested") 
-        
+        if species_processes_dictionary:
+            for species in species_processes_dictionary:
+                if species_processes_dictionary[species]:  # Check that the value is not empty
+                    preprocesses = [p for p, _ in species_processes_dictionary[species]]
+                    preprocess_str = add_grammar_and_capitlization_to_list(preprocesses)
+                    log.info(f"{species.title()} had {preprocess_str} requested")
+    
         # Loop through all cutouts downloaded. If a cutout is downloaded and its species has had
         # a preprocess requested for it load it into the dicionary with its images and the process
         # that have been requested for that particular species
         cutout_image_dictionary = {}
-        for cutout in self.all_cutouts:
+        for cutout in tqdm(self.all_cutouts, desc="Loading images"):
             species = query_for_cutout_metadata(cutout, self.cursor)
 
-            # Check to see if this cutout id has aa preprocess requested, if so load into the dictionary
+            # Check if this cutout id has a preprocess requested, if so load into the dictionary
             if species in species_processes_dictionary.keys():
                 img = cv2.imread(str(f"{self.cutout_path}/{cutout}.png"), cv2.IMREAD_UNCHANGED)
                 if img is None:
-                    raise FileNotFoundError(f"Could not read image: {str(f"{self.cutout_path}/{cutout}.png")}")
+                    raise FileNotFoundError(f"Could not read image: {str(f'{self.cutout_path}/{cutout}.png')}")
 
                 cutout_image_dictionary[cutout] = (img, species_processes_dictionary[species])
-
+                
         return cutout_image_dictionary
 
 def main(cfg: DictConfig) -> None:

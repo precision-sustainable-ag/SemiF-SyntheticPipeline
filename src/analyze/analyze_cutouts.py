@@ -6,7 +6,7 @@ from pathlib import Path
 from omegaconf import DictConfig, OmegaConf
 
 # util imports
-from utils.pdf import PDFDrafter
+from utils.pdf import PDFDrafter, add_grammar_and_capitlization_to_list
 from utils.utils import clear_directory, read_recipe, query_for_cutout_metadata
 from utils.graphs import horizontal_bar_chart_plot, jitter_plot, vertical_bar_chart_plot, boolean_horizontal_bar_chart_plot
 

@@ -2,11 +2,15 @@ import os
 import cv2
 import json
 import random
+import logging
 import sqlite3
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import List, Tuple
+
+
+log = logging.getLogger(__name__)
 
 def filter_area(df, lower, upper):
     filtered_dfs = []
@@ -280,3 +284,39 @@ def query_for_cutout_metadata(cutout_id: str,cursor: sqlite3.Cursor) -> str:
         species = row_dict['category']['common_name'].upper()
 
         return species
+
+def index_cutouts_by_species(json_recipe_path: str) -> dict[str, dict]:
+
+    synthetic_images = load_json(json_recipe_path)
+
+    species_indexed_cutouts = {}
+    for synthetic_image in synthetic_images:
+        for cutout in synthetic_image["cutouts"]:
+            species = cutout["category"]["common_name"].upper()
+            if species not in species_indexed_cutouts:
+                species_indexed_cutouts[species] = []
+            species_indexed_cutouts[species].append(cutout)
+
+    return species_indexed_cutouts
+
+# TODO EXACT CODE IS USED IN MOVE_CUTOUTS
+def load_json(json_file_path: str) -> list[dict]:
+    """
+    Loads the JSON data from the specified file.
+
+    :return: List of synthetic image dictionaries containing cutout information.
+    """
+    try:
+        with open(json_file_path, "r") as f:
+            data = json.load(f)
+            log.info(
+                f"Successfully loaded JSON data from {json_file_path}")
+            return data["synthetic_images"]
+    except FileNotFoundError as e:
+        log.error(f"JSON file not found: {json_file_path} - {e}")
+        raise
+    except json.JSONDecodeError as e:
+        log.error(f"Error decoding JSON file: {json_file_path} - {e}")
+        raise
+
+    return data

@@ -1,15 +1,17 @@
 import os
 import cv2
 import random
-import sqlite3
 import logging
 import numpy as np
 from omegaconf import DictConfig
 
-from utils.pdf import PDFDrafter
-from utils.utils import query_for_cutout_metadata
+from move_cutouts import CutoutDownloader
+from utils.utils import clear_directory, index_cutouts_by_species
+from utils.pdf import PDFDrafter, add_grammar_and_capitlization_to_list
 
 log = logging.getLogger(__name__)
+
+import sys
 
 class PreprocessAnalyzer():
     def __init__(self, cfg: DictConfig) -> None:
@@ -17,32 +19,15 @@ class PreprocessAnalyzer():
         self.cfg = cfg
         self.db_path = str(cfg.paths.sql_database)
         self.original_cutout_path = cfg.paths.cutoutdir
-        self.preproccessed_cutout_path = cfg.paths.preprocessed_cutoutdir
 
-        # Connect to database (READ ONLY)
-        conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
-        self.cursor = conn.cursor()
-
+        self.cutouts_indexed_by_species = index_cutouts_by_species(f"{cfg.paths.recipesdir}/{self.cfg.project_name}_{self.cfg.sub_name}.json")
         self.species_cutout_dict = {}
     
-    def compute_iou(self, cutout_id: str) -> float:
-
-        img1 = cv2.imread(str(f"{self.original_cutout_path}/{cutout_id}.png"), cv2.IMREAD_UNCHANGED)
-        img2 = cv2.imread(str(f"{self.preproccessed_cutout_path}/{cutout_id}.png"), cv2.IMREAD_UNCHANGED)
-
-        assert img1.shape == img2.shape, "Images must be the same shape"
-        
-        intersection = np.logical_and(img1, img2).sum()
-        union = np.logical_or(img1, img2).sum()
-        
-        iou = intersection / union if union != 0 else 0
-        return iou
-
     def build_description(self, report: PDFDrafter) -> str:
 
         # Grab list of preprocesses
         preprocesses_list = list(set(preprocess.lower().replace('_', ' ') for preprocess in self.cfg.preprocess_cutouts.keys()))
-        preprocesses_str = report.add_grammar_and_capitlization_to_list(preprocesses_list)
+        preprocesses_str = add_grammar_and_capitlization_to_list(preprocesses_list)
         
         # Grab list of species
         seen = set()
@@ -53,15 +38,16 @@ class PreprocessAnalyzer():
                 if species not in seen:
                     seen.add(species)
                     species_list.append(species)
-        species_str = report.add_grammar_and_capitlization_to_list(species_list)
+        species_str = add_grammar_and_capitlization_to_list(species_list)
 
         # Make description string
         technique_or_techniques = "techniques" if (len(preprocesses_list) > 1) else "technique"
         description = (
-            f"This report presents the results of applying {technique_or_techniques} preprocessing to the species {species_str}, "
-            f"as outlined in {preprocesses_str}. It includes visual comparisons of cutouts before and after preprocessing, "
-            f"highlighting the impact of the techniques applied. A representative sample from each species is shown, selected "
-            f"based on the Intersection over Union (IoU) between the original and preprocessed cutouts to best illustrate the changes."
+            f"This report details the application of {technique_or_techniques} preprocessing to the species {species_str}, "
+            f"as specified in {preprocesses_str}. It features side-by-side visual comparisons of cutouts before and after preprocessing, "
+            f"demonstrating the effects of the applied techniques. A representative sample from each species is included, "
+            f"carefully chosen based on metadata distribution—for example, if bbox ranges from 0 to 1000, "
+            f"cutouts with bbox like 200, 400, and 800 are selected to reflect this spread."
         )
         return description, species_list
 
@@ -90,39 +76,74 @@ class PreprocessAnalyzer():
 
             species_heading = f"{species.title()} had the following preprocess performed {formatted_preprocess}. The results are shown below."
 
-            # Find the cutouts with the smallest IoU, get a random 40 to generate pdf faster
-            cutouts_and_their_ious = {}
-            preprocessed_cutouts_for_species = self.species_cutout_dict[species]
-            selected_cutouts = random.sample(preprocessed_cutouts_for_species, min(40, len(preprocessed_cutouts_for_species)))
-
-            for cutout in selected_cutouts:
-                cutouts_and_their_ious[cutout] = self.compute_iou(cutout)
-
-            list_of_cutouts_for_species = self.get_strings_for_smallest_six_floats(cutouts_and_their_ious)
+            # Find the samples of cutouts based on metadata
+            preprocessed_cutouts = self.cutouts_indexed_by_species[species]
+            
+            meta_data = 'blur_effect'
+            list_of_cutout_metadata_for_species = self.pick_cutouts_based_on_metadata(preprocessed_cutouts, meta_data)
+            list_of_cutouts_for_species = []
+            for cutout in list_of_cutout_metadata_for_species:
+                list_of_cutouts_for_species.append(cutout["cutout_id"])
 
             data_for_body_of_pdf[species] = (species_heading, list_of_cutouts_for_species)
+        
+        self.download_orignal_cutouts(data_for_body_of_pdf)
 
         report.compare_cutouts(data_for_body_of_pdf)
 
-    def create_species_cutout_id_dict(self, species_list):
+        clear_directory(f"{self.cfg.paths.cutoutdir}/tmp")
 
-        # Grab list of all cutouts that were preprocessed, remove .png
-        preprocessed_cutouts = [filename[:-4] for filename in os.listdir(self.cfg.paths.preprocessed_cutoutdir)]
+    def download_orignal_cutouts(self, cutouts_to_download: dict[tuple[str, list]]) -> None:
 
-        # Query to for the cutout to attach it to the dict with the appropriate species key
-        for cutout_id in preprocessed_cutouts:
-            cutouts_species = query_for_cutout_metadata(cutout_id, self.cursor)
+        downloader = ModifiedCutoutDownloader(self.cfg)
+        os.makedirs(f"{self.cfg.paths.cutoutdir}/tmp", exist_ok=True)
 
-            if cutouts_species not in species_list:
-                continue
+        list_of_cutouts_to_download = []
+        for species in cutouts_to_download:
+            _,list_of_cutouts_for_species = cutouts_to_download[species]
+            list_of_cutouts_to_download.extend(list_of_cutouts_for_species)
 
-            if cutouts_species not in self.species_cutout_dict:
-                self.species_cutout_dict[cutouts_species] = []
-            self.species_cutout_dict[cutouts_species].append(cutout_id)
+        downloader.process_cutouts_sequentially(list_of_cutouts_to_download)
 
-    def get_strings_for_smallest_six_floats(self, data: dict[str, float]) -> list[str]:
-        # Sort by value (the floats), take the first 6, return the keys
-        return [k for k, _ in sorted(data.items(), key=lambda item: item[1])[:6]]
+    def pick_cutouts_based_on_metadata(self, preprocessed_cutouts, metadata):
+        # Sort them by bounding box area
+        sorted_cutouts = sorted(
+            preprocessed_cutouts,
+            key=lambda x: x['cutout_props'][metadata]
+        )
+
+        # Pick 6 equally spaced cutouts
+        num_to_select = 6
+        total = len(sorted_cutouts)
+
+        if total <= num_to_select:
+            selected_cutouts = sorted_cutouts  # Not enough, return all
+        else:
+            step = total / num_to_select
+            selected_cutouts = [sorted_cutouts[int(i * step)] for i in range(num_to_select)]
+        
+        return selected_cutouts
+
+
+class ModifiedCutoutDownloader(CutoutDownloader):
+    def __init__(self, cfg: DictConfig):
+        super().__init__(cfg)
+        self.local_download_folder = f"{cfg.paths.cutoutdir}/tmp"
+
+    def process_cutouts_sequentially(self, allowed_cutout_ids: list) -> None:
+
+        synthetic_images = self.load_json()
+
+        unique_cutouts = self.get_unique_cutouts(synthetic_images)
+
+        for cutout_id, batch_id in unique_cutouts.items():
+            if cutout_id in allowed_cutout_ids:
+                self.download_image(cutout_id, batch_id)
+
+        log.info("Download process completed in serial mode.")
+
+
+
 
 def main(cfg: DictConfig) -> None:    
 
@@ -142,14 +163,11 @@ def main(cfg: DictConfig) -> None:
         Description
     '''
     description, species_list = analyzer.build_description(report)
-
-    analyzer.create_species_cutout_id_dict(species_list)
     report.initialize_heading_and_description(heading, description)
 
     '''
         Grab data to pass into PDF.py to build body of report
     '''
-    analyzer.create_species_cutout_id_dict(species_list)
     analyzer.grab_data_and_build_body_of_report(species_list, report)
 
     '''

@@ -147,9 +147,9 @@ class PDFDrafter():
                     new_line=True
 
                 # Place original image
-                first_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/{cutout_id}.png"), False, max_height)
+                first_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/tmp/{cutout_id}.png"), False, max_height)
                 max_height = max(first_height, max_height, second_height)
-                second_height = self.place_image(str(f"{self.cfg.paths.preprocessed_cutoutdir}/{cutout_id}.png"), new_line, max_height)  
+                second_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/{cutout_id}.png"), new_line, max_height)  
 
                 # Configed to allow 2 comparisons per line
                 if i==2:
@@ -273,11 +273,11 @@ class PDFDrafter():
             self.pdf.showPage()
             self.position_state["offset_from_top_of_page"] = 0
     
-    def add_grammar_and_capitlization_to_list(self, list_to_fix: str) -> str:
-        sorted_list = sorted(list_to_fix, key=lambda s: s.lower())
-        if len(sorted_list) > 1:
-            titled = [s.title() for s in sorted_list]
-            fixed_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
-        else:
-            fixed_str = sorted_list[0].title()
-        return fixed_str
+def add_grammar_and_capitlization_to_list(list_to_fix: str) -> str:
+    sorted_list = sorted(list_to_fix, key=lambda s: s.lower())
+    if len(sorted_list) > 1:
+        titled = [s.title() for s in sorted_list]
+        fixed_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
+    else:
+        fixed_str = sorted_list[0].title()
+    return fixed_str
