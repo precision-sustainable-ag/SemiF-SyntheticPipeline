@@ -251,7 +251,7 @@ def main(cfg: DictConfig) -> None:
     description = f"The following is a report of the {species_list} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
 
     report.initialize_heading_and_description(heading, description)
-    report.add_graphs_to_pdf(num_cutouts)
+    report.add_analysis_graphs_to_pdf(num_cutouts)
     report.save_pdf()
 
     # Delete graphs

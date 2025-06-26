@@ -62,7 +62,7 @@ class PDFDrafter():
         self.pdf.save()
         log.info(f"PDF saved to {self.output_pdf}")
 
-    def add_graphs_to_pdf(self, num_cutouts: tuple[dict[str, int], dict[str, int]]) -> None:
+    def add_analysis_graphs_to_pdf(self, num_cutouts: tuple[dict[str, int], dict[str, int]]) -> None:
         '''
             Below inserts metadata graphs for each species into the final report.
         '''
