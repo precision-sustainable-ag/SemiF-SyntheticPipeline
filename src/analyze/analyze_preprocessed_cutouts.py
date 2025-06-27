@@ -8,6 +8,7 @@ from omegaconf import DictConfig
 from move_cutouts import CutoutDownloader
 from utils.utils import clear_directory, index_cutouts_by_species
 from utils.pdf import PDFDrafter, add_grammar_and_capitlization_to_list
+from preprocess_cutouts import invert_and_check_species_preprocess_dictionary
 
 log = logging.getLogger(__name__)
 
@@ -20,8 +21,16 @@ class PreprocessAnalyzer():
         self.db_path = str(cfg.paths.sql_database)
         self.original_cutout_path = cfg.paths.cutoutdir
 
-        self.cutouts_indexed_by_species = index_cutouts_by_species(f"{cfg.paths.recipesdir}/{self.cfg.project_name}_{self.cfg.sub_name}.json")
+        recipe_file = f"{cfg.paths.recipesdir}/{cfg.project_name}_{cfg.sub_name}.json"
+        self.cutouts_indexed_by_species = index_cutouts_by_species(recipe_file)
+
         self.species_cutout_dict = {}
+
+        self.preprocess_cutouts = cfg.preprocess_cutouts
+
+        self.common_names = [
+            name.upper() for name in self.cfg.cutout_filters.category.common_name
+        ]
     
     def build_description(self, report: PDFDrafter) -> str:
 
@@ -53,30 +62,27 @@ class PreprocessAnalyzer():
 
     def grab_data_and_build_body_of_report(self, species_list: str, report: PDFDrafter):
 
+        species_processes_dictionary = invert_and_check_species_preprocess_dictionary(self.preprocess_cutouts, self.common_names)
+
         data_for_body_of_pdf = {}
-
-        species_processes_dictionary = {}
-        for preprocess in self.cfg.preprocess_cutouts.keys():
-            species_list = list(self.cfg.preprocess_cutouts[preprocess])
-            for species in species_list:
-                params = self.cfg.preprocess_cutouts[preprocess][species]
-                species = species.upper()
-                if species not in species_processes_dictionary:
-                    species_processes_dictionary[species] = []
-
-                species_processes_dictionary[species].append((preprocess,params)) 
+        
 
         for species in species_list:  
             species = species.upper()
             formatted_preprocess = [
-                f"{preprocess.title().replace('_', ' ')} at {params}%" if preprocess.title() == "Remove_Soil"
+                f"{preprocess.title().replace('_', ' ')} at level {params}" if preprocess.title() == "Remove_Soil"
                 else f"{preprocess.title().replace('_', ' ')} with params {params}"
                 for preprocess, params in species_processes_dictionary[species]
             ]
+            preprocess_string = add_grammar_and_capitlization_to_list(formatted_preprocess)
 
-            species_heading = f"{species.title()} had the following preprocess performed {formatted_preprocess}. The results are shown below."
+            species_heading = f"{species.title()} had the following preprocess performed {preprocess_string}. The results are shown below."
 
             # Find the samples of cutouts based on metadata
+            if species not in self.cutouts_indexed_by_species.keys():
+                log.warning("Requested analysis for a species that wasnt preprocessed. Skipping.")
+                continue
+
             preprocessed_cutouts = self.cutouts_indexed_by_species[species]
             
             meta_data = 'blur_effect'
@@ -95,14 +101,13 @@ class PreprocessAnalyzer():
 
     def download_orignal_cutouts(self, cutouts_to_download: dict[tuple[str, list]]) -> None:
 
-        downloader = ModifiedCutoutDownloader(self.cfg)
-        os.makedirs(f"{self.cfg.paths.cutoutdir}/tmp", exist_ok=True)
-
         list_of_cutouts_to_download = []
         for species in cutouts_to_download:
             _,list_of_cutouts_for_species = cutouts_to_download[species]
             list_of_cutouts_to_download.extend(list_of_cutouts_for_species)
 
+        downloader = ModifiedCutoutDownloader(self.cfg)
+        os.makedirs(f"{self.cfg.paths.cutoutdir}/tmp", exist_ok=True)
         downloader.process_cutouts_sequentially(list_of_cutouts_to_download)
 
     def pick_cutouts_based_on_metadata(self, preprocessed_cutouts, metadata):
@@ -132,7 +137,7 @@ class ModifiedCutoutDownloader(CutoutDownloader):
 
     def process_cutouts_sequentially(self, allowed_cutout_ids: list) -> None:
 
-        synthetic_images = self.load_json()
+        synthetic_images = self.load_json(self.json_file_path)
 
         unique_cutouts = self.get_unique_cutouts(synthetic_images)
 
@@ -141,9 +146,6 @@ class ModifiedCutoutDownloader(CutoutDownloader):
                 self.download_image(cutout_id, batch_id)
 
         log.info("Download process completed in serial mode.")
-
-
-
 
 def main(cfg: DictConfig) -> None:    
 

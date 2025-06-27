@@ -299,7 +299,6 @@ def index_cutouts_by_species(json_recipe_path: str) -> dict[str, dict]:
 
     return species_indexed_cutouts
 
-# TODO EXACT CODE IS USED IN MOVE_CUTOUTS
 def load_json(json_file_path: str) -> list[dict]:
     """
     Loads the JSON data from the specified file.

@@ -4,10 +4,10 @@ import logging
 import shutil
 from pathlib import Path
 from typing import List, Dict
-
 from omegaconf import DictConfig
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from utils.utils import load_json
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ class CutoutDownloader:
         """
         self.json_file_path = Path(cfg.paths.projectdir, "recipes",
                                    f"{cfg.project_name}_{cfg.sub_name}.json")
+        self.load_json = load_json
 
         self.primary_storage_base = Path(cfg.paths.primary_longterm_storage, "semifield-cutouts")
         self.secondary_storage_base = Path(cfg.paths.secondary_longterm_storage, "semifield-cutouts")
@@ -55,25 +56,6 @@ class CutoutDownloader:
     #             return False
     #         else:
     #             raise
-
-    def load_json(self) -> List[Dict]:
-        """
-        Loads the JSON data from the specified file.
-
-        :return: List of synthetic image dictionaries containing cutout information.
-        """
-        try:
-            with open(self.json_file_path, "r") as f:
-                data = json.load(f)
-                log.info(
-                    f"Successfully loaded JSON data from {self.json_file_path}")
-                return data["synthetic_images"]
-        except FileNotFoundError as e:
-            log.error(f"JSON file not found: {self.json_file_path} - {e}")
-            raise
-        except json.JSONDecodeError as e:
-            log.error(f"Error decoding JSON file: {self.json_file_path} - {e}")
-            raise
 
     def download_image(self, cutout_id: str, batch_id: str) -> None:
         """
@@ -141,7 +123,7 @@ class CutoutDownloader:
         """
         Processes each cutout in the JSON file and downloads the corresponding images from long-term storage in serial mode.
         """
-        synthetic_images = self.load_json()
+        synthetic_images = self.load_json(self.json_file_path)
 
         unique_cutouts = self.get_unique_cutouts(synthetic_images)
         log.info(f"Found {len(unique_cutouts)} unique cutouts to download.")
@@ -156,7 +138,7 @@ class CutoutDownloader:
         Processes each cutout in the JSON file and downloads the corresponding images from long-term storage.
         This method uses multithreading to parallelize the download process.
         """
-        synthetic_images = self.load_json()
+        synthetic_images = self.load_json(self.json_file_path)
         unique_cutouts = self.get_unique_cutouts(synthetic_images)
         log.info(f"Found {len(unique_cutouts)} unique cutouts to download.")
 
