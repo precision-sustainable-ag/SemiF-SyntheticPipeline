@@ -116,7 +116,7 @@ class CutoutProcessor():
         self.save_images(cutout_image_dictionary)
 
 
-def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str, dict[str, list]],common_names: list[str]) ""-> dict[str, list[tuple[str, list]]]:   
+def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str, dict[str, list]],common_names: list[str]) -> dict[str, list[tuple[str, list]]]:   
     """
         This function takes the preprocess dictionary in the config and inverts it to make the keys based on species
     """
