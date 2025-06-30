@@ -149,7 +149,20 @@ Moves cutout images from long-term storage to a local directory.
 Preprocesses downloaded cutouts based on the what you set for a certain species.
 
 #### Arguments
-- **Remove_Soil. Applies EXG to all cutouts of a certain species, intensity based on level set**
+
+- **Remove_Soil**: Applies EXG to all cutouts of a certain species. Levels can be floats and exceed 5.
+
+**Remove_Soil – EXG Intensity Levels**
+
+| **Level** | **Description**                               |
+|-----------|-----------------------------------------------|
+| 1         | Almost all greenish areas                     |
+| 2         | Solid green vegetation                        |
+| 3         | Strong green only (excludes less intense)     |
+| 4         | Very strong green (excludes weaker greens)    |
+| 5         | Darkest, most saturated greens                |
+
+
 
 #### Output:
 - `data/cutouts/*.png` (Preprcessed cutout images)
