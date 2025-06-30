@@ -36,6 +36,12 @@ class CutoutProcessor():
         """
             Perform basic EXG
         """
+
+        if not (-50 <= exg_threshold <= 50):
+            log.error(f"Exceeding threshold limit [-50, 50] at {exg_threshold}, skipping")
+            return image
+
+
         # Convert to float32 for ExG calculation
         img_float = image[:, :, :3].astype(np.float32)
 
@@ -160,6 +166,10 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
 
 def main(cfg: DictConfig) -> None:
     log.info("Reached cutout preprocessing task")
+
+    if not cfg.preprocess_cutouts:
+        log.error("Empty preprocess dictionary, skipping task")
+        return
 
     CutoutProcessor(cfg)
 

@@ -41,6 +41,11 @@ class PreprocessAnalyzer():
         seen = set()
         species_list = []
         for preprocess in self.cfg.preprocess_cutouts:
+            species_values = self.cfg.preprocess_cutouts[preprocess]
+            
+            if not species_values:
+                log.warning(f"No species listed for preprocess '{preprocess}', skipping.")
+                continue
             for species in self.cfg.preprocess_cutouts[preprocess]:
                 species = species.upper()
                 if species not in seen:
@@ -160,6 +165,10 @@ class ModifiedCutoutDownloader(CutoutDownloader):
 def main(cfg: DictConfig) -> None:    
 
     log.info("Reached analyze_preprocessed_cutouts subtask of analysis")
+
+    if not cfg.preprocess_cutouts:
+        log.error("Empty preprocess dictionary, skipping task")
+        return
 
     # Create PDF from graphs
     report = PDFDrafter(cfg)
