@@ -8,7 +8,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
-from utils.utils import count_all_files, 
+from utils.utils import count_all_files
 
 log = logging.getLogger(__name__)
 
