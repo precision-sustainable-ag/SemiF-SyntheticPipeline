@@ -59,6 +59,9 @@ class PreprocessAnalyzer():
         return description, species_list
 
     def grab_data_and_build_body_of_report(self, species_list: str, report: PDFDrafter):
+        """
+            This function works to build the body of the report. It handles grabbing the images and formulating the headings
+        """
 
         species_processes_dictionary = invert_and_check_species_preprocess_dictionary(self.preprocess_cutouts, self.common_names)
 
@@ -91,7 +94,7 @@ class PreprocessAnalyzer():
 
                 preprocessed_cutouts = self.cutouts_indexed_by_species[species]
                 
-                meta_data = 'blur_effect'
+                meta_data = 'bbox_area_cm2'
                 list_of_cutout_metadata_for_species = self.pick_cutouts_based_on_metadata(preprocessed_cutouts, meta_data)
                 list_of_cutouts_for_species = []
                 for cutout in list_of_cutout_metadata_for_species:
@@ -116,7 +119,7 @@ class PreprocessAnalyzer():
         os.makedirs(f"{self.cfg.paths.cutoutdir}/tmp", exist_ok=True)
         downloader.process_cutouts_sequentially(list_of_cutouts_to_download)
 
-    def pick_cutouts_based_on_metadata(self, preprocessed_cutouts, metadata):
+    def pick_cutouts_based_on_metadata(self, preprocessed_cutouts: list, metadata: str):
         # Sort them by bounding box area
         sorted_cutouts = sorted(
             preprocessed_cutouts,
@@ -135,7 +138,7 @@ class PreprocessAnalyzer():
         
         return selected_cutouts
 
-
+# Modify downloader class so that it only downloads images we need for comparison
 class ModifiedCutoutDownloader(CutoutDownloader):
     def __init__(self, cfg: DictConfig):
         super().__init__(cfg)

@@ -33,7 +33,10 @@ class CutoutProcessor():
         self.perform_preprocessing()
         
 
-    def remove_soil(self, image: np.ndarray, exg_threshold) -> np.ndarray:
+    def remove_soil(self, image: np.ndarray, exg_threshold: float) -> np.ndarray:
+        """
+            Perform basic EXG
+        """
         # Convert to float32 for ExG calculation
         img_float = image[:, :, :3].astype(np.float32)
 
@@ -63,6 +66,10 @@ class CutoutProcessor():
             cv2.imwrite(f"{self.cfg.paths.cutoutdir}/{cutout}.png", cutout_image_dictionary[cutout])
             
     def perform_preprocessing(self) -> dict[str, tuple[np.ndarray, list]]:
+        """
+            This function handles all the preprocessing tasks. It will go the config, figure out which species need preprocessing
+            and then preprocess those species.
+        """
 
         # Check which species were downloaded (by looking at the recipe)
         downloaded_species_dict_path = f"{self.cfg.paths.recipesdir}/{self.cfg.project_name}_{self.cfg.sub_name}.json"
@@ -109,8 +116,10 @@ class CutoutProcessor():
         self.save_images(cutout_image_dictionary)
 
 
-
-def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str, dict[str, list]],common_names: list[str]) -> dict[str, list[tuple[str, list]]]:    
+def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str, dict[str, list]],common_names: list[str]) ""-> dict[str, list[tuple[str, list]]]:   
+    """
+        This function takes the preprocess dictionary in the config and inverts it to make the keys based on species
+    """
     species_processes_dictionary = {}
     for preprocess in preprocess_cutouts.keys():
 
