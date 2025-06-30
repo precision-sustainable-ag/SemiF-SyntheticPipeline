@@ -128,7 +128,7 @@ class PDFDrafter():
                 self.position_state["offset_from_left_of_page"] = 0
                 num_of_images_on_line = 0
 
-    def compare_cutouts(self, compare_cutout_dict: dict[tuple[str, list]]):
+    def compare_cutouts(self, compare_cutout_dict: dict[tuple[str, list]]) -> None:
         for species in compare_cutout_dict.keys():
             description, cutouts_to_compare = compare_cutout_dict[species]
 
@@ -136,13 +136,11 @@ class PDFDrafter():
 
             cutouts_to_compare = compare_cutout_dict[species][1]
 
-            i = 0
             max_height = first_height = second_height = 0
             for idx, cutout_id in enumerate(cutouts_to_compare):
-                i+=1
                 new_line=False
                 # Configed to allow 2 comparisons per line, and deal with last image (odd num edgecase)
-                if i==2 or idx == len(cutouts_to_compare) - 1:
+                if (idx%2==1) or idx == len(cutouts_to_compare) - 1:
                     new_line=True # if last image set to true
 
                 # Place original image
@@ -150,11 +148,10 @@ class PDFDrafter():
                 max_height = max(first_height, max_height, second_height)
                 second_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/{cutout_id}.png"), new_line, max_height)  
 
-                # Configed to allow 2 comparisons per line
-                if i==2 or idx == len(cutouts_to_compare) - 1:
+                # Configed to allow 2 comparisons per line, and deal with last image (odd num edgecase)
+                if (idx%2==1) or idx == len(cutouts_to_compare) - 1:
                     # Move back to the right side of the page
                     self.position_state["offset_from_left_of_page"] = 0
-                    i=0
                     max_height = 0
                     first_height = 0
                     second_height = 0
