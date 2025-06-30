@@ -113,6 +113,11 @@ class CutoutProcessor():
 def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str, dict[str, list]],common_names: list[str]) -> dict[str, list[tuple[str, list]]]:    
     species_processes_dictionary = {}
     for preprocess in preprocess_cutouts.keys():
+
+        if not preprocess_cutouts[preprocess]:
+            log.error(f"{preprocess} was left empty, skipping")
+            continue
+
         preprocess_upper = preprocess.upper()
         species_list = list(preprocess_cutouts[preprocess])
         
@@ -120,10 +125,10 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
             species_upper = species.upper()
             params = preprocess_cutouts[preprocess][species]
 
-            if species_upper not in species_processes_dictionary:
-                species_processes_dictionary[species_upper] = []
-
             if species_upper in (name.upper() for name in common_names):
+                if species_upper not in species_processes_dictionary:
+                    species_processes_dictionary[species_upper] = []
+
                 existing = species_processes_dictionary[species_upper]
                 for existing_preprocess, existing_params in existing:
                     if existing_preprocess.upper() == preprocess_upper and existing_params != params:

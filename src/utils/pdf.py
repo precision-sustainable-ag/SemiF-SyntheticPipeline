@@ -138,13 +138,12 @@ class PDFDrafter():
 
             i = 0
             max_height = first_height = second_height = 0
-            for cutout_id in cutouts_to_compare:
+            for idx, cutout_id in enumerate(cutouts_to_compare):
                 i+=1
                 new_line=False
-                # Configed to allow 2 comparisons per line
-                if i==2:
-                    # add new line
-                    new_line=True
+                # Configed to allow 2 comparisons per line, and deal with last image (odd num edgecase)
+                if i==2 or idx == len(cutouts_to_compare) - 1:
+                    new_line=True # if last image set to true
 
                 # Place original image
                 first_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/tmp/{cutout_id}.png"), False, max_height)
@@ -152,7 +151,7 @@ class PDFDrafter():
                 second_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/{cutout_id}.png"), new_line, max_height)  
 
                 # Configed to allow 2 comparisons per line
-                if i==2:
+                if i==2 or idx == len(cutouts_to_compare) - 1:
                     # Move back to the right side of the page
                     self.position_state["offset_from_left_of_page"] = 0
                     i=0

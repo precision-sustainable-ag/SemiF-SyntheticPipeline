@@ -12,8 +12,6 @@ from preprocess_cutouts import invert_and_check_species_preprocess_dictionary
 
 log = logging.getLogger(__name__)
 
-import sys
-
 class PreprocessAnalyzer():
     def __init__(self, cfg: DictConfig) -> None:
 
@@ -64,34 +62,42 @@ class PreprocessAnalyzer():
 
         species_processes_dictionary = invert_and_check_species_preprocess_dictionary(self.preprocess_cutouts, self.common_names)
 
-        data_for_body_of_pdf = {}
-        
+        if not species_processes_dictionary:
+            log.error("No preprocessing requested. Exiting class.")
+            return  
 
+        data_for_body_of_pdf = {}
+        print(species_list)
         for species in species_list:  
             species = species.upper()
-            formatted_preprocess = [
-                f"{preprocess.title().replace('_', ' ')} at level {params}" if preprocess.title() == "Remove_Soil"
-                else f"{preprocess.title().replace('_', ' ')} with params {params}"
-                for preprocess, params in species_processes_dictionary[species]
-            ]
-            preprocess_string = add_grammar_and_capitlization_to_list(formatted_preprocess)
 
-            species_heading = f"{species.title()} had the following preprocess performed {preprocess_string}. The results are shown below."
+            if species not in species_processes_dictionary:
+                log.warning(f"Species '{species}' not found in species_processes_dictionary.")
+                formatted_preprocess = []
+            else:
+                formatted_preprocess = [
+                    f"{preprocess.replace('_', ' ').title()} with params {params}"
+                    for preprocess, params in species_processes_dictionary[species]
+                ]
 
-            # Find the samples of cutouts based on metadata
-            if species not in self.cutouts_indexed_by_species.keys():
-                log.warning("Requested analysis for a species that wasnt preprocessed. Skipping.")
-                continue
+                preprocess_string = add_grammar_and_capitlization_to_list(formatted_preprocess)
 
-            preprocessed_cutouts = self.cutouts_indexed_by_species[species]
-            
-            meta_data = 'blur_effect'
-            list_of_cutout_metadata_for_species = self.pick_cutouts_based_on_metadata(preprocessed_cutouts, meta_data)
-            list_of_cutouts_for_species = []
-            for cutout in list_of_cutout_metadata_for_species:
-                list_of_cutouts_for_species.append(cutout["cutout_id"])
+                species_heading = f"{species.title()} had the following preprocess performed {preprocess_string}. The results are shown below."
 
-            data_for_body_of_pdf[species] = (species_heading, list_of_cutouts_for_species)
+                # Find the samples of cutouts based on metadata
+                if species not in self.cutouts_indexed_by_species.keys():
+                    log.warning("Requested analysis for a species that wasnt preprocessed. Skipping.")
+                    continue
+
+                preprocessed_cutouts = self.cutouts_indexed_by_species[species]
+                
+                meta_data = 'blur_effect'
+                list_of_cutout_metadata_for_species = self.pick_cutouts_based_on_metadata(preprocessed_cutouts, meta_data)
+                list_of_cutouts_for_species = []
+                for cutout in list_of_cutout_metadata_for_species:
+                    list_of_cutouts_for_species.append(cutout["cutout_id"])
+
+                data_for_body_of_pdf[species] = (species_heading, list_of_cutouts_for_species)
         
         self.download_orignal_cutouts(data_for_body_of_pdf)
 
@@ -150,7 +156,6 @@ class ModifiedCutoutDownloader(CutoutDownloader):
 def main(cfg: DictConfig) -> None:    
 
     log.info("Reached analyze_preprocessed_cutouts subtask of analysis")
-
 
     # Create PDF from graphs
     report = PDFDrafter(cfg)
