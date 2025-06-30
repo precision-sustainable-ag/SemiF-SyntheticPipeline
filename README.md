@@ -56,14 +56,20 @@ sub_name: test
 
 tasks:
   create_recipes:
-  analysis: 
-    - analyze_cutouts
   move_cutouts: 
-  synthesize: 
+  preprocess_cutouts:
+  analysis:
+    - analyze_cutouts
+    - analyze_preprocessed_cutouts
+  synthesize:
 
 move_cutouts:
   parallel: True
   parallel_workers: 8
+
+preprocess_cutouts:
+  remove_soil: 
+    Hairy vetch: 5  
 
 synthesize:
   resize_factor: 0.35
@@ -122,6 +128,12 @@ Generates a report on the metadata of the cutouts specified in your recipe and c
 #### Output:
 - `projects/<project>/<name>/analysis/report<date>.pdf`
 
+#### **2.2 Analyze Preprocessed Cutouts** (`analyze_preprocessed_cutouts.py`)
+Generates a report on the preprocessing done to the cutouts. 
+
+#### Output:
+- `projects/<project>/<name>/analysis/report<date>.pdf`
+
 ### **3. Move Cutouts** (`move_cutouts.py`)
 Moves cutout images from long-term storage to a local directory.
 
@@ -133,7 +145,16 @@ Moves cutout images from long-term storage to a local directory.
 #### Output:
 - `data/cutouts/*.png` (Downloaded cutout images)
 
-### **4. Synthesize** (`synthesize.py`)
+### **4. Preprocess Cutouts** (`preprocess_cutouts.py`)
+Preprocesses downloaded cutouts based on the what you set for a certain species.
+
+#### Arguments
+- **Remove_Soil. Applies EXG to all cutouts of a certain species, intensity based on level set**
+
+#### Output:
+- `data/cutouts/*.png` (Preprcessed cutout images)
+
+### **5. Synthesize** (`synthesize.py`)
 Generates synthetic images by overlaying cutouts onto backgrounds.
 
 #### Includes:
