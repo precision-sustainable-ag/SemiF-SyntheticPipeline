@@ -5,10 +5,11 @@ import logging
 import numpy as np
 from omegaconf import DictConfig
 
+from utils.pdf import PDFDrafter
 from move_cutouts import CutoutDownloader
-from utils.utils import clear_directory, index_cutouts_by_species
-from utils.pdf import PDFDrafter, add_grammar_and_capitlization_to_list
 from preprocess_cutouts import invert_and_check_species_preprocess_dictionary
+from utils.utils import clear_directory, index_cutouts_by_species, add_grammar_and_capitlization_to_list
+
 
 log = logging.getLogger(__name__)
 

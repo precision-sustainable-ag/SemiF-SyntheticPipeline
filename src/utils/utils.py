@@ -319,3 +319,12 @@ def load_json(json_file_path: str) -> list[dict]:
         raise
 
     return data
+
+def add_grammar_and_capitlization_to_list(list_to_fix: str) -> str:
+    sorted_list = sorted(list_to_fix, key=lambda s: s.lower())
+    if len(sorted_list) > 1:
+        titled = [s.title() for s in sorted_list]
+        fixed_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
+    else:
+        fixed_str = sorted_list[0].title()
+    return fixed_str

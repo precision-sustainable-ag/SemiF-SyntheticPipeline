@@ -4,10 +4,11 @@ import datetime
 from omegaconf import DictConfig
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
-from utils.utils import count_all_files
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import stringWidth
+
+from utils.utils import count_all_files, 
 
 log = logging.getLogger(__name__)
 
@@ -269,11 +270,3 @@ class PDFDrafter():
             self.pdf.showPage()
             self.position_state["offset_from_top_of_page"] = 0
     
-def add_grammar_and_capitlization_to_list(list_to_fix: str) -> str:
-    sorted_list = sorted(list_to_fix, key=lambda s: s.lower())
-    if len(sorted_list) > 1:
-        titled = [s.title() for s in sorted_list]
-        fixed_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
-    else:
-        fixed_str = sorted_list[0].title()
-    return fixed_str
