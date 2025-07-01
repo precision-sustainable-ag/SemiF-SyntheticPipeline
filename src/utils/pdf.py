@@ -150,7 +150,7 @@ class PDFDrafter():
                 second_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/{cutout_id}.png"), new_line=new_line, last_image_height=max_height)  
 
                 # Configed to allow 2 comparisons per line, and deal with last image (odd num edgecase)
-                if (idx%2==1) or idx == len(cutouts_to_compare) - 1:
+                if new_line:
                     # Move back to the right side of the page
                     self.position_state["offset_from_left_of_page"] = 0
                     max_height = 0
