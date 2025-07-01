@@ -117,15 +117,15 @@ class PDFDrafter():
                 num_of_images_on_line = 0
 
             # Place first couple of images, pass in 0 because all of them are the same size
-            self.place_image(all_cutout_path, False, 0)
+            self.place_image(all_cutout_path)
             # Place second couple of images, pass in 0 because all of them are the same size
-            self.place_image(specified_cutout_path, new_line, 0)    
+            self.place_image(specified_cutout_path, new_line=new_line)    
 
             # Place storage graphs
             if i % graphs_per_species == (graphs_per_species-1):
                 if (current_species_index-1<len(storage_graphs)):
                     storage_graph_paths = os.path.join(storage_graph_dir, storage_graphs[current_species_index-1])
-                    self.place_image(storage_graph_paths, True, 0, (2,2))    
+                    self.place_image(storage_graph_paths, new_line=True, image_scaler_width_and_height=(2,2))    
                 self.position_state["offset_from_left_of_page"] = 0
                 num_of_images_on_line = 0
 
@@ -145,9 +145,9 @@ class PDFDrafter():
                     new_line=True # if last image set to true
 
                 # Place original image
-                first_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/tmp/{cutout_id}.png"), False, max_height)
+                first_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/tmp/{cutout_id}.png"), last_image_height=max_height)
                 max_height = max(first_height, max_height, second_height)
-                second_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/{cutout_id}.png"), new_line, max_height)  
+                second_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/{cutout_id}.png"), new_line=new_line, last_image_height=max_height)  
 
                 # Configed to allow 2 comparisons per line, and deal with last image (odd num edgecase)
                 if (idx%2==1) or idx == len(cutouts_to_compare) - 1:
@@ -196,7 +196,7 @@ class PDFDrafter():
         # Add spacing between description and images
         self.position_state["offset_from_top_of_page"] += 0.15 * inch  
 
-    def place_image(self, image_path: str, new_line: bool, last_image_height: float, image_scaler_width_and_height: tuple[int, int] = (1, 1)) -> float:
+    def place_image(self, image_path: str, new_line: bool = False, last_image_height: float = 0, image_scaler_width_and_height: tuple[int, int] = (1, 1)) -> float:
         final_width = 2 * inch * image_scaler_width_and_height[0]
         img = ImageReader(image_path)
         img_width, img_height = img.getSize()
