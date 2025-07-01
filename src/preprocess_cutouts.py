@@ -109,7 +109,7 @@ class CutoutProcessor():
                             if not cutout["cutout_id"] in cutout_image_dictionary.keys():
                                 img = cv2.imread(str(f'{self.cutout_path}/{cutout["cutout_id"]}.png'), cv2.IMREAD_UNCHANGED)
                                 if img is None:
-                                    raise FileNotFoundError(f"Could not read image: {str(f'{self.cutout_path}/{cutout}.png')}")
+                                    raise FileNotFoundError(f"Could not read image: {str(f'{self.cutout_path}/{cutout["cutout_id"]}.png')}")
                                 cutout_image_dictionary[cutout["cutout_id"]] = img
 
                             method = getattr(self, process_name, None)
