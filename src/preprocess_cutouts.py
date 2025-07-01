@@ -31,12 +31,7 @@ class CutoutProcessor():
 
         # perform preprocessing
         self.perform_preprocessing()
-        
-    def save_images(self, cutout_image_dictionary: dict[str, np.ndarray]) -> None:
-        log.info("Saving preprocessed images")
-        for cutout in tqdm(cutout_image_dictionary.keys(), desc="Saving cutouts"):
-            cv2.imwrite(f"{self.cfg.paths.cutoutdir}/{cutout}.png", cutout_image_dictionary[cutout])
-            
+                    
     def perform_preprocessing(self) -> dict[str, tuple[np.ndarray, list]]:
         """
             This function handles all the preprocessing tasks. It will go the config, figure out which species need preprocessing
@@ -69,13 +64,16 @@ class CutoutProcessor():
                         continue
                     species_group = downloaded_species_dict[species]
 
+                    # add save images to the preprocess list
+                    preprocesses_parameter += [("save_images", self.cfg)]
+
                     for process_name, parameter in preprocesses_parameter:
                         process_name = process_name.lower()
                         method = PROCESSING_METHODS.get(process_name)
                         if not method:
                             raise ValueError(f"Unknown process: {process_name}")
 
-                        with Pool(processes=5) as pool:
+                        with Pool(processes=40) as pool:
                             func = partial(process_cutout, cutout_path=self.cutout_path,
                                         process_name=process_name, parameter=parameter)
 
@@ -83,17 +81,16 @@ class CutoutProcessor():
                                 tqdm(
                                     pool.imap(func, species_group),
                                     total=len(species_group),
-                                    desc=f"Processing cutouts for {species}"
+                                    desc=f"Processing {process_name} cutouts for {species}"
                                 )
                             )   
 
                         # Save results back into dictionary
-                        for cutout_id, processed_img in results:
-                            cutout_image_dictionary[cutout_id] = processed_img
+                        if process_name != "save_images": 
+                            for cutout_id, processed_img in results:
+                                cutout_image_dictionary[cutout_id] = processed_img
 
-        self.save_images(cutout_image_dictionary)
-
-def remove_soil(image: np.ndarray, exg_threshold: float) -> np.ndarray:
+def remove_soil(image: np.ndarray, cutout_id: str, exg_threshold: float) -> np.ndarray:
     """
         Perform basic EXG
     """
@@ -126,6 +123,9 @@ def remove_soil(image: np.ndarray, exg_threshold: float) -> np.ndarray:
 
     return out_img
 
+def save_images(image: np.ndarray, cutout_id: str, cfg: float) -> None:
+    cv2.imwrite(f"{cfg.paths.cutoutdir}/{cutout_id}.png", image)
+
 def process_cutout(cutout, cutout_path, process_name, parameter):
     cutout_id = cutout["cutout_id"]
     img_path = f"{cutout_path}/{cutout_id}.png"
@@ -139,7 +139,7 @@ def process_cutout(cutout, cutout_path, process_name, parameter):
     if not method:
         raise ValueError(f"Unknown process: {process_name}")
 
-    return cutout_id, method(img, parameter)
+    return cutout_id, method(img, cutout_id, parameter)
 
 def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str, dict[str, list]],common_names: list[str]) -> dict[str, list[tuple[str, list]]]:   
     """
@@ -147,6 +147,9 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
     """
     species_processes_dictionary = {}
     for preprocess in preprocess_cutouts.keys():
+
+        if preprocess == "num_workers":
+            continue
 
         if not preprocess_cutouts[preprocess]:
             log.error(f"{preprocess} was left empty, skipping")
@@ -185,6 +188,7 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
 
 PROCESSING_METHODS = {
     "remove_soil": remove_soil,
+    "save_images": save_images,
 }
 
 def main(cfg: DictConfig) -> None:
