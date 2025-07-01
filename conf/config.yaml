@@ -38,6 +38,7 @@ move_cutouts:
 preprocess_cutouts:
   remove_soil: # applies exg filter
     # species: percentage of exg
+  num_workers: 50
 
     
 synthesize:
