@@ -140,7 +140,7 @@ class CutoutDownloader:
         log.info("Download process completed in serial mode.")
 
     @process_cutouts_sequentially.register
-    def _(self, allowed_cutout_ids: list) -> None:  # Use plain `list` here, not `List[str]`
+    def _(self, allowed_cutout_ids: list) -> None:
         """
         Process only allowed cutouts if arg is a list.
         """
