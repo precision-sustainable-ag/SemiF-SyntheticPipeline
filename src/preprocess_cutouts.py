@@ -104,18 +104,19 @@ class CutoutProcessor():
                         for process_name, parameter in preprocesses_parameter:
                             process_name = process_name.lower()
 
+                            # If image is not in the dictionary then add it from local cutout path
+                            # Keep track of all tranfromations done to these images
                             if not cutout["cutout_id"] in cutout_image_dictionary.keys():
                                 img = cv2.imread(str(f'{self.cutout_path}/{cutout["cutout_id"]}.png'), cv2.IMREAD_UNCHANGED)
                                 if img is None:
                                     raise FileNotFoundError(f"Could not read image: {str(f'{self.cutout_path}/{cutout}.png')}")
                                 cutout_image_dictionary[cutout["cutout_id"]] = img
 
-
-                                method = getattr(self, process_name, None)
-                                if method:
-                                    cutout_image_dictionary[cutout["cutout_id"]] = method(cutout_image_dictionary[cutout["cutout_id"]], parameter)
-                                else:
-                                    raise ValueError(f"Unknown process: {process_name}")
+                            method = getattr(self, process_name, None)
+                            if method:
+                                cutout_image_dictionary[cutout["cutout_id"]] = method(cutout_image_dictionary[cutout["cutout_id"]], parameter)
+                            else:
+                                raise ValueError(f"Unknown process: {process_name}")
 
         self.save_images(cutout_image_dictionary)
 
