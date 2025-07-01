@@ -3,7 +3,9 @@ import sqlite3
 import logging
 import numpy as np
 from tqdm import tqdm
+from functools import partial
 from omegaconf import DictConfig
+from multiprocessing import Pool
 from utils.utils import index_cutouts_by_species, add_grammar_and_capitlization_to_list
 
 log = logging.getLogger(__name__)
@@ -30,40 +32,6 @@ class CutoutProcessor():
         # perform preprocessing
         self.perform_preprocessing()
         
-
-    def remove_soil(self, image: np.ndarray, exg_threshold: float) -> np.ndarray:
-        """
-            Perform basic EXG
-        """
-
-        if not (-50 <= exg_threshold <= 50):
-            log.error(f"Exceeding threshold limit [-50, 50] at {exg_threshold}, skipping")
-            return image
-
-
-        # Convert to float32 for ExG calculation
-        img_float = image[:, :, :3].astype(np.float32)
-
-        # Split channels (OpenCV uses BGR)
-        B, G, R = cv2.split(img_float)
-
-        # Compute Excess Green Index: ExG = 2G - R - B
-        exg = 2 * G - R - B
-
-        # Threshold: keep green areas, set others to black
-        mask = exg > (exg_threshold*10)
-
-        # Create output image: all black
-        out_img = np.zeros_like(image)
-
-        if out_img.shape[2] == 4:  # has alpha channel
-            out_img[:, :, 3] = 255  # set alpha to fully opaque
-
-        # Copy original color where ExG percentage is high enough
-        out_img[mask] = image[mask]
-
-        return out_img
-
     def save_images(self, cutout_image_dictionary: dict[str, np.ndarray]) -> None:
         log.info("Saving preprocessed images")
         for cutout in tqdm(cutout_image_dictionary.keys(), desc="Saving cutouts"):
@@ -100,26 +68,78 @@ class CutoutProcessor():
                         log.warning("Requested preprocessing for a species that wasnt downloaded. Skipping.")
                         continue
                     species_group = downloaded_species_dict[species]
-                    for cutout in tqdm(species_group, desc=f"Processing cutouts for {species}"):
-                        for process_name, parameter in preprocesses_parameter:
-                            process_name = process_name.lower()
 
-                            # If image is not in the dictionary then add it from local cutout path
-                            # Keep track of all tranfromations done to these images
-                            if not cutout["cutout_id"] in cutout_image_dictionary.keys():
-                                img = cv2.imread(str(f'{self.cutout_path}/{cutout["cutout_id"]}.png'), cv2.IMREAD_UNCHANGED)
-                                if img is None:
-                                    raise FileNotFoundError(f"Could not read image: {str(f'{self.cutout_path}/{cutout["cutout_id"]}.png')}")
-                                cutout_image_dictionary[cutout["cutout_id"]] = img
+                    for process_name, parameter in preprocesses_parameter:
+                        process_name = process_name.lower()
+                        method = PROCESSING_METHODS.get(process_name)
+                        if not method:
+                            raise ValueError(f"Unknown process: {process_name}")
 
-                            method = getattr(self, process_name, None)
-                            if method:
-                                cutout_image_dictionary[cutout["cutout_id"]] = method(cutout_image_dictionary[cutout["cutout_id"]], parameter)
-                            else:
-                                raise ValueError(f"Unknown process: {process_name}")
+                        with Pool(processes=5) as pool:
+                            func = partial(process_cutout, cutout_path=self.cutout_path,
+                                        process_name=process_name, parameter=parameter)
+
+                            results = list(
+                                tqdm(
+                                    pool.imap(func, species_group),
+                                    total=len(species_group),
+                                    desc=f"Processing cutouts for {species}"
+                                )
+                            )   
+
+                        # Save results back into dictionary
+                        for cutout_id, processed_img in results:
+                            cutout_image_dictionary[cutout_id] = processed_img
 
         self.save_images(cutout_image_dictionary)
 
+def remove_soil(image: np.ndarray, exg_threshold: float) -> np.ndarray:
+    """
+        Perform basic EXG
+    """
+
+    if not (-50 <= exg_threshold <= 50):
+        log.error(f"Exceeding threshold limit [-50, 50] at {exg_threshold}, skipping")
+        return image
+
+
+    # Convert to float32 for ExG calculation
+    img_float = image[:, :, :3].astype(np.float32)
+
+    # Split channels (OpenCV uses BGR)
+    B, G, R = cv2.split(img_float)
+
+    # Compute Excess Green Index: ExG = 2G - R - B
+    exg = 2 * G - R - B
+
+    # Threshold: keep green areas, set others to black
+    mask = exg > (exg_threshold*10)
+
+    # Create output image: all black
+    out_img = np.zeros_like(image)
+
+    if out_img.shape[2] == 4:  # has alpha channel
+        out_img[:, :, 3] = 255  # set alpha to fully opaque
+
+    # Copy original color where ExG percentage is high enough
+    out_img[mask] = image[mask]
+
+    return out_img
+
+def process_cutout(cutout, cutout_path, process_name, parameter):
+    cutout_id = cutout["cutout_id"]
+    img_path = f"{cutout_path}/{cutout_id}.png"
+
+    img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        raise FileNotFoundError(f"Could not read image: {img_path}")
+
+    # Apply preprocessing method (define or import mapping from name to function)
+    method = PROCESSING_METHODS.get(process_name)
+    if not method:
+        raise ValueError(f"Unknown process: {process_name}")
+
+    return cutout_id, method(img, parameter)
 
 def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str, dict[str, list]],common_names: list[str]) -> dict[str, list[tuple[str, list]]]:   
     """
@@ -163,6 +183,9 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
 
     return species_processes_dictionary
 
+PROCESSING_METHODS = {
+    "remove_soil": remove_soil,
+}
 
 def main(cfg: DictConfig) -> None:
     log.info("Reached cutout preprocessing task")
@@ -173,4 +196,6 @@ def main(cfg: DictConfig) -> None:
 
     CutoutProcessor(cfg)
 
-    
+
+
+
