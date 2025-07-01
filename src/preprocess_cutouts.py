@@ -4,7 +4,6 @@ import logging
 import numpy as np
 from tqdm import tqdm
 from omegaconf import DictConfig
-
 from utils.utils import index_cutouts_by_species, add_grammar_and_capitlization_to_list
 
 log = logging.getLogger(__name__)

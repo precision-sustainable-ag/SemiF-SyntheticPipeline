@@ -5,6 +5,8 @@ import shutil
 from pathlib import Path
 from typing import List, Dict
 from omegaconf import DictConfig
+from typing import List, Optional
+from functools import singledispatchmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils.utils import load_json
@@ -119,17 +121,35 @@ class CutoutDownloader:
                     unique_cutouts[cutout_id] = batch_id
         return unique_cutouts
 
-    def process_cutouts_sequentially(self) -> None:
+    @singledispatchmethod
+    def process_cutouts_sequentially(self, arg):
+        raise NotImplementedError(f"Unsupported argument type: {type(arg)}")
+
+    @process_cutouts_sequentially.register
+    def _(self, arg: type(None)) -> None:
         """
-        Processes each cutout in the JSON file and downloads the corresponding images from long-term storage in serial mode.
+        Process all cutouts if arg is None.
         """
         synthetic_images = self.load_json(self.json_file_path)
-
         unique_cutouts = self.get_unique_cutouts(synthetic_images)
         log.info(f"Found {len(unique_cutouts)} unique cutouts to download.")
 
         for cutout_id, batch_id in unique_cutouts.items():
             self.download_image(cutout_id, batch_id)
+
+        log.info("Download process completed in serial mode.")
+
+    @process_cutouts_sequentially.register
+    def _(self, allowed_cutout_ids: list) -> None:  # Use plain `list` here, not `List[str]`
+        """
+        Process only allowed cutouts if arg is a list.
+        """
+        synthetic_images = self.load_json(self.json_file_path)
+        unique_cutouts = self.get_unique_cutouts(synthetic_images)
+
+        for cutout_id, batch_id in unique_cutouts.items():
+            if cutout_id in allowed_cutout_ids:
+                self.download_image(cutout_id, batch_id)
 
         log.info("Download process completed in serial mode.")
 

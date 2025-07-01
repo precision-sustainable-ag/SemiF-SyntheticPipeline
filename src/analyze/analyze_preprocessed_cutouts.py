@@ -121,8 +121,9 @@ class PreprocessAnalyzer():
             _,list_of_cutouts_for_species = cutouts_to_download[species]
             list_of_cutouts_to_download.extend(list_of_cutouts_for_species)
 
-        downloader = ModifiedCutoutDownloader(self.cfg)
+        downloader = CutoutDownloader(self.cfg)
         os.makedirs(f"{self.cfg.paths.cutoutdir}/tmp", exist_ok=True)
+        downloader.local_download_folder = f"{self.cfg.paths.cutoutdir}/tmp"
         downloader.process_cutouts_sequentially(list_of_cutouts_to_download)
 
     def pick_cutouts_based_on_metadata(self, preprocessed_cutouts: list, metadata: str):
@@ -143,24 +144,6 @@ class PreprocessAnalyzer():
             selected_cutouts = [sorted_cutouts[int(i * step)] for i in range(num_to_select)]
         
         return selected_cutouts
-
-# Modify downloader class so that it only downloads images we need for comparison
-class ModifiedCutoutDownloader(CutoutDownloader):
-    def __init__(self, cfg: DictConfig):
-        super().__init__(cfg)
-        self.local_download_folder = f"{cfg.paths.cutoutdir}/tmp"
-
-    def process_cutouts_sequentially(self, allowed_cutout_ids: list) -> None:
-
-        synthetic_images = self.load_json(self.json_file_path)
-
-        unique_cutouts = self.get_unique_cutouts(synthetic_images)
-
-        for cutout_id, batch_id in unique_cutouts.items():
-            if cutout_id in allowed_cutout_ids:
-                self.download_image(cutout_id, batch_id)
-
-        log.info("Download process completed in serial mode.")
 
 def main(cfg: DictConfig) -> None:    
 
