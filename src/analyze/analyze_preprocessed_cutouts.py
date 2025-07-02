@@ -43,6 +43,9 @@ class PreprocessAnalyzer():
         for preprocess in self.cfg.preprocess_cutouts:
             species_values = self.cfg.preprocess_cutouts[preprocess]
             
+            if preprocess == "num_workers":
+                continue
+
             if not species_values:
                 log.warning(f"No species listed for preprocess '{preprocess}', skipping.")
                 continue
