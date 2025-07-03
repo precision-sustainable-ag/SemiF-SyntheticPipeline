@@ -14,13 +14,13 @@ sub_name: mixed
 
 tasks:
   # - json_to_mongo # Deprecated
-  create_recipes:
+  # create_recipes:
   move_cutouts: 
   preprocess_cutouts:
   analysis:
-    - analyze_cutouts
+    # - analyze_cutouts
     - analyze_preprocessed_cutouts
-  synthesize: 
+  # synthesize: 
 
 move_cutouts:
   parallel: True
@@ -36,9 +36,20 @@ move_cutouts:
 #   4	Very strong green	excludes 
 #   5 Darkest, most saturated greens
 preprocess_cutouts:
+  color_correction:
+    Hairy Vetch: dry
+    Barley: dry
+    Oats: dry
+    Cereal Rye: dry
+    Crimson clover: dry
   remove_soil: # applies exg filter
     # species: percentage of exg
-  num_workers: 50
+    Hairy Vetch: 2
+    Barley: 2
+    Oats: 2
+    Cereal Rye: 2
+    Crimson clover: 2
+  num_workers: 20
 
     
 synthesize:
