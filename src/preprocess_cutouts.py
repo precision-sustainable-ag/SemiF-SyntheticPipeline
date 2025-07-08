@@ -159,46 +159,6 @@ def remove_soil(img: np.ndarray, cutout_id: str, exg_threshold: float) -> np.nda
 
     return out_img
 
-def color_correction(img: np.ndarray, cutout_id: str, color_correction: str) -> np.ndarray:
-    """
-    Apply a brownish-yellow tint to simulate a drying or dying plant.
-    Only affects non-black pixels.
-    """
-
-    if color_correction == "dry":
-        intensity = 0.25
-        intensity = np.clip(intensity, 0.0, 1.0)
-
-    has_alpha = img.shape[2] == 4
-    if has_alpha:
-        b, g, r, a = cv2.split(img)
-    else:
-        b, g, r = cv2.split(img)
-
-    # Convert to float32 for manipulation
-    b_f = b.astype(np.float32)
-    g_f = g.astype(np.float32)
-    r_f = r.astype(np.float32)
-
-    # Mask: only modify non-black pixels
-    non_black_mask = (b > 0) | (g > 0) | (r > 0)
-
-    # Shift values toward brownish-yellow
-    r_f[non_black_mask] += 255 * intensity * 0.5   # More red
-    g_f[non_black_mask] += 255 * intensity * 0.3   # Some green
-    b_f[non_black_mask] -= 255 * intensity * 0.4   # Less blue
-
-    # Clip values to [0, 255] and convert back to uint8
-    r_out = np.clip(r_f, 0, 255).astype(np.uint8)
-    g_out = np.clip(g_f, 0, 255).astype(np.uint8)
-    b_out = np.clip(b_f, 0, 255).astype(np.uint8)
-
-    if has_alpha:
-        return cv2.merge((b_out, g_out, r_out, a))
-    else:
-        return cv2.merge((b_out, g_out, r_out))
-
-
 def overwrite_images(img: np.ndarray, cutout_id: str, cfg: DictConfig) -> np.ndarray:
     """
         Return not used but added to fit into multiprocessing
@@ -270,7 +230,6 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
 
 PROCESSING_METHODS = {
     "remove_soil": remove_soil,
-    "color_correction": color_correction,
     "overwrite_images": overwrite_images,
 }
 
