@@ -8,6 +8,8 @@ from typing import Union
 from functools import partial
 from omegaconf import DictConfig
 from multiprocessing import Pool
+from omegaconf import DictConfig, ListConfig
+
 from utils.utils import index_cutouts_by_species, add_grammar_and_capitlization_to_list
 
 log = logging.getLogger(__name__)
@@ -132,10 +134,6 @@ def remove_soil(img: np.ndarray, cutout_id: str, exg_threshold: float) -> np.nda
         Perform basic EXG
     """
 
-    if not (-50 <= exg_threshold <= 50):
-        log.error(f"Exceeding threshold limit [-50, 50] at {exg_threshold}, skipping")
-        return
-
     # Convert to float32 for ExG calculation
     img_float = img[:, :, :3].astype(np.float32)
 
@@ -146,7 +144,7 @@ def remove_soil(img: np.ndarray, cutout_id: str, exg_threshold: float) -> np.nda
     exg = 2 * G - R - B
 
     # Threshold: keep green areas, set others to black
-    mask = exg > (exg_threshold*10)
+    mask = exg > (exg_threshold)
 
     # Create output image: all black
     out_img = np.zeros_like(img)
@@ -158,6 +156,51 @@ def remove_soil(img: np.ndarray, cutout_id: str, exg_threshold: float) -> np.nda
     out_img[mask] = img[mask]
 
     return out_img
+
+def color_correction(img: np.ndarray, cutout_id: str, params: list) -> np.ndarray:
+    """
+        Blend image toward a target BGR color by intensity (0 to 1),
+        ignoring pure black pixels and soil-like pixels (exg < threshold).
+    """
+
+    target_bgr = params['target_bgr']
+    intensity = params['intensity']
+
+    has_alpha = img.shape[2] == 4
+    if has_alpha:
+        b, g, r, a = cv2.split(img)
+    else:
+        b, g, r = cv2.split(img)
+
+    # Convert to float for operations
+    B = b.astype(np.float32)
+    G = g.astype(np.float32)
+    R = r.astype(np.float32)
+
+    # Compute Excess Green Index (ExG)
+    exg = 2 * G - R - B
+
+    # Create mask for pixels that are:
+    # - not black
+    # - AND have exg above threshold (i.e. probably vegetation, not soil)
+    non_black_mask = (b > 0) | (g > 0) | (r > 0)
+    plant_mask = (exg > exg_threshold) & non_black_mask
+
+    # Blend only these pixels
+    target_b, target_g, target_r = target_bgr
+    B[plant_mask] = B[plant_mask] * (1 - intensity) + target_b * intensity
+    G[plant_mask] = G[plant_mask] * (1 - intensity) + target_g * intensity
+    R[plant_mask] = R[plant_mask] * (1 - intensity) + target_r * intensity
+
+    # Clip to valid range
+    b_out = np.clip(B, 0, 255).astype(np.uint8)
+    g_out = np.clip(G, 0, 255).astype(np.uint8)
+    r_out = np.clip(R, 0, 255).astype(np.uint8)
+
+    if has_alpha:
+        return cv2.merge((b_out, g_out, r_out, a))
+    else:
+        return cv2.merge((b_out, g_out, r_out))
 
 def overwrite_images(img: np.ndarray, cutout_id: str, cfg: DictConfig) -> np.ndarray:
     """
@@ -189,7 +232,6 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
     """
     species_processes_dictionary = {}
     for preprocess in preprocess_cutouts.keys():
-
         if preprocess == "num_workers":
             continue
 
@@ -198,13 +240,19 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
             continue
 
         preprocess_upper = preprocess.upper()
-        species_list = list(preprocess_cutouts[preprocess])
-        
-        for species in species_list:
-            species_upper = species.upper()
-            params = preprocess_cutouts[preprocess][species]
+        species_data = preprocess_cutouts[preprocess]
 
-            if species_upper in (name.upper() for name in common_names):
+        if isinstance(species_data, DictConfig):
+            iterable = species_data.items()
+        elif isinstance(species_data, ListConfig):
+            iterable = ((species, []) for species in species_data)
+        else:
+            raise ValueError(f"Unsupported type for {preprocess}: {type(species_data)}")
+
+        for species, params in iterable:
+            species_upper = species.upper()
+
+            if not common_names or species_upper in (name.upper() for name in common_names):
                 if species_upper not in species_processes_dictionary:
                     species_processes_dictionary[species_upper] = []
 
@@ -230,6 +278,7 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
 
 PROCESSING_METHODS = {
     "remove_soil": remove_soil,
+    "color_correction": color_correction,
     "overwrite_images": overwrite_images,
 }
 

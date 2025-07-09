@@ -215,7 +215,7 @@ class CutoutAnalyzer():
 
         return data
 
-def main(cfg: DictConfig) -> None:
+def main(cfg: DictConfig, report: PDFDrafter) -> None:
 
     log.info("Reached analyze_cutouts subtask of analysis")
 
@@ -239,9 +239,6 @@ def main(cfg: DictConfig) -> None:
     # Total num of cutouts
     num_cutouts = all_cutouts.num_cutouts, specified_cutouts.num_cutouts
 
-    # Create PDF from graphs
-    report = PDFDrafter(cfg)
-
     # Heading
     heading = "Analysis of Cutouts"
 
@@ -252,7 +249,6 @@ def main(cfg: DictConfig) -> None:
 
     report.initialize_heading_and_description(heading, description)
     report.add_analysis_graphs_to_pdf(num_cutouts)
-    report.save_pdf()
 
     # Delete graphs
     clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_all_cutouts}")

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import List, Tuple
-
+import matplotlib.pyplot as plt
 
 log = logging.getLogger(__name__)
 
@@ -332,3 +332,62 @@ def add_grammar_and_capitlization_to_list(list_to_fix: str) -> str:
     else:
         fixed_str = sorted_list[0].title()
     return fixed_str
+
+def image_comp_grid(base_dir: str, row_labels: list[str], col_labels: list[str], num_rows: int, num_cols: int, row_spacing: float = 0.05) -> None:
+    # Read images
+    images = []
+    for image_file in sorted(os.listdir(base_dir)):
+        if image_file.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
+            img = cv2.imread(f"{base_dir}/{image_file}", cv2.IMREAD_UNCHANGED)
+            if img is not None:
+                images.append(img)
+    num_images = num_rows * num_cols
+    images = images[:num_images]
+
+    # Create plot object, set background black
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(3*num_cols, 3*num_rows))
+    fig.patch.set_facecolor('black')
+
+    # Ensure axes is 2D array
+    if num_rows == 1 and num_cols == 1:
+        axes = np.array([[axes]])
+    elif num_rows == 1:
+        axes = np.array([axes])
+    elif num_cols == 1:
+        axes = np.array([[ax] for ax in axes])
+
+    # Add images to plot
+    for i, ax in enumerate(axes.flatten(order='F')):
+        if i < len(images):
+            img = images[i]
+            if img.ndim == 2:
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            elif img.shape[2] == 4:
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
+            else:
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            ax.imshow(img_rgb)
+        ax.axis('off')
+        ax.set_facecolor('black')
+
+    plt.tight_layout()
+    plt.subplots_adjust(left=0.18, top=0.9, right=0.98, bottom=0.08)
+    fig.canvas.draw()
+
+    # Set column labels as xlabels at the top row, aligned
+    for ax, col_label in zip(axes[0], col_labels[:num_cols]):
+        pos = ax.get_position()
+        x = pos.x0 + pos.width / 2
+        fig.text(x, 0.93, col_label, va='bottom', ha='center', fontsize=15, color='white')
+
+    fig.align_xlabels(axes[0, :])
+
+    for ax, row_label in zip(axes[:, 0], row_labels[:num_rows]):
+        pos = ax.get_position()
+        y = pos.y0 + pos.height / 2
+        fig.text(row_spacing, y, row_label, va='center', ha='right', fontsize=15, color='white')
+
+    plt.savefig(f"{base_dir}/image_grid.png", dpi=300, bbox_inches='tight', facecolor=fig.get_facecolor())
+    plt.close()
+
+    return f"{base_dir}/image_grid.png"

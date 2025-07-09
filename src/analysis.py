@@ -1,6 +1,7 @@
 import os
 import hydra
 import logging
+from utils.pdf import PDFDrafter
 from hydra.utils import get_method
 from omegaconf import DictConfig, OmegaConf
 
@@ -28,20 +29,32 @@ def main(cfg: DictConfig) -> None:
     os.makedirs(str(file_path), exist_ok=True)
 
     if cfg.tasks.analysis : 
+
+        report = PDFDrafter(cfg)
+        title = "Pre-Synthesis Analysis"
+        author = "Maintainer: PSA CV Team"
+        report.add_title_author_date(title,author)
+
         for sub_task_name in analysis_subtasks:
 
             if sub_task_name in TASK_REGISTRY:
                 log.info(f"Running task {sub_task_name}")
                 try:
-                    TASK_REGISTRY[sub_task_name](cfg)
+                    TASK_REGISTRY[sub_task_name](cfg, report)
                 except Exception as e:
                     log.error(f"Error running task {sub_task_name}: {e}")
                     raise
+
+                # If we have more than one analysis task and we are not on the last one
+                # add a new page
+                if not sub_task_name == analysis_subtasks[-1]:
+                    report.add_new_page()
 
             else:
                 log.error(f"Task {sub_task_name} not found in analysis task registry")
                 raise ValueError(f"Task {sub_task_name} not found in analysis task registry")
     
+        report.save_pdf()
         log.info("Analysis completed.")
     else : 
         # Description

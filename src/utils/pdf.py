@@ -53,12 +53,6 @@ class PDFDrafter():
             "offset_from_left_of_page": 0
         }
 
-        # Title
-        self.title = "Pre-Synthesis Analysis"
-
-        # Author
-        self.author = "Maintainer: PSA CV Team"
-
     def save_pdf(self) -> None:
         self.pdf.save()
         log.info(f"PDF saved to {self.output_pdf}")
@@ -125,61 +119,47 @@ class PDFDrafter():
             if i % graphs_per_species == (graphs_per_species-1):
                 if (current_species_index-1<len(storage_graphs)):
                     storage_graph_paths = os.path.join(storage_graph_dir, storage_graphs[current_species_index-1])
-                    self.place_image(storage_graph_paths, new_line=True, image_scaler_width_and_height=(2,2))    
+                    self.place_image(storage_graph_paths, new_line=True, image_scaler=2)    
                 self.position_state["offset_from_left_of_page"] = 0
                 num_of_images_on_line = 0
 
-    def compare_cutouts(self, compare_cutout_dict: dict[tuple[str, list]]) -> None:
-        for species in compare_cutout_dict.keys():
-            description, cutouts_to_compare = compare_cutout_dict[species]
+    def add_two_images_with_caption(self, caption: str, image_paths: tuple[str, str]) -> None:
 
-            self.wrap_text(description, self.fonts["styles"]["normal"], self.fonts["size"]["heading"])
+        if caption:
+            self.wrap_text(caption, self.fonts["styles"]["normal"], self.fonts["size"]["heading"])
 
-            cutouts_to_compare = compare_cutout_dict[species][1]
+        first_image, second_image = images
 
-            max_height = first_height = second_height = 0
-            for idx, cutout_id in enumerate(cutouts_to_compare):
-                new_line=False
-                # Configed to allow 2 comparisons per line, and deal with last image (odd num edgecase)
-                if (idx%2==1) or idx == len(cutouts_to_compare) - 1:
-                    new_line=True # if last image set to true
+        # Place images
+        self.place_image(first_image)
+        self.place_image(second_image, new_line=True)  
 
-                # Place original image
-                first_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/tmp/{cutout_id}.png"), last_image_height=max_height)
-                max_height = max(first_height, max_height, second_height)
-                second_height = self.place_image(str(f"{self.cfg.paths.cutoutdir}/{cutout_id}.png"), new_line=new_line, last_image_height=max_height)  
+        # Move cursor back to left side of page
+        self.position_state["offset_from_left_of_page"] = 0
+        
+    def add_one_image_with_caption(self, caption: str, image_path: str) -> None:
 
-                # Configed to allow 2 comparisons per line, and deal with last image (odd num edgecase)
-                if new_line:
-                    # Move back to the right side of the page
-                    self.position_state["offset_from_left_of_page"] = 0
-                    max_height = 0
-                    first_height = 0
-                    second_height = 0
+        if caption:
+            self.wrap_text(caption, self.fonts["styles"]["normal"], self.fonts["size"]["heading"])
+
+        # Place image
+        self.place_image(image_path, new_line=True, image_scaler=4)  
+        
+        # Move cursor back to left side of page
+        self.position_state["offset_from_left_of_page"] = 0
+    
+    def add_new_page(self):
+
+        # Make new page
+        self.pdf.showPage()
+
+        # Move cursor to left of page
+        self.position_state["offset_from_left_of_page"] = 0
+
+        # Move cursor to top of page
+        self.position_state["offset_from_top_of_page"] = 0
 
     def initialize_heading_and_description(self, heading: str, description : str) -> None:
-        '''
-            Below we set the title of the report.
-        '''
-        self.pdf.setFont(self.fonts["styles"]["bold"], self.fonts["size"]["title"])
-        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"], self.title)
-        self.position_state["offset_from_top_of_page"] += self.fonts["size"]["title"]
-
-        '''
-            Below we author the report.
-        '''
-        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["author"])
-        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, self.author)
-        self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["author"]+4)
-
-        '''
-            Below we add the date to the report
-        '''
-        date = str(datetime.date.today())
-        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["time"])
-        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, date)
-        self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["time"]+4)
-
         '''
             Below we add the heading for this section of the report
         '''
@@ -195,12 +175,39 @@ class PDFDrafter():
         self.wrap_text(description, self.fonts["styles"]["normal"], self.fonts["size"]["body"])
         # Add spacing between description and images
         self.position_state["offset_from_top_of_page"] += 0.15 * inch  
+    
+    def add_title_author_date(self, title, author):
+        '''
+            Below we set the title of the report.
+        '''
+        self.pdf.setFont(self.fonts["styles"]["bold"], self.fonts["size"]["title"])
+        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"], title)
+        self.position_state["offset_from_top_of_page"] += self.fonts["size"]["title"]
 
-    def place_image(self, image_path: str, new_line: bool = False, last_image_height: float = 0, image_scaler_width_and_height: tuple[int, int] = (1, 1)) -> float:
-        final_width = 2 * inch * image_scaler_width_and_height[0]
+        '''
+            Below we author the report.
+        '''
+        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["author"])
+        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, author)
+        self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["author"]+4)
+
+        '''
+            Below we add the date to the report
+        '''
+        date = str(datetime.date.today())
+        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["time"])
+        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, date)
+        self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["time"]+4)
+
+
+    def place_image(self, image_path: str, new_line: bool = False, image_scaler: int = 1) -> float:
+        '''
+            Place image has defualt image size of 1/4 of page.
+        '''
+        final_width = 2 * inch * image_scaler
         img = ImageReader(image_path)
         img_width, img_height = img.getSize()
-        aspect_ratio = img_height / img_width * (image_scaler_width_and_height[1]/image_scaler_width_and_height[0])
+        aspect_ratio = img_height / img_width
 
         image_margin = 0.25 * inch
 
@@ -221,8 +228,7 @@ class PDFDrafter():
         # Y calculations
         # check to see if we need to add a new line
         if (new_line):
-            padded_height = last_image_height if last_image_height>final_height else final_height
-            self.position_state["offset_from_top_of_page"] += padded_height + 0.25 * inch
+            self.position_state["offset_from_top_of_page"] += final_height + 0.25 * inch
 
         return final_height
         
