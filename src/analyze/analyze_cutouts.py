@@ -245,7 +245,7 @@ def main(cfg: DictConfig, report: PDFDrafter) -> None:
     # Description
     species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
     species_list = add_grammar_and_capitlization_to_list(species_list)
-    description = f"The following is a report of the {species_list} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
+    description = f"The following section is a report of the {species_list} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
 
     report.initialize_heading_and_description(heading, description)
     report.add_analysis_graphs_to_pdf(num_cutouts)

@@ -110,16 +110,16 @@ class PDFDrafter():
                 new_line = True      
                 num_of_images_on_line = 0
 
-            # Place first couple of images, pass in 0 because all of them are the same size
-            self.place_image(all_cutout_path)
-            # Place second couple of images, pass in 0 because all of them are the same size
-            self.place_image(specified_cutout_path, new_line=new_line)    
+            # Place first couple of images
+            self.place_image(all_cutout_path, new_line=False, image_scaler=1/4)
+            # Place second couple of images
+            self.place_image(specified_cutout_path, new_line=new_line, image_scaler=1/4)    
 
             # Place storage graphs
             if i % graphs_per_species == (graphs_per_species-1):
                 if (current_species_index-1<len(storage_graphs)):
                     storage_graph_paths = os.path.join(storage_graph_dir, storage_graphs[current_species_index-1])
-                    self.place_image(storage_graph_paths, new_line=True, image_scaler=2)    
+                    self.place_image(storage_graph_paths, new_line=True, image_scaler=1/2)    
                 self.position_state["offset_from_left_of_page"] = 0
                 num_of_images_on_line = 0
 
@@ -131,8 +131,8 @@ class PDFDrafter():
         first_image, second_image = images
 
         # Place images
-        self.place_image(first_image)
-        self.place_image(second_image, new_line=True)  
+        self.place_image(first_image, new_line=False, image_scaler=1/2)
+        self.place_image(second_image, new_line=True, image_scaler=1/2)  
 
         # Move cursor back to left side of page
         self.position_state["offset_from_left_of_page"] = 0
@@ -143,7 +143,7 @@ class PDFDrafter():
             self.wrap_text(caption, self.fonts["styles"]["normal"], self.fonts["size"]["heading"])
 
         # Place image
-        self.place_image(image_path, new_line=True, image_scaler=4)  
+        self.place_image(image_path, new_line=True, image_scaler=1)  
         
         # Move cursor back to left side of page
         self.position_state["offset_from_left_of_page"] = 0
@@ -202,9 +202,11 @@ class PDFDrafter():
 
     def place_image(self, image_path: str, new_line: bool = False, image_scaler: int = 1) -> float:
         '''
-            Place image has defualt image size of 1/4 of page.
+            Image_scaler of 1 will make image take up whole page
+            Image_scaler of 1/2 will make image take up whole page 1/2 off the page
+            ...
         '''
-        final_width = 2 * inch * image_scaler
+        final_width = 8 * inch * image_scaler
         img = ImageReader(image_path)
         img_width, img_height = img.getSize()
         aspect_ratio = img_height / img_width
