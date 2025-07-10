@@ -157,51 +157,6 @@ def remove_soil(img: np.ndarray, cutout_id: str, exg_threshold: float) -> np.nda
 
     return out_img
 
-def color_correction(img: np.ndarray, cutout_id: str, params: list) -> np.ndarray:
-    """
-        Blend image toward a target BGR color by intensity (0 to 1),
-        ignoring pure black pixels and soil-like pixels (exg < threshold).
-    """
-
-    target_bgr = params['target_bgr']
-    intensity = params['intensity']
-
-    has_alpha = img.shape[2] == 4
-    if has_alpha:
-        b, g, r, a = cv2.split(img)
-    else:
-        b, g, r = cv2.split(img)
-
-    # Convert to float for operations
-    B = b.astype(np.float32)
-    G = g.astype(np.float32)
-    R = r.astype(np.float32)
-
-    # Compute Excess Green Index (ExG)
-    exg = 2 * G - R - B
-
-    # Create mask for pixels that are:
-    # - not black
-    # - AND have exg above threshold (i.e. probably vegetation, not soil)
-    non_black_mask = (b > 0) | (g > 0) | (r > 0)
-    plant_mask = (exg > exg_threshold) & non_black_mask
-
-    # Blend only these pixels
-    target_b, target_g, target_r = target_bgr
-    B[plant_mask] = B[plant_mask] * (1 - intensity) + target_b * intensity
-    G[plant_mask] = G[plant_mask] * (1 - intensity) + target_g * intensity
-    R[plant_mask] = R[plant_mask] * (1 - intensity) + target_r * intensity
-
-    # Clip to valid range
-    b_out = np.clip(B, 0, 255).astype(np.uint8)
-    g_out = np.clip(G, 0, 255).astype(np.uint8)
-    r_out = np.clip(R, 0, 255).astype(np.uint8)
-
-    if has_alpha:
-        return cv2.merge((b_out, g_out, r_out, a))
-    else:
-        return cv2.merge((b_out, g_out, r_out))
-
 def overwrite_images(img: np.ndarray, cutout_id: str, cfg: DictConfig) -> np.ndarray:
     """
         Return not used but added to fit into multiprocessing
@@ -278,7 +233,6 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
 
 PROCESSING_METHODS = {
     "remove_soil": remove_soil,
-    "color_correction": color_correction,
     "overwrite_images": overwrite_images,
 }
 

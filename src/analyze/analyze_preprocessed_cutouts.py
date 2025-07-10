@@ -7,7 +7,7 @@ from omegaconf import DictConfig
 
 from utils.pdf import PDFDrafter
 from move_cutouts import CutoutDownloader
-from preprocess_cutouts import remove_soil, color_correction, invert_and_check_species_preprocess_dictionary
+from preprocess_cutouts import remove_soil, invert_and_check_species_preprocess_dictionary
 from utils.utils import clear_directory, index_cutouts_by_species, add_grammar_and_capitlization_to_list, image_comp_grid
 
 log = logging.getLogger(__name__)
@@ -28,21 +28,6 @@ class PreprocessAnalyzer():
 
         # EXG CONFIGS
         self.exg_tests = [20, 30, 40, 50]
-
-        # COLOR CORRECTION CONFIGS
-        colors = [
-            "#b8e186",  # Spring Green
-            "#addc91",  # Light Olive Green
-            "#99d98c",  # Yellow Green
-            "#78c679",  # Light Green
-            "#56b75f",  # Grass Green
-            "#3fb34f",  # Medium Green
-            "#2e8b57",  # Forest Green
-            "#228c68",  # Emerald Green
-            "#1e956b",  # Teal Green
-            "#156f4e",  # Dark Green
-            "#084d3f"   # Deep Pine Green
-        ]
 
         self.test_dictionary = {}
         self.test_dictionary['remove_soil'] = self.exg_tests
@@ -144,16 +129,21 @@ class PreprocessAnalyzer():
         downloader.process_cutouts_sequentially(list_of_cutouts)
 
     def pick_cutouts_based_on_metadata(self, preprocessed_cutouts: list, metadata: str):
-        # Sort them by bounding box area
+        # Sort by brown colors
+        def brownish_score(x):
+            r, g, b = x['cutout_props']['cropout_rgb_mean']
+            return r - min(g, b)
+
         sorted_cutouts = sorted(
             preprocessed_cutouts,
-            key=lambda x: x['cutout_props'][metadata]
+            key=brownish_score,
+            reverse=True 
         )
 
         total = len(sorted_cutouts)
 
         if total <= self.num_cutouts_per_species:
-            selected_cutouts = sorted_cutouts  # Not enough, return all
+            selected_cutouts = sorted_cutouts
         else:
             step = total / self.num_cutouts_per_species
             selected_cutouts = [sorted_cutouts[int(i * step)] for i in range(self.num_cutouts_per_species)]
@@ -179,7 +169,6 @@ class PreprocessAnalyzer():
 
 PROCESSING_METHODS = {
     "remove_soil": remove_soil,
-    "color_correction": color_correction,
 }
 
 def main(cfg: DictConfig, report: PDFDrafter) -> None:    

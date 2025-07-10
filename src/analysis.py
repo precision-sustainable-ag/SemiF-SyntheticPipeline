@@ -30,6 +30,7 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.tasks.analysis : 
 
+        # Start report, add title and authors
         report = PDFDrafter(cfg)
         title = "Pre-Synthesis Analysis"
         author = "Maintainer: PSA CV Team"
@@ -54,6 +55,7 @@ def main(cfg: DictConfig) -> None:
                 log.error(f"Task {sub_task_name} not found in analysis task registry")
                 raise ValueError(f"Task {sub_task_name} not found in analysis task registry")
     
+        # save report
         report.save_pdf()
         log.info("Analysis completed.")
     else : 

@@ -275,6 +275,5 @@ class PDFDrafter():
             move the pdf to the next page and reset the position state to the top of the page.
         """
         if (self.page_info["height"]-(self.position_state["offset_from_top_of_page"] + height)) <= self.page_info["margin"]:
-            self.pdf.showPage()
-            self.position_state["offset_from_top_of_page"] = 0
+            self.add_new_page()
     
