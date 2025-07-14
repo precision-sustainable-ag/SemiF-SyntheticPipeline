@@ -22,28 +22,14 @@ tasks:
   preprocess_cutouts:
   synthesize: 
 
-
 analysis:
   analyze_preprocessed_cutouts:
     remove_soil:
-      - Hairy Vetch
-      - Crimson clover
-    # color_correction:
-    #   - Hairy Vetch
 
 move_cutouts:
   parallel: True
   parallel_workers: 8
 
-# For each preprocessing step, specify the species 
-# it should be applied to. Pass in your params to the species
-# dictionary. If no params are required pass in None
-# For exg/remove soil
-#   1	Almost all greenish areas
-#   2	Solid green vegetation
-#   3	Strong green only	excludes
-#   4	Very strong green	excludes 
-#   5 Darkest, most saturated greens
 preprocess_cutouts:
   remove_soil: # applies exg filter
   num_workers: 20
