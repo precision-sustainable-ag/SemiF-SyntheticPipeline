@@ -151,19 +151,20 @@ class PreprocessAnalyzer():
         return selected_cutouts
 
     def list_species_for_preprocessing(self) -> list[str]:
-        # Grab list of species
         seen = set()
         species_list = []
 
-        for preprocess in self.preprocess_cutouts:
+        if self.preprocess_cutouts:
+            for preprocess in self.preprocess_cutouts:
+                species_iterable = self.preprocess_cutouts[preprocess]
+                if species_iterable is None:
+                    continue
 
-            species = self.preprocess_cutouts[preprocess]
-
-            for species in self.preprocess_cutouts[preprocess]:
-                species = species.upper()
-                if species not in seen:
-                    seen.add(species)
-                    species_list.append(species)
+                for species in species_iterable:
+                    species = species.upper()
+                    if species not in seen:
+                        seen.add(species)
+                        species_list.append(species)
 
         return species_list
 

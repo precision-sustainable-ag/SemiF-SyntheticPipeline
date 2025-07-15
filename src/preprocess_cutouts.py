@@ -37,12 +37,10 @@ class CutoutProcessor():
         self.perform_preprocessing()
 
 
-    def load_work_items(self,species_group: list[dict],cutout_image_dictionary: dict[str, np.ndarray]) -> list[tuple[str, np.ndarray]]:
+    def populate_cutout_image_dictionary(self, species_group: list[dict], cutout_image_dictionary: dict[str, np.ndarray]) -> None:
         """
-        Creates list of (cutout_id, image) tuples.
+        Loads images into cutout_image_dictionary in place.
         """
-        work_items = []
-
         for item in species_group:
             cutout_id = item['cutout_id']
             image_path = os.path.join(self.cutout_path, f"{cutout_id}.png")
@@ -57,9 +55,7 @@ class CutoutProcessor():
                 continue
 
             cutout_image_dictionary[cutout_id] = img
-            work_items.append((cutout_id, img))
 
-        return work_items
 
     def perform_preprocessing(self) -> dict[str, tuple[np.ndarray, list]]:
         """
@@ -96,18 +92,16 @@ class CutoutProcessor():
 
                     # create a dictionary of cutouts and their images
                     cutout_image_dictionary = {}
+                    self.populate_cutout_image_dictionary(species_group, cutout_image_dictionary)
+
                     for process_name, parameter in preprocesses_parameter:
                         process_name = process_name.lower()
                         method = PROCESSING_METHODS.get(process_name)
                         if not method:
                             raise ValueError(f"Unknown process: {process_name}")
 
-                        # Load images only at the first preprocessing step, else load them in from dictionary
-                        work_items=[]
-                        if not cutout_image_dictionary:
-                            work_items = self.load_work_items(species_group, cutout_image_dictionary)
-                        else:
-                            work_items = [(cutout_id, img) for cutout_id, img in cutout_image_dictionary.items()]
+                        # Always build work_items from the current dictionary
+                        work_items = [(cutout_id, img) for cutout_id, img in cutout_image_dictionary.items()]
 
                         with Pool(processes=self.num_workers) as pool:
                             func = partial(
@@ -116,7 +110,6 @@ class CutoutProcessor():
                                 parameter=parameter
                             )
 
-                            # Run multiprocessing
                             results = list(
                                 tqdm(
                                     pool.imap(func, work_items),
