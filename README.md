@@ -56,11 +56,11 @@ sub_name: test
 
 tasks:
   create_recipes:
-  move_cutouts: 
-  preprocess_cutouts:
   analysis:
     - analyze_cutouts
     - analyze_preprocessed_cutouts
+  move_cutouts: 
+  preprocess_cutouts:
   synthesize:
 
 move_cutouts:
@@ -129,7 +129,7 @@ Generates a report on the metadata of the cutouts specified in your recipe and c
 - `projects/<project>/<name>/analysis/report<date>.pdf`
 
 #### **2.2 Analyze Preprocessed Cutouts** (`analyze_preprocessed_cutouts.py`)
-Generates a report on the preprocessing done to the cutouts. 
+Generates a report on ranges of preprocessing that can be done to the cutouts . 
 
 #### Output:
 - `projects/<project>/<name>/analysis/report<date>.pdf`
@@ -150,19 +150,7 @@ Preprocesses downloaded cutouts based on the what you set for a certain species.
 
 #### Arguments
 
-- **Remove_Soil**: Applies EXG to all cutouts of a certain species. Levels can be floats and exceed 5.
-
-**Remove_Soil – EXG Intensity Levels**
-
-| **Level** | **Description**                               |
-|-----------|-----------------------------------------------|
-| 1         | Almost all greenish areas                     |
-| 2         | Solid green vegetation                        |
-| 3         | Strong green only (excludes less intense)     |
-| 4         | Very strong green (excludes weaker greens)    |
-| 5         | Darkest, most saturated greens                |
-
-
+- **Remove_Soil**: Applies EXG to all cutouts of a certain species
 
 #### Output:
 - `data/cutouts/*.png` (Preprcessed cutout images)
