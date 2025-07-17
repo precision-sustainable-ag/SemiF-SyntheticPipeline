@@ -25,6 +25,8 @@ tasks:
 analysis:
   analyze_preprocessed_cutouts:
     remove_soil:
+      - Hairy vetch
+      - Crimson clover
 
 move_cutouts:
   parallel: True
@@ -32,6 +34,8 @@ move_cutouts:
 
 preprocess_cutouts:
   remove_soil: # applies exg filter
+    Hairy Vetch: 20
+    Crimson Clover: 100
   num_workers: 20
 
     
