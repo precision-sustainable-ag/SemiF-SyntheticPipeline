@@ -110,7 +110,7 @@ class PreprocessAnalyzer():
                 num_cutouts = len(list_of_cutout_metadata_for_species)
                 num_params = len(self.test_dictionary[preprocess])+1 # add one to include original image
                 row_labels = self.row_label_dictionary[preprocess]
-                col_labels = list_of_cutouts_for_species
+                col_labels = sorted(list_of_cutouts_for_species)
                 row_spacing = self.row_spacing_dictionary[preprocess]
                 image_grid_path = image_comp_grid(base_dir=download_directory, row_labels=row_labels, col_labels=col_labels, num_rows=num_params, num_cols=num_cutouts, row_spacing=row_spacing)
 
