@@ -20,8 +20,8 @@ class PreprocessAnalyzer():
         recipe_file = f"{cfg.paths.recipesdir}/{cfg.project_name}_{cfg.sub_name}.json"
         self.cutouts_indexed_by_species = index_cutouts_by_species(recipe_file)
 
-        self.preprocess_cutouts = cfg.analysis.analyze_preprocessed_cutouts
-        self.preprocesses_list = list(set(preprocess.lower().replace('_', ' ') for preprocess in cfg.analysis.analyze_preprocessed_cutouts.keys()))
+        self.preprocess_cutouts = cfg.preprocess_cutouts
+        self.preprocesses_list = list(set(preprocess.lower().replace('_', ' ') for preprocess in cfg.preprocess_cutouts.keys()))
         self.species_list = self.list_species_for_preprocessing()
 
         self.num_cutouts_per_species = 15
@@ -155,10 +155,19 @@ class PreprocessAnalyzer():
         species_list = []
 
         if self.preprocess_cutouts:
-            for preprocess in self.preprocess_cutouts:
-                species_iterable = self.preprocess_cutouts[preprocess]
-                if species_iterable is None:
+            for preprocess_key, species_dict in self.preprocess_cutouts.items():
+                if preprocess_key == "num_workers":
+                    continue  
+
+                if not isinstance(species_dict, dict):
+                    print(f"[Warning] Skipping {preprocess_key}: expected dict, got {type(species_dict).__name__}")
                     continue
+
+                species_iterable = species_dict.keys()
+                if not species_iterable:
+                    continue
+
+                print(f"[Info] Found species: {list(species_iterable)}")
 
                 for species in species_iterable:
                     species = species.upper()
@@ -176,7 +185,7 @@ def main(cfg: DictConfig, report: PDFDrafter) -> None:
 
     log.info("Reached analyze_preprocessed_cutouts subtask of analysis")
 
-    if not cfg.analysis.analyze_preprocessed_cutouts:
+    if not cfg.preprocess_cutouts:
         log.error("Left analyze_preprocessed_cutouts dictionary empty. Skipping this part of analysis.")
         return  
 
