@@ -49,9 +49,9 @@ class PreprocessAnalyzer():
 
         # Make description string
         description = (
-            f"The following section is a report of the application of {preprocesses_str} to the species {species_str}. NOTE: "
-            f"This does not demonstrate compounding image processes to one cutout. Performing two processes "
-            f"on one group of cutouts may have unexpected results"
+            f"This section provides a report on the use of {preprocesses_str} for the species {species_str}. Please note: "
+            f"the results shown do not reflect the combined impact of multiple preprocessing steps on a single cutout. "
+            f"Applying more than one process to the same group of cutouts may yield unpredictable outcomes."
         )
         return description
 

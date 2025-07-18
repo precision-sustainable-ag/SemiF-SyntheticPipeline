@@ -337,7 +337,7 @@ def image_comp_grid(base_dir: str, row_labels: list[str], col_labels: list[str],
     # Read images
     images = []
     for image_file in sorted(os.listdir(base_dir)):
-        if image_file.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
+        if image_file.lower().endswith('.png'):
             img = cv2.imread(f"{base_dir}/{image_file}", cv2.IMREAD_UNCHANGED)
             if img is not None:
                 images.append(img)
@@ -360,9 +360,7 @@ def image_comp_grid(base_dir: str, row_labels: list[str], col_labels: list[str],
     for i, ax in enumerate(axes.flatten(order='F')):
         if i < len(images):
             img = images[i]
-            if img.ndim == 2:
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-            elif img.shape[2] == 4:
+            if img.shape[2] == 4:
                 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
             else:
                 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
