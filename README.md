@@ -132,7 +132,7 @@ Produces a report that summarizes the metadata of the cutouts specified in the r
 - `projects/<project>/<name>/analysis/report<date>.pdf`
 
 #### **2.2 Analyze Preprocessed Cutouts** (`analyze_preprocessed_cutouts.py`)
-Generates a report that explores the range of preprocessing values applicable to the cutouts. Currently, the only supported preprocessing method is EXG. For each species and their associated preprocessing requests, relevant graphs are generated prior to applying preprocessing. This allows evaluation of optimal parameter ranges and helps avoid unnecessary processing on unsuitable data.
+Generates a report that explores the range of preprocessing values applicable to the cutouts. Currently, the only supported preprocessing method is EXG. For each species and their associated preprocessing requests, relevant graphs are generated prior to applying preprocessing. This allows evaluation of optimal parameter ranges and helps avoid unnecessary processing on unsuitable data. Note the report generates plots for species based on the ones listed in preprocess_cutouts. 
 
 ![Hairy Vetch EXG Plot](markdown_images/hairy_vetch_exg.png)
 
