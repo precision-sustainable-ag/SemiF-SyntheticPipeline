@@ -120,11 +120,11 @@ Generates synthetic image recipes by selecting cutouts and assigning them to bac
   ```
 
 ### **2. Analysis** (`analysis.py`)
-Handles the analysis of the generated recipe before proceeding with downloading cutouts and generating synthetic images. The purpose of this step is to gain insight into the cutouts and their metadata, allowing informed decisions before committing to the full pipeline.
+Handles the analysis of the generated recipe before proceeding with downloading cutouts and generating synthetic images. The purpose of this step is to gain insight into the cutouts and their metadata, allowing informed decisions before committing to the full pipeline. If multiple reports are requested in a single run, they will be combined into one PDF.
 
 #### **2.1 Analyze Cutouts** (`analyze_cutouts.py`)
 
-Produces a report that summarizes the metadata of the cutouts specified in the recipe and compares it against the metadata of all available cutouts for the selected species. This helps assess the representativeness and quality of the selected data. Expected outputs include various graphs and visual summaries of the metadata. If multiple reports are requested in a single run, they will be combined into one PDF..
+Produces a report that summarizes the metadata of the cutouts specified in the recipe and compares it against the metadata of all available cutouts for the selected species. This helps assess the representativeness and quality of the selected data. Expected outputs include various graphs and visual summaries of the metadata.
 
 ![Bounding Box Graph](markdown_images/bbox_area_metadata_graph.png)
 
