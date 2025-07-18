@@ -130,13 +130,13 @@ class PreprocessAnalyzer():
 
     def pick_cutouts_based_on_metadata(self, preprocessed_cutouts: list, metadata: str):
         # Sort by brown colors
-        def brownish_score(x):
+        def is_brown(x):
             r, g, b = x['cutout_props']['cropout_rgb_mean']
             return r - min(g, b)
 
         sorted_cutouts = sorted(
             preprocessed_cutouts,
-            key=brownish_score,
+            key=is_brown,
             reverse=True 
         )
 
@@ -151,7 +151,7 @@ class PreprocessAnalyzer():
         return selected_cutouts
 
     def list_species_for_preprocessing(self) -> list[str]:
-        seen = set()
+        in_list = set()
         species_list = []
 
         if self.preprocess_cutouts:
@@ -160,19 +160,16 @@ class PreprocessAnalyzer():
                     continue  
 
                 if not isinstance(species_dict, dict):
-                    print(f"[Warning] Skipping {preprocess_key}: expected dict, got {type(species_dict).__name__}")
                     continue
 
                 species_iterable = species_dict.keys()
                 if not species_iterable:
                     continue
 
-                print(f"[Info] Found species: {list(species_iterable)}")
-
                 for species in species_iterable:
                     species = species.upper()
-                    if species not in seen:
-                        seen.add(species)
+                    if species not in in_list:
+                        in_list.add(species)
                         species_list.append(species)
 
         return species_list
