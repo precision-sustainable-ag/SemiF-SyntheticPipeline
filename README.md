@@ -63,12 +63,6 @@ tasks:
   preprocess_cutouts:
   synthesize:
 
-analysis:
-  analyze_preprocessed_cutouts:
-    remove_soil:
-      - Hairy vetch
-      - Crimson clover
-
 move_cutouts:
   parallel: True
   parallel_workers: 8
