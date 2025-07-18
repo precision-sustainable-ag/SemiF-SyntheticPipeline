@@ -124,7 +124,7 @@ Handles the analysis of the generated recipe before proceeding with downloading 
 
 #### **2.1 Analyze Cutouts** (`analyze_cutouts.py`)
 
-Produces a report that summarizes the metadata of the cutouts specified in the recipe and compares it against the metadata of all available cutouts for the selected species. This helps assess the representativeness and quality of the selected data. Expected outputs include various graphs and visual summaries of the metadata.
+Produces a report that summarizes the metadata of the cutouts specified in the recipe and compares it against the metadata of all available cutouts for the selected species. This helps assess the representativeness and quality of the selected data. Expected outputs include various graphs and visual summaries of the metadata. If multiple reports are requested in a single run, they will be combined into one PDF..
 
 ![Bounding Box Graph](markdown_images/bbox_area_metadata_graph.png)
 
