@@ -120,16 +120,21 @@ Generates synthetic image recipes by selecting cutouts and assigning them to bac
   ```
 
 ### **2. Analysis** (`analysis.py`)
-Handles the analsis of the generated recipe before commiting to pulling cutouts and generating synthetic images. 
+Handles the analysis of the generated recipe before proceeding with downloading cutouts and generating synthetic images. The purpose of this step is to gain insight into the cutouts and their metadata, allowing informed decisions before committing to the full pipeline.
 
 #### **2.1 Analyze Cutouts** (`analyze_cutouts.py`)
-Generates a report on the metadata of the cutouts specified in your recipe and compares it to the metadata of all cutouts for the given species.
+
+Produces a report that summarizes the metadata of the cutouts specified in the recipe and compares it against the metadata of all available cutouts for the selected species. This helps assess the representativeness and quality of the selected data. Expected outputs include various graphs and visual summaries of the metadata.
+
+![Bounding Box Graph](markdown_images/bbox_area_metadata_graph.png)
 
 #### Output:
 - `projects/<project>/<name>/analysis/report<date>.pdf`
 
 #### **2.2 Analyze Preprocessed Cutouts** (`analyze_preprocessed_cutouts.py`)
-Generates a report on ranges of preprocessing that can be done to the cutouts . 
+Generates a report that explores the range of preprocessing values applicable to the cutouts. Currently, the only supported preprocessing method is EXG. For each species and their associated preprocessing requests, relevant graphs are generated prior to applying preprocessing. This allows evaluation of optimal parameter ranges and helps avoid unnecessary processing on unsuitable data.
+
+![Hairy Vetch EXG Plot](markdown_images/hairy_vetch_exg.png)
 
 #### Output:
 - `projects/<project>/<name>/analysis/report<date>.pdf`
@@ -150,7 +155,7 @@ Preprocesses downloaded cutouts based on the what you set for a certain species.
 
 #### Arguments
 
-- **Remove_Soil**: Applies EXG to all cutouts of a certain species
+- **Remove_Soil**: Applies the Excess Green Index (EXG) to all cutouts of a specified species, with the goal of minimizing the presence of soil in the images. Note: While EXG is effective at reducing soil visibility, it may also unintentionally remove other plant parts such as stems and flowers. Use with caution.
 
 #### Output:
 - `data/cutouts/*.png` (Preprcessed cutout images)
