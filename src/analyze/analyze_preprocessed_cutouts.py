@@ -27,7 +27,7 @@ class PreprocessAnalyzer():
         self.num_cutouts_per_species = 15
 
         # EXG CONFIGS
-        self.exg_tests = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        self.exg_tests = [0, 20, 40, 60, 80, 100]
 
         self.test_dictionary = {}
         self.test_dictionary['remove_soil'] = self.exg_tests
@@ -119,7 +119,7 @@ class PreprocessAnalyzer():
                 report.add_one_image_with_caption(caption, image_grid_path)
 
                 # Delete grid and the images it used
-                clear_directory(self.analysisdir)
+                # clear_directory(self.analysisdir)
 
     def download_cutouts(self, species: str, list_of_cutouts: list[str], download_directory: str) -> None:
         downloader = CutoutDownloader(self.cfg)
