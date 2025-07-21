@@ -3,6 +3,7 @@ workdir: ${hydra:runtime.cwd}  # where the code is executed
 projectdir: ${paths.workdir}/projects/${project_name}/${sub_name} # TODO: change this so that projects is it's own directory separate from data
 datadir: ${paths.workdir}/data
 cutoutdir: ${paths.datadir}/cutouts
+cutoutanalysisdir: ${paths.cutoutdir}/analysis
 backgrounddir: ${paths.datadir}/backgrounds
 recipesdir: ${paths.projectdir}/recipes
 resultsdir: ${paths.projectdir}/results

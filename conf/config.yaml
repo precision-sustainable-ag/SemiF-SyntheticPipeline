@@ -15,15 +15,24 @@ sub_name: mixed
 tasks:
   # - json_to_mongo # Deprecated
   create_recipes:
-  analysis: 
+  analysis:
     - analyze_cutouts
+    - analyze_preprocessed_cutouts
   move_cutouts: 
+  preprocess_cutouts:
   synthesize: 
 
 move_cutouts:
   parallel: True
   parallel_workers: 8
 
+preprocess_cutouts:
+  remove_soil: # applies exg filter, working range [0,100]
+    Hairy Vetch: 20
+    Crimson Clover: 100
+  num_workers: 20
+
+    
 synthesize:
   parallel: false
   parallel_workers: 4

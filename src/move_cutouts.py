@@ -4,10 +4,12 @@ import logging
 import shutil
 from pathlib import Path
 from typing import List, Dict
-
 from omegaconf import DictConfig
-
+from typing import List, Optional
+from functools import singledispatchmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from utils.utils import load_json
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +29,7 @@ class CutoutDownloader:
         """
         self.json_file_path = Path(cfg.paths.projectdir, "recipes",
                                    f"{cfg.project_name}_{cfg.sub_name}.json")
+        self.load_json = load_json
 
         self.primary_storage_base = Path(cfg.paths.primary_longterm_storage, "semifield-cutouts")
         self.secondary_storage_base = Path(cfg.paths.secondary_longterm_storage, "semifield-cutouts")
@@ -55,25 +58,6 @@ class CutoutDownloader:
     #             return False
     #         else:
     #             raise
-
-    def load_json(self) -> List[Dict]:
-        """
-        Loads the JSON data from the specified file.
-
-        :return: List of synthetic image dictionaries containing cutout information.
-        """
-        try:
-            with open(self.json_file_path, "r") as f:
-                data = json.load(f)
-                log.info(
-                    f"Successfully loaded JSON data from {self.json_file_path}")
-                return data["synthetic_images"]
-        except FileNotFoundError as e:
-            log.error(f"JSON file not found: {self.json_file_path} - {e}")
-            raise
-        except json.JSONDecodeError as e:
-            log.error(f"Error decoding JSON file: {self.json_file_path} - {e}")
-            raise
 
     def download_image(self, cutout_id: str, batch_id: str) -> None:
         """
@@ -137,12 +121,16 @@ class CutoutDownloader:
                     unique_cutouts[cutout_id] = batch_id
         return unique_cutouts
 
-    def process_cutouts_sequentially(self) -> None:
-        """
-        Processes each cutout in the JSON file and downloads the corresponding images from long-term storage in serial mode.
-        """
-        synthetic_images = self.load_json()
+    @singledispatchmethod
+    def process_cutouts_sequentially(self, arg):
+        raise NotImplementedError(f"Unsupported argument type: {type(arg)}")
 
+    @process_cutouts_sequentially.register
+    def _(self, arg: type(None)) -> None:
+        """
+        Process all cutouts if arg is None.
+        """
+        synthetic_images = self.load_json(self.json_file_path)
         unique_cutouts = self.get_unique_cutouts(synthetic_images)
         log.info(f"Found {len(unique_cutouts)} unique cutouts to download.")
 
@@ -151,12 +139,26 @@ class CutoutDownloader:
 
         log.info("Download process completed in serial mode.")
 
+    @process_cutouts_sequentially.register
+    def _(self, allowed_cutout_ids: list) -> None:
+        """
+        Process only allowed cutouts if arg is a list.
+        """
+        synthetic_images = self.load_json(self.json_file_path)
+        unique_cutouts = self.get_unique_cutouts(synthetic_images)
+
+        for cutout_id, batch_id in unique_cutouts.items():
+            if cutout_id in allowed_cutout_ids:
+                self.download_image(cutout_id, batch_id)
+
+        log.info("Download process completed in serial mode.")
+
     def process_cutouts_concurrently(self) -> None:
         """
         Processes each cutout in the JSON file and downloads the corresponding images from long-term storage.
         This method uses multithreading to parallelize the download process.
         """
-        synthetic_images = self.load_json()
+        synthetic_images = self.load_json(self.json_file_path)
         unique_cutouts = self.get_unique_cutouts(synthetic_images)
         log.info(f"Found {len(unique_cutouts)} unique cutouts to download.")
 

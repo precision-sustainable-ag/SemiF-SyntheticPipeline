@@ -1,28 +1,25 @@
 import os
-import hydra
 import logging
 import datetime
+from omegaconf import DictConfig
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
-from utils.utils import count_all_files
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
-from omegaconf import DictConfig, OmegaConf
 from reportlab.pdfbase.pdfmetrics import stringWidth
+
+from utils.utils import count_all_files
 
 log = logging.getLogger(__name__)
 
 class PDFDrafter():
-    def __init__(self, cfg: DictConfig, num_cutouts: tuple[dict[str, int], dict[str, int]]) -> None:
+    def __init__(self, cfg: DictConfig) -> None:
 
         self.cfg = cfg
 
         # Extract species and sort them alphabetically, ignore duplicates
         species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
         self.sorted_species = sorted(species_list, key=lambda s: s.lower())
-
-        # Extract num cutouts into specified and all
-        self.specified_cutouts, self.all_cutouts = num_cutouts
 
         # Set up canvas/pdf
         self.date_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -56,20 +53,17 @@ class PDFDrafter():
             "offset_from_left_of_page": 0
         }
 
-        # Title
-        self.title = "Pre-Synthesis Analysis"
-
-        # Author
-        self.author = "Maintainer: PSA CV Team"
-
     def save_pdf(self) -> None:
         self.pdf.save()
         log.info(f"PDF saved to {self.output_pdf}")
 
-    def add_graphs_to_pdf(self) -> None:
+    def add_analysis_graphs_to_pdf(self, num_cutouts: tuple[dict[str, int], dict[str, int]]) -> None:
         '''
             Below inserts metadata graphs for each species into the final report.
         '''
+
+        # Extract num cutouts into specified and all
+        specified_cutouts, all_cutouts = num_cutouts
 
         # Load in the image (graph) paths
         all_cutout_dir = str(f"{self.cfg.paths.analysisdir}/all")
@@ -96,7 +90,7 @@ class PDFDrafter():
                     self.wrap_text(species.title(), self.fonts["styles"]["normal"], self.fonts["size"]["author"])
             
                     # Add size statistics for the first species
-                    subj = f"{species.title()} has {self.specified_cutouts[species.upper()]} total number of cutouts. Your configs specify {self.all_cutouts[species.upper()]} of those cutouts."
+                    subj = f"{species.title()} has {specified_cutouts[species.upper()]} total number of cutouts. Your configs specify {all_cutouts[species.upper()]} of those cutouts."
                     self.wrap_text(subj, self.fonts["styles"]["normal"], self.fonts["size"]["body"])
 
                     current_species_index += 1
@@ -117,42 +111,41 @@ class PDFDrafter():
                 num_of_images_on_line = 0
 
             # Place first couple of images
-            self.place_image(all_cutout_path, False)
+            self.place_image(all_cutout_path, new_line=False, image_scaler=1/4)
             # Place second couple of images
-            self.place_image(specified_cutout_path, new_line)    
+            self.place_image(specified_cutout_path, new_line=new_line, image_scaler=1/4)    
 
             # Place storage graphs
             if i % graphs_per_species == (graphs_per_species-1):
                 if (current_species_index-1<len(storage_graphs)):
                     storage_graph_paths = os.path.join(storage_graph_dir, storage_graphs[current_species_index-1])
-                    self.place_image(storage_graph_paths, True, (2,2))    
+                    self.place_image(storage_graph_paths, new_line=True, image_scaler=1/2)    
                 self.position_state["offset_from_left_of_page"] = 0
                 num_of_images_on_line = 0
+        
+    def add_one_image_with_caption(self, caption: str, image_path: str) -> None:
 
+        if caption:
+            self.wrap_text(caption, self.fonts["styles"]["normal"], self.fonts["size"]["heading"])
+
+        # Place image
+        self.place_image(image_path, new_line=True, image_scaler=1)  
+        
+        # Move cursor back to left side of page
+        self.position_state["offset_from_left_of_page"] = 0
+    
+    def add_new_page(self):
+
+        # Make new page
+        self.pdf.showPage()
+
+        # Move cursor to left of page
+        self.position_state["offset_from_left_of_page"] = 0
+
+        # Move cursor to top of page
+        self.position_state["offset_from_top_of_page"] = 0
 
     def initialize_heading_and_description(self, heading: str, description : str) -> None:
-        '''
-            Below we set the title of the report.
-        '''
-        self.pdf.setFont(self.fonts["styles"]["bold"], self.fonts["size"]["title"])
-        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"], self.title)
-        self.position_state["offset_from_top_of_page"] += self.fonts["size"]["title"]
-
-        '''
-            Below we author the report.
-        '''
-        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["author"])
-        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, self.author)
-        self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["author"]+4)
-
-        '''
-            Below we add the date to the report
-        '''
-        date = str(datetime.date.today())
-        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["time"])
-        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, date)
-        self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["time"]+4)
-
         '''
             Below we add the heading for this section of the report
         '''
@@ -168,12 +161,41 @@ class PDFDrafter():
         self.wrap_text(description, self.fonts["styles"]["normal"], self.fonts["size"]["body"])
         # Add spacing between description and images
         self.position_state["offset_from_top_of_page"] += 0.15 * inch  
+    
+    def add_title_author_date(self, title, author):
+        '''
+            Below we set the title of the report.
+        '''
+        self.pdf.setFont(self.fonts["styles"]["bold"], self.fonts["size"]["title"])
+        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"], title)
+        self.position_state["offset_from_top_of_page"] += self.fonts["size"]["title"]
 
-    def place_image(self, image_path: str, new_line: bool, image_scaler_width_and_height: tuple[int, int] = (1, 1)) -> None:
-        final_width = 2 * inch * image_scaler_width_and_height[0]
+        '''
+            Below we author the report.
+        '''
+        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["author"])
+        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, author)
+        self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["author"]+4)
+
+        '''
+            Below we add the date to the report
+        '''
+        date = str(datetime.date.today())
+        self.pdf.setFont(self.fonts["styles"]["normal"], self.fonts["size"]["time"])
+        self.pdf.drawCentredString(self.page_info["width"] / 2, self.page_info["top_of_page"] - self.position_state["offset_from_top_of_page"] - 4, date)
+        self.position_state["offset_from_top_of_page"] += (self.fonts["size"]["time"]+4)
+
+
+    def place_image(self, image_path: str, new_line: bool = False, image_scaler: int = 1) -> float:
+        '''
+            Image_scaler of 1 will make image take up whole page
+            Image_scaler of 1/2 will make image take up whole page 1/2 off the page
+            ...
+        '''
+        final_width = 8 * inch * image_scaler
         img = ImageReader(image_path)
         img_width, img_height = img.getSize()
-        aspect_ratio = img_height / img_width * (image_scaler_width_and_height[1]/image_scaler_width_and_height[0])
+        aspect_ratio = img_height / img_width
 
         image_margin = 0.25 * inch
 
@@ -195,6 +217,8 @@ class PDFDrafter():
         # check to see if we need to add a new line
         if (new_line):
             self.position_state["offset_from_top_of_page"] += final_height + 0.25 * inch
+
+        return final_height
         
     def wrap_text(self, sentances: str, font_style: str, font_size: int) -> None:
         """
@@ -237,24 +261,5 @@ class PDFDrafter():
             move the pdf to the next page and reset the position state to the top of the page.
         """
         if (self.page_info["height"]-(self.position_state["offset_from_top_of_page"] + height)) <= self.page_info["margin"]:
-            self.pdf.showPage()
-            self.position_state["offset_from_top_of_page"] = 0
-
-# for debugging to avoid going through whole pipeline
-# run pipeline once to get graphs then run python3 src/utils/pdf.py, remember to fix the utils pathing
-@hydra.main(version_base="1.2", config_path="../../conf", config_name="config")
-def main(cfg: DictConfig) -> None:
-    all_cutouts = {}
-    specified_cutouts = {}
-    species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
-    for species in species_list:
-        species = species.upper()
-        all_cutouts[species] = (0,0)
-        specified_cutouts[species] = (0,0)
-    num_cutouts = specified_cutouts, all_cutouts
-
-    cfg = OmegaConf.create(cfg)
-    PDFDrafter(cfg, num_cutouts)
-
-if __name__ == "__main__":
-    main()
+            self.add_new_page()
+    

@@ -1,11 +1,16 @@
 import os
+import cv2
 import json
 import random
-from pathlib import Path
-from typing import List, Tuple
-import cv2
+import logging
+import sqlite3
 import numpy as np
 import pandas as pd
+from pathlib import Path
+from typing import List, Tuple
+import matplotlib.pyplot as plt
+
+log = logging.getLogger(__name__)
 
 def filter_area(df, lower, upper):
     filtered_dfs = []
@@ -252,3 +257,135 @@ def clear_directory(dir_path: str) -> None:
             os.rmdir(full_path)
     os.rmdir(dir_path)
 
+def query_for_cutout_metadata(cutout_id: str,cursor: sqlite3.Cursor) -> str:
+
+        # Get column names
+        cursor.execute("PRAGMA table_info(semif_cutouts);")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        # Fetch the single row with the given cutout_id
+        cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
+        row = cursor.fetchone()
+
+        if row is None:
+            raise ValueError(f"No entry found for cutout_id: {cutout_id}")
+
+        # Turn the row into a dictionary
+        row_dict = dict(zip(columns, row))
+
+        # Attempt to parse JSON fields
+        try:
+            row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
+            row_dict['category'] = json.loads(row_dict['category'])
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse JSON fields for cutout_id {cutout_id}: {e}")
+
+        # Extract species
+        species = row_dict['category']['common_name'].upper()
+
+        return species
+
+def index_cutouts_by_species(json_recipe_path: str) -> dict[str, dict]:
+
+    synthetic_images = load_json(json_recipe_path)
+
+    species_indexed_cutouts = {}
+    for synthetic_image in synthetic_images:
+        for cutout in synthetic_image["cutouts"]:
+            species = cutout["category"]["common_name"].upper()
+            if species not in species_indexed_cutouts:
+                species_indexed_cutouts[species] = []
+            species_indexed_cutouts[species].append(cutout)
+
+    return species_indexed_cutouts
+
+def load_json(json_file_path: str) -> list[dict]:
+    """
+    Loads the JSON data from the specified file.
+
+    :return: List of synthetic image dictionaries containing cutout information.
+    """
+    try:
+        with open(json_file_path, "r") as f:
+            data = json.load(f)
+            log.info(
+                f"Successfully loaded JSON data from {json_file_path}")
+            return data["synthetic_images"]
+    except FileNotFoundError as e:
+        log.error(f"JSON file not found: {json_file_path} - {e}")
+        raise
+    except json.JSONDecodeError as e:
+        log.error(f"Error decoding JSON file: {json_file_path} - {e}")
+        raise
+
+    return data
+
+def add_grammar_and_capitalization_to_list(list_to_fix: str) -> str:
+
+    if len(list_to_fix) == 0:
+        return ""
+
+    sorted_list = sorted(list_to_fix, key=lambda s: s.lower())
+    if len(sorted_list) > 1:
+        titled = [s.title() for s in sorted_list]
+        fixed_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
+    else:
+        fixed_str = sorted_list[0].title()
+    return fixed_str
+
+def image_comp_grid(base_dir: str, row_labels: list[str], col_labels: list[str], num_rows: int, num_cols: int, row_spacing: float = 0.05) -> None:
+    # Read images
+    images = []
+    for image_file in sorted(os.listdir(base_dir)):
+        if image_file.lower().endswith('.png'):
+            img = cv2.imread(f"{base_dir}/{image_file}", cv2.IMREAD_UNCHANGED)
+            if img is not None:
+                images.append(img)
+    num_images = num_rows * num_cols
+    images = images[:num_images]
+
+    # Create plot object, set background black
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(3*num_cols, 3*num_rows))
+    fig.patch.set_facecolor('black')
+
+    # Ensure axes is 2D array
+    if num_rows == 1 and num_cols == 1:
+        axes = np.array([[axes]])
+    elif num_rows == 1:
+        axes = np.array([axes])
+    elif num_cols == 1:
+        axes = np.array([[ax] for ax in axes])
+
+    # Add images to plot
+    for i, ax in enumerate(axes.flatten(order='F')):
+        if i < len(images):
+            img = images[i]
+            if img.shape[2] == 4:
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
+            else:
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            ax.imshow(img_rgb)
+        ax.axis('off')
+        ax.set_facecolor('black')
+
+    plt.tight_layout()
+    plt.subplots_adjust(left=0.18, top=0.9, right=0.98, bottom=0.08)
+    fig.canvas.draw()
+
+    # Set column labels as xlabels at the top row, aligned
+    for ax, col_label in zip(axes[0], col_labels[:num_cols]):
+        pos = ax.get_position()
+        x = pos.x0 + pos.width / 2
+        fig.text(x, 0.93, col_label, va='bottom', ha='center', fontsize=15, color='white')
+
+    fig.align_xlabels(axes[0, :])
+
+    for ax, row_label in zip(axes[:, 0], row_labels[:num_rows]):
+        pos = ax.get_position()
+        y = pos.y0 + pos.height / 2
+        fig.text(row_spacing, y, row_label, va='center', ha='right', fontsize=15, color='white')
+
+    plt.savefig(f"{base_dir}/image_grid.png", dpi=300, bbox_inches='tight', facecolor=fig.get_facecolor())
+    plt.close()
+
+    return f"{base_dir}/image_grid.png"

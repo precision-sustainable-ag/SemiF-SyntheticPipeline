@@ -5,10 +5,9 @@ import logging
 from pathlib import Path
 from omegaconf import DictConfig, OmegaConf
 
-
 # util imports
-from utils.pdf import PDFDrafter
-from utils.utils import clear_directory, read_recipe
+from utils.pdf import PDFDrafter 
+from utils.utils import clear_directory, read_recipe, query_for_cutout_metadata, add_grammar_and_capitalization_to_list
 from utils.graphs import horizontal_bar_chart_plot, jitter_plot, vertical_bar_chart_plot, boolean_horizontal_bar_chart_plot
 
 log = logging.getLogger(__name__)
@@ -46,48 +45,48 @@ class CutoutAnalyzer():
 
         # Connect to database (READ ONLY)
         conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
-        cursor = conn.cursor()
+        self.cursor = conn.cursor()
 
         # Get column names
-        cursor.execute("PRAGMA table_info(semif_cutouts);")
-        columns = [col[1] for col in cursor.fetchall()]
+        self.cursor.execute("PRAGMA table_info(semif_cutouts);")
+        columns = [col[1] for col in self.cursor.fetchall()]
 
         if analysis_type == 'specified': 
             # Find out which storage we would be getting the cutouts from
             batch_ids, cutout_ids = read_recipe(f"{cfg.paths.recipesdir}/{cfg.project_name}_{cfg.sub_name}.json")
-            storage_location_data = self.resolve_image_storage_locations(batch_ids, cutout_ids, sorted_species, cursor)
+            storage_location_data = self.resolve_image_storage_locations(batch_ids, cutout_ids, sorted_species)
             # load downloaded cutout metadata
-            self.load_cutout_metadata(cursor, columns, cutout_ids)
+            self.load_cutout_metadata(columns, cutout_ids)
             self.graph_cutout_data(analysis_type, storage_location_data)
         elif analysis_type == 'all': 
             # load all data of species specified in config
-            self.load_species_metadata(sorted_species, cursor, columns)
+            self.load_species_metadata(sorted_species, columns)
             self.graph_cutout_data(analysis_type, None)
 
         conn.close()
 
-    def load_cutout_metadata(self, cursor: sqlite3.Cursor, columns: list[str], cutout_ids: list[str]) -> None:
+    def load_cutout_metadata(self, columns: list[str], cutout_ids: list[str]) -> None:
         """
             load_cutout_metadata: Function used to query for all metadata from cutouts in the generated recipes
         """
         # Loop through specified cutouts
         for cutout_id in cutout_ids:
-            cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
-            rows = cursor.fetchall()
+            self.cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
+            rows = self.cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
-    def load_species_metadata(self, common_name: list[str], cursor: sqlite3.Cursor, columns: list[str]) -> None:
+    def load_species_metadata(self, common_name: list[str], columns: list[str]) -> None:
         """
             load_species_metadata: Function used to query for all metadata for all cutouts in the common_name list
         """
         # Loop through all specified species cutouts
         for species in common_name:
             species_lower = species.lower()
-            cursor.execute(
+            self.cursor.execute(
                 "SELECT * FROM semif_cutouts WHERE LOWER(json_extract(category, '$.common_name')) = ?",
                 (species_lower,)
             )
-            rows = cursor.fetchall()
+            rows = self.cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
     def query_for_metadata(self, rows: list[tuple], columns: list[str]) -> None:
@@ -112,33 +111,6 @@ class CutoutAnalyzer():
                 # log states that we are pulling data from
                 log.info(f"Cutouts pulled from: {row_dict['cutout_id'][:2]}")
 
-    def query_for_cutout_metadata(self,cutout_id: str,cursor: sqlite3.Cursor) -> str:
-
-        # Get column names
-        cursor.execute("PRAGMA table_info(semif_cutouts);")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        # Fetch the single row with the given cutout_id
-        cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
-        row = cursor.fetchone()
-
-        if row is None:
-            raise ValueError(f"No entry found for cutout_id: {cutout_id}")
-
-        # Turn the row into a dictionary
-        row_dict = dict(zip(columns, row))
-
-        # Attempt to parse JSON fields
-        try:
-            row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
-            row_dict['category'] = json.loads(row_dict['category'])
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse JSON fields for cutout_id {cutout_id}: {e}")
-
-        # Extract species
-        species = row_dict['category']['common_name'].upper()
-
-        return species
 
     def metadata_to_dict(self, species: str, synthetic: str, cutout: dict) -> None:
         """
@@ -197,7 +169,7 @@ class CutoutAnalyzer():
             for species in storage_location_data:
                 vertical_bar_chart_plot(storage_location_data[species], "Cutout Distribution Across Storages", file_path, 'storage_location', species)
 
-    def resolve_image_storage_locations(self,batch_ids: list[str], cutout_ids: list[str], all_species: list[str],cursor: sqlite3.Cursor) -> dict[str, dict[str, int]]:
+    def resolve_image_storage_locations(self,batch_ids: list[str], cutout_ids: list[str], all_species: list[str]) -> dict[str, dict[str, int]]:
 
         data = {}
 
@@ -214,7 +186,7 @@ class CutoutAnalyzer():
         for batch_id, cutout_id in zip(batch_ids, cutout_ids):
             image_filename = f"{cutout_id}.png"
 
-            species = self.query_for_cutout_metadata(cutout_id,cursor)
+            species = query_for_cutout_metadata(cutout_id,self.cursor)
 
             # List of storage locations in order of preference.
             storages = [
@@ -243,7 +215,7 @@ class CutoutAnalyzer():
 
         return data
 
-def main(cfg: DictConfig) -> None:
+def main(cfg: DictConfig, report: PDFDrafter) -> None:
 
     log.info("Reached analyze_cutouts subtask of analysis")
 
@@ -267,25 +239,16 @@ def main(cfg: DictConfig) -> None:
     # Total num of cutouts
     num_cutouts = all_cutouts.num_cutouts, specified_cutouts.num_cutouts
 
-    # Create PDF from graphs
-    report = PDFDrafter(cfg, num_cutouts)
-
     # Heading
     heading = "Analysis of Cutouts"
 
     # Description
     species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
-    sorted_species = sorted(species_list, key=lambda s: s.lower())
-    if len(sorted_species) > 1:
-        titled = [s.title() for s in sorted_species]
-        species_str = ', '.join(titled[:-1]) + f", and {titled[-1]}"
-    else:
-        species_str = sorted_species[0].title()
-    description = f"The following is a report of the {species_str} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
+    species_list = add_grammar_and_capitalization_to_list(species_list)
+    description = f"The following section is a report of the {species_list} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
 
     report.initialize_heading_and_description(heading, description)
-    report.add_graphs_to_pdf()
-    report.save_pdf()
+    report.add_analysis_graphs_to_pdf(num_cutouts)
 
     # Delete graphs
     clear_directory(f"{cfg.paths.analysisdir}/{directory_for_graphs_of_all_cutouts}")
