@@ -94,11 +94,25 @@ class PreprocessAnalyzer():
                 self.download_cutouts(species, list_of_cutouts_for_species, download_directory)
 
                 # Apply preprocessing
+                row_label = self.row_label_dictionary[preprocess][:]
+                tests = self.test_dictionary[preprocess][:]
+
                 for cutout in list_of_cutouts_for_species:
                     img = cv2.imread(f"{download_directory}/{cutout}.png", cv2.IMREAD_UNCHANGED) 
 
                     process_function = PROCESSING_METHODS.get(preprocess)
-                    for idx, param in enumerate(self.test_dictionary[preprocess]):
+
+                    if preprocess == 'remove_soil':
+                        species_dict = self.cfg.preprocess_cutouts.remove_soil
+                        species_dict = {k.upper(): v for k, v in species_dict.items()}
+                        specified_exg = species_dict[species.upper()]
+                        # Update EXG threshold analysis to include analysis of target EXG
+                        index_to_replace = min(range(len(tests)), key=lambda i: abs(tests[i] - specified_exg))
+                        tests[index_to_replace] = specified_exg
+                        # Update row label as well, add one because of no_exg insert at beggining of list
+                        row_label[index_to_replace + 1] = f'cfg: exg={specified_exg}'
+
+                    for idx, param in enumerate(tests):
                         processed_image = process_function(img,"",param)
 
                         # save file add underscore to keep track on where to place in plot
@@ -108,8 +122,8 @@ class PreprocessAnalyzer():
             
                 # Create grid from downloaded/preprocessed cutouts
                 num_cutouts = len(list_of_cutout_metadata_for_species)
-                num_params = len(self.test_dictionary[preprocess])+1 # add one to include original image
-                row_labels = self.row_label_dictionary[preprocess]
+                num_params = len(tests)+1 # add one to include original image
+                row_labels = row_label
                 col_labels = sorted(list_of_cutouts_for_species)
                 row_spacing = self.row_spacing_dictionary[preprocess]
                 image_grid_path = image_comp_grid(base_dir=download_directory, row_labels=row_labels, col_labels=col_labels, num_rows=num_params, num_cols=num_cutouts, row_spacing=row_spacing)
@@ -119,7 +133,7 @@ class PreprocessAnalyzer():
                 report.add_one_image_with_caption(caption, image_grid_path)
 
                 # Delete grid and the images it used
-                # clear_directory(self.analysisdir)
+                clear_directory(self.analysisdir)
 
     def download_cutouts(self, species: str, list_of_cutouts: list[str], download_directory: str) -> None:
         downloader = CutoutDownloader(self.cfg)
