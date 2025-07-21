@@ -320,7 +320,7 @@ def load_json(json_file_path: str) -> list[dict]:
 
     return data
 
-def add_grammar_and_capitlization_to_list(list_to_fix: str) -> str:
+def add_grammar_and_capitalization_to_list(list_to_fix: str) -> str:
 
     if len(list_to_fix) == 0:
         return ""

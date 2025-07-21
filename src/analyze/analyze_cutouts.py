@@ -7,7 +7,7 @@ from omegaconf import DictConfig, OmegaConf
 
 # util imports
 from utils.pdf import PDFDrafter 
-from utils.utils import clear_directory, read_recipe, query_for_cutout_metadata, add_grammar_and_capitlization_to_list
+from utils.utils import clear_directory, read_recipe, query_for_cutout_metadata, add_grammar_and_capitalization_to_list
 from utils.graphs import horizontal_bar_chart_plot, jitter_plot, vertical_bar_chart_plot, boolean_horizontal_bar_chart_plot
 
 log = logging.getLogger(__name__)
@@ -244,7 +244,7 @@ def main(cfg: DictConfig, report: PDFDrafter) -> None:
 
     # Description
     species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
-    species_list = add_grammar_and_capitlization_to_list(species_list)
+    species_list = add_grammar_and_capitalization_to_list(species_list)
     description = f"The following section is a report of the {species_list} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
 
     report.initialize_heading_and_description(heading, description)

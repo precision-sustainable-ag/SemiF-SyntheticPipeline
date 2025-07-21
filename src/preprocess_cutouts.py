@@ -6,11 +6,10 @@ import numpy as np
 from tqdm import tqdm
 from typing import Union
 from functools import partial
-from omegaconf import DictConfig
 from multiprocessing import Pool
 from omegaconf import DictConfig, ListConfig
 
-from utils.utils import index_cutouts_by_species, add_grammar_and_capitlization_to_list
+from utils.utils import index_cutouts_by_species, add_grammar_and_capitalization_to_list
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +77,7 @@ class CutoutProcessor():
 
                     preprocesses_parameter = [(pre, param) for pre, param in species_processes_dictionary[species]]
                     preprocesses_parameter_list = [pre for pre, param in preprocesses_parameter]
-                    preprocess_str = add_grammar_and_capitlization_to_list(preprocesses_parameter_list)
+                    preprocess_str = add_grammar_and_capitalization_to_list(preprocesses_parameter_list)
                     log.info(f"{species.title()} had {preprocess_str} requested")
 
                     # Check to see if species was downloaded before performing preprocessing

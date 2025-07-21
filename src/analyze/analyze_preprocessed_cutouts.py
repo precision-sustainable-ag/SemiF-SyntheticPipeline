@@ -6,7 +6,7 @@ from omegaconf import DictConfig
 from utils.pdf import PDFDrafter
 from move_cutouts import CutoutDownloader
 from preprocess_cutouts import remove_soil, invert_and_check_species_preprocess_dictionary
-from utils.utils import clear_directory, index_cutouts_by_species, add_grammar_and_capitlization_to_list, image_comp_grid
+from utils.utils import clear_directory, index_cutouts_by_species, add_grammar_and_capitalization_to_list, image_comp_grid
 
 log = logging.getLogger(__name__)
 
@@ -24,16 +24,14 @@ class PreprocessAnalyzer():
 
         self.num_cutouts_per_species = 15
 
+        self.sweep_dictionary = {}
+        self.row_label_dictionary = {}
+        self.row_spacing_dictionary = {}
+
         # EXG CONFIGS
         exg_sweep = [0, 20, 40, 60, 80, 100]
-
-        self.test_dictionary = {}
-        self.test_dictionary['remove_soil'] = exg_sweep
-
-        self.row_label_dictionary = {}
-        self.row_label_dictionary['remove_soil'] = ['no exg'] + [f'exg={x}' for x in self.test_dictionary['remove_soil']]
-
-        self.row_spacing_dictionary = {}
+        self.sweep_dictionary['remove_soil'] = exg_sweep
+        self.row_label_dictionary['remove_soil'] = ['no exg'] + [f'exg={x}' for x in self.sweep_dictionary['remove_soil']]
         self.row_spacing_dictionary['remove_soil'] = .16
 
         self.analysisdir = cfg.paths.cutoutanalysisdir
@@ -41,9 +39,9 @@ class PreprocessAnalyzer():
     def build_description(self, report: PDFDrafter) -> str:
 
         # Make list of preprocesses a string
-        preprocesses_str = add_grammar_and_capitlization_to_list(self.preprocesses_list)
+        preprocesses_str = add_grammar_and_capitalization_to_list(self.preprocesses_list)
 
-        species_str = add_grammar_and_capitlization_to_list(self.species_list)
+        species_str = add_grammar_and_capitalization_to_list(self.species_list)
 
         # Make description string
         description = (
@@ -88,10 +86,12 @@ class PreprocessAnalyzer():
                 # If preprocess has a specified parameter from the config, update sweep/labels.
                 row_label,parameter_sweep = self.update_labels_and_sweep(preprocess, preprocess_param)
 
+                # Lookup preprocessing function
+                process_function = PROCESSING_METHODS.get(preprocess)
+
+                # Loop through all cutouts and apply process_function to them
                 for cutout in list_of_cutouts_for_species:
                     img = cv2.imread(f"{download_directory}/{cutout}.png", cv2.IMREAD_UNCHANGED) 
-
-                    process_function = PROCESSING_METHODS.get(preprocess)
 
                     for idx, param in enumerate(parameter_sweep):
                         processed_image = process_function(img,"",param)
@@ -106,7 +106,10 @@ class PreprocessAnalyzer():
                 num_params = len(parameter_sweep)+1 # add one to include original image
                 row_labels = row_label
                 col_labels = sorted(list_of_cutouts_for_species)
-                row_spacing = self.row_spacing_dictionary[preprocess]
+                if preprocess in self.row_spacing_dictionary:
+                    row_spacing = self.row_spacing_dictionary[preprocess]
+                else:
+                    row_spacing = .16
                 image_grid_path = image_comp_grid(base_dir=download_directory, row_labels=row_labels, col_labels=col_labels, num_rows=num_params, num_cols=num_cutouts, row_spacing=row_spacing)
 
                 # Add grid to report with caption
@@ -170,8 +173,13 @@ class PreprocessAnalyzer():
         return species_list
 
     def update_labels_and_sweep(self, preprocess, preprocess_param):
+
+        if preprocess not in self.row_label_dictionary or preprocess not in self.sweep_dictionary:
+            log.error(f"{preprocess} preprocessing requested. But row_label_dictionary or sweep_dictionary does not contain the preprocess")
+            return
+
         row_label = self.row_label_dictionary[preprocess][:]
-        parameter_sweep = self.test_dictionary[preprocess][:]
+        parameter_sweep = self.sweep_dictionary[preprocess][:]
 
         if preprocess == 'remove_soil':
             specified_exg = preprocess_param
