@@ -127,6 +127,10 @@ def remove_soil(img: np.ndarray, cutout_id: str, exg_threshold: float) -> np.nda
         Perform basic EXG
     """
 
+    if not 20 <= exg_threshold <= 50:
+        log.warning(f"Specified exg_threshold: {exg_threshold} out of range [20,50]")
+
+
     # Convert to float32 for ExG calculation
     img_float = img[:, :, :3].astype(np.float32)
 

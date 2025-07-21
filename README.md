@@ -155,7 +155,7 @@ Preprocesses downloaded cutouts based on the what you set for a certain species.
 
 #### Arguments
 
-- **Remove_Soil**: Applies the Excess Green Index (EXG) to all cutouts of a specified species, with the goal of minimizing the presence of soil in the images. Note: While EXG is effective at reducing soil visibility, it may also unintentionally remove other plant parts such as stems and flowers. Use with caution.
+- **Remove_Soil**: Applies the Excess Green Index (EXG) to all cutouts of a specified species, with the goal of minimizing the presence of soil in the images. Note: While EXG is effective at reducing soil visibility, it may also unintentionally remove other plant parts such as stems and flowers. Use with caution. A working range is set on this filter between EXG 20,50
 
 #### Output:
 - `data/cutouts/*.png` (Preprcessed cutout images)

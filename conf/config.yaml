@@ -27,7 +27,7 @@ move_cutouts:
   parallel_workers: 8
 
 preprocess_cutouts:
-  remove_soil: # applies exg filter
+  remove_soil: # applies exg filter, working range [20,50]
     Hairy Vetch: 20
     Crimson Clover: 100
   num_workers: 20
