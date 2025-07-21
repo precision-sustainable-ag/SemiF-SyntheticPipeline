@@ -122,20 +122,6 @@ class PDFDrafter():
                     self.place_image(storage_graph_paths, new_line=True, image_scaler=1/2)    
                 self.position_state["offset_from_left_of_page"] = 0
                 num_of_images_on_line = 0
-
-    def add_two_images_with_caption(self, caption: str, image_paths: tuple[str, str]) -> None:
-
-        if caption:
-            self.wrap_text(caption, self.fonts["styles"]["normal"], self.fonts["size"]["heading"])
-
-        first_image, second_image = images
-
-        # Place images
-        self.place_image(first_image, new_line=False, image_scaler=1/2)
-        self.place_image(second_image, new_line=True, image_scaler=1/2)  
-
-        # Move cursor back to left side of page
-        self.position_state["offset_from_left_of_page"] = 0
         
     def add_one_image_with_caption(self, caption: str, image_path: str) -> None:
 
