@@ -27,7 +27,7 @@ class PreprocessAnalyzer():
         self.num_cutouts_per_species = 15
 
         # EXG CONFIGS
-        self.exg_tests = [20, 30, 40, 50]
+        self.exg_tests = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
         self.test_dictionary = {}
         self.test_dictionary['remove_soil'] = self.exg_tests
