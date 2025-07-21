@@ -1,8 +1,6 @@
 import os
 import cv2
-import random
 import logging
-import numpy as np
 from omegaconf import DictConfig
 
 from utils.pdf import PDFDrafter
@@ -27,10 +25,10 @@ class PreprocessAnalyzer():
         self.num_cutouts_per_species = 15
 
         # EXG CONFIGS
-        self.exg_tests = [0, 20, 40, 60, 80, 100]
+        exg_sweep = [0, 20, 40, 60, 80, 100]
 
         self.test_dictionary = {}
-        self.test_dictionary['remove_soil'] = self.exg_tests
+        self.test_dictionary['remove_soil'] = exg_sweep
 
         self.row_label_dictionary = {}
         self.row_label_dictionary['remove_soil'] = ['no exg'] + [f'exg={x}' for x in self.test_dictionary['remove_soil']]
@@ -65,12 +63,6 @@ class PreprocessAnalyzer():
         # pass in species list to ensure we analyze all cutouts
         species_processes_dictionary = invert_and_check_species_preprocess_dictionary(self.preprocess_cutouts, self.species_list) 
         
-        # remove empty params
-        species_processes_dictionary = {
-            species: processes
-            for species, processes in species_processes_dictionary.items()
-        }
-
         for species, process_param_pairs in species_processes_dictionary.items():
 
             if species not in self.cutouts_indexed_by_species:
@@ -93,24 +85,15 @@ class PreprocessAnalyzer():
                 os.makedirs(download_directory, exist_ok=True)
                 self.download_cutouts(species, list_of_cutouts_for_species, download_directory)
 
-                # Apply preprocessing
-                row_label = self.row_label_dictionary[preprocess][:]
-                tests = self.test_dictionary[preprocess][:]
+                # If preprocess has a specified parameter from the config, update sweep/labels.
+                row_label,parameter_sweep = self.update_labels_and_sweep(preprocess, preprocess_param)
 
                 for cutout in list_of_cutouts_for_species:
                     img = cv2.imread(f"{download_directory}/{cutout}.png", cv2.IMREAD_UNCHANGED) 
 
                     process_function = PROCESSING_METHODS.get(preprocess)
 
-                    if preprocess == 'remove_soil':
-                        specified_exg = preprocess_param
-                        # Update EXG threshold analysis to include analysis of target EXG
-                        index_to_replace = min(range(len(tests)), key=lambda i: abs(tests[i] - specified_exg))
-                        tests[index_to_replace] = specified_exg
-                        # Update row label as well, add one because of no_exg insert at beggining of list
-                        row_label[index_to_replace + 1] = f'cfg: exg={specified_exg}'
-
-                    for idx, param in enumerate(tests):
+                    for idx, param in enumerate(parameter_sweep):
                         processed_image = process_function(img,"",param)
 
                         # save file add underscore to keep track on where to place in plot
@@ -120,7 +103,7 @@ class PreprocessAnalyzer():
             
                 # Create grid from downloaded/preprocessed cutouts
                 num_cutouts = len(list_of_cutout_metadata_for_species)
-                num_params = len(tests)+1 # add one to include original image
+                num_params = len(parameter_sweep)+1 # add one to include original image
                 row_labels = row_label
                 col_labels = sorted(list_of_cutouts_for_species)
                 row_spacing = self.row_spacing_dictionary[preprocess]
@@ -186,6 +169,22 @@ class PreprocessAnalyzer():
 
         return species_list
 
+    def update_labels_and_sweep(self, preprocess, preprocess_param):
+        row_label = self.row_label_dictionary[preprocess][:]
+        parameter_sweep = self.test_dictionary[preprocess][:]
+
+        if preprocess == 'remove_soil':
+            specified_exg = preprocess_param
+            # Update EXG threshold analysis to include analysis of target EXG
+            index_to_replace = min(range(len(parameter_sweep)), key=lambda i: abs(parameter_sweep[i] - specified_exg))
+            parameter_sweep[index_to_replace] = specified_exg
+            # Update row label as well, add one because of no_exg insert at beggining of list
+            row_label[index_to_replace + 1] = f'cfg: exg={specified_exg}'
+
+        return row_label, parameter_sweep
+
+# Lookup dictionary to map preprocessing names from the config to actual function implementations.
+# To add a new preprocessing method, add an entry here linking the string name to the corresponding function.
 PROCESSING_METHODS = {
     "remove_soil": remove_soil,
 }

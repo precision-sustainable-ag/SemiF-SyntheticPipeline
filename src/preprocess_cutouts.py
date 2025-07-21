@@ -230,6 +230,8 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
 
     return species_processes_dictionary
 
+# Lookup dictionary to map preprocessing names from the config to actual function implementations.
+# To add a new preprocessing method, add an entry here linking the string name to the corresponding function.
 PROCESSING_METHODS = {
     "remove_soil": remove_soil,
     "overwrite_images": overwrite_images,
