@@ -67,11 +67,11 @@ class PreprocessAnalyzer():
         
         # remove empty params
         species_processes_dictionary = {
-            species: [process for (process, _) in processes]
+            species: processes
             for species, processes in species_processes_dictionary.items()
         }
 
-        for species in species_processes_dictionary:
+        for species, process_param_pairs in species_processes_dictionary.items():
 
             if species not in self.cutouts_indexed_by_species:
                 log.error(f"Requested analysis for a species: {species} not in recipe (not requested in category.common_name). Skipping")
@@ -85,7 +85,7 @@ class PreprocessAnalyzer():
                 list_of_cutouts_for_species.append(cutout["cutout_id"])
 
             # Loop over preprocesses, perform them, create plot, then delete downloaded cutouts
-            for preprocess in species_processes_dictionary[species]:
+            for preprocess, preprocess_param in process_param_pairs:
                 preprocess=preprocess.lower()
 
                 # Download cutouts
@@ -103,9 +103,7 @@ class PreprocessAnalyzer():
                     process_function = PROCESSING_METHODS.get(preprocess)
 
                     if preprocess == 'remove_soil':
-                        species_dict = self.cfg.preprocess_cutouts.remove_soil
-                        species_dict = {k.upper(): v for k, v in species_dict.items()}
-                        specified_exg = species_dict[species.upper()]
+                        specified_exg = preprocess_param
                         # Update EXG threshold analysis to include analysis of target EXG
                         index_to_replace = min(range(len(tests)), key=lambda i: abs(tests[i] - specified_exg))
                         tests[index_to_replace] = specified_exg
