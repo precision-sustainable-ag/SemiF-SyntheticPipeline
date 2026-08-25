@@ -1,5 +1,6 @@
 import os
 import cv2
+import json
 import logging
 from omegaconf import DictConfig
 
@@ -129,7 +130,10 @@ class PreprocessAnalyzer():
     def pick_cutouts_based_on_metadata(self, preprocessed_cutouts: list, metadata: str):
         # Sort by brown colors
         def is_brown(x):
-            r, g, b = x['cutout_props']['cropout_rgb_mean']
+            rgb = x['cropout_rgb_mean']
+            if isinstance(rgb, str):
+                rgb = json.loads(rgb)
+            r, g, b = rgb
             return r - min(g, b)
 
         sorted_cutouts = sorted(

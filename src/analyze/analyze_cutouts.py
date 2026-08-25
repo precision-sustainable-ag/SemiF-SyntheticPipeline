@@ -8,7 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 # util imports
 from utils.pdf import PDFDrafter 
 from utils.utils import clear_directory, read_recipe, query_for_cutout_metadata, add_grammar_and_capitalization_to_list
-from utils.graphs import horizontal_bar_chart_plot, jitter_plot, vertical_bar_chart_plot, boolean_horizontal_bar_chart_plot
+from utils.graphs import horizontal_bar_chart_plot, jitter_plot, vertical_bar_chart_plot, boolean_horizontal_bar_chart_plot, bbox_area_horizontal_box_plot
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class CutoutAnalyzer():
         self.cursor = conn.cursor()
 
         # Get column names
-        self.cursor.execute("PRAGMA table_info(semif_cutouts);")
+        self.cursor.execute("PRAGMA table_info(semif);")
         columns = [col[1] for col in self.cursor.fetchall()]
 
         if analysis_type == 'specified': 
@@ -71,7 +71,7 @@ class CutoutAnalyzer():
         """
         # Loop through specified cutouts
         for cutout_id in cutout_ids:
-            self.cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
+            self.cursor.execute("SELECT * FROM semif WHERE cutout_id = ?", (cutout_id,))
             rows = self.cursor.fetchall()
             self.query_for_metadata(rows, columns)
 
@@ -83,7 +83,7 @@ class CutoutAnalyzer():
         for species in common_name:
             species_lower = species.lower()
             self.cursor.execute(
-                "SELECT * FROM semif_cutouts WHERE LOWER(json_extract(category, '$.common_name')) = ?",
+                "SELECT * FROM semif WHERE LOWER(trim(category_common_name)) = ?",
                 (species_lower,)
             )
             rows = self.cursor.fetchall()
@@ -95,13 +95,8 @@ class CutoutAnalyzer():
         """
         for row in rows:
             row_dict = dict(zip(columns, row))
-            try:
-                row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
-                row_dict['category'] = json.loads(row_dict['category'])
-            except Exception:
-                continue
 
-            species = row_dict['category']['common_name'].upper()
+            species = row_dict['category_common_name'].upper()
 
             self.metadata_to_dict(species, row_dict['cutout_id'], row_dict)
             if self.states is None:
@@ -118,13 +113,13 @@ class CutoutAnalyzer():
         """
         prop_map = {
             'num_components': self.batch_num_components,
-            'bbox_area_cm2': self.bbox,
+            'estimated_bbox_area_cm2': self.bbox,
             'blur_effect': self.blur,
             'is_primary': self.is_primary,
             'extends_border': self.extends_border,
         }
         for prop, target_dict in prop_map.items():
-            val = cutout['cutout_props'].get(prop)
+            val = cutout.get(prop)
             target_dict[species].setdefault(synthetic, []).append(val)
 
         # Track cutout count
@@ -157,6 +152,8 @@ class CutoutAnalyzer():
             horizontal_bar_chart_plot(self.batch_num_components[species], species, "Number of Components", file_path, title_info, palette, logrithmic)
         for species in self.bbox:
             jitter_plot(self.bbox[species], species, "BBOX Area (cm^2)", file_path, title_info, palette)
+            if title_info == 'all':
+                bbox_area_horizontal_box_plot(self.bbox[species], species, self.cfg.paths.resultsdir)
         for species in self.blur:
             jitter_plot(self.blur[species], species, "Blur Effect", file_path, title_info, palette)
         for species in self.is_primary:

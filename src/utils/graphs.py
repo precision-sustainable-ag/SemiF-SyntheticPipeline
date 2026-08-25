@@ -229,6 +229,61 @@ def jitter_plot(
 
     save_plot(species, file_name, file_path, title_info)
 
+def bbox_area_horizontal_box_plot(
+    meta_data_dict: dict[str, list[int | float | None]],
+    species: str,
+    results_dir: str,
+) -> None:
+    """Save a horizontal bbox-area box plot with quartiles, median, and mean."""
+    bbox_values = []
+    for _, values in meta_data_dict.items():
+        for value in values:
+            if value is None:
+                continue
+            try:
+                bbox_values.append(float(value))
+            except (TypeError, ValueError):
+                continue
+
+    if not bbox_values:
+        log.warning(f"No bbox_area_cm2 values found for {species}. Skipping box plot.")
+        return
+
+    output_dir = os.path.join(results_dir, "bbox_area_boxplots")
+    os.makedirs(output_dir, exist_ok=True)
+
+    bbox_series = pd.Series(bbox_values, name="BBOX Area (cm^2)")
+    q1 = bbox_series.quantile(0.25)
+    median = bbox_series.quantile(0.5)
+    q3 = bbox_series.quantile(0.75)
+    mean = bbox_series.mean()
+
+    plt.figure(figsize=(10, 3.5))
+    ax = sns.boxplot(
+        x=bbox_series,
+        orient="h",
+        color="#9ecae1",
+        showmeans=True,
+        meanprops={"marker": "o", "markerfacecolor": "#e6550d", "markeredgecolor": "#e6550d", "markersize": 7},
+        medianprops={"color": "#08519c", "linewidth": 2},
+    )
+
+    ax.set_title(f"BBOX Area Distribution: {species.title()}", fontsize=16)
+    ax.set_xlabel("BBOX Area (cm^2)", fontsize=12)
+    ax.set_yticks([])
+    ax.grid(True, axis="x", alpha=0.3)
+
+    stats_text = f"mean={mean:.2f} | q1={q1:.2f} | median={median:.2f} | q3={q3:.2f}"
+    ax.text(0.01, 1.08, stats_text, transform=ax.transAxes, fontsize=10, ha="left", va="bottom")
+
+    file_name = f"{species}_bbox_area_boxplot.png".replace(" ", "_").lower()
+    output_path = os.path.join(output_dir, file_name)
+
+    plt.tight_layout()
+    plt.savefig(output_path, bbox_inches="tight")
+    log.info(f"Plot saved as {output_path}")
+    plt.close()
+
 def vertical_bar_chart_plot(
     data_dict: dict[str, int],
     file_name: str,

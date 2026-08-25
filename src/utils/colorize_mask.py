@@ -28,13 +28,16 @@ def load_class_rgb_mapping(json_file: Path) -> dict:
     for image in synthetic_images:
         cutouts = image.get("cutouts", [])
         for cutout in cutouts:
-            category = cutout.get("category", {})
-            class_id = category.get("class_id")
-            rgb = category.get("rgb")
-            
+            class_id = cutout.get("category_class_id")
+            rgb = cutout.get("category_rgb")
+
             # Only add the mapping if both class_id and rgb exist.
             if class_id is not None and rgb is not None:
-                # Convert the list to a tuple for immutability.
+                class_id = int(class_id)
+                # rgb comes from the DB as a stringified list (e.g. "[171, 42, 159]"),
+                # not an actual list, so parse it before converting to a tuple.
+                if isinstance(rgb, str):
+                    rgb = json.loads(rgb)
                 rgb_tuple = tuple(rgb)
                 # If the class_id is already mapped, you might want to check for consistency.
                 if class_id in class_rgb_mapping:

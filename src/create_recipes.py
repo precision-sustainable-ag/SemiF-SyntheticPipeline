@@ -132,7 +132,7 @@ class DBRecipeManager:
         # Group documents by normalized common_name
         class_groups = defaultdict(list)
         for doc in documents:
-            common_name = doc['category']['common_name'].lower()  # Normalize to lowercase
+            common_name = doc['category_common_name'].lower()  # Normalize to lowercase
             class_groups[common_name].append(doc)
 
         # Create a weighted population based on normalized weights
@@ -316,7 +316,7 @@ def log_sample_counts(documents, text="samples"):
     # Group documents by common_name and count occurrences
     class_counts = defaultdict(int)
     for doc in documents:
-        common_name = doc['category']['common_name']
+        common_name = doc['category_common_name']
         class_counts[common_name] += 1
 
     # Print the counts
@@ -343,7 +343,7 @@ def main(cfg: DictConfig) -> None:
             # Generate a new unique identifier as a string.
             doc["_id"] = str(uuid.uuid4())
     # Convert nested JSON strings into dictionaries/lists.
-    documents = [recursively_parse_json(doc) for doc in documents]
+    # documents = [recursively_parse_json(doc) for doc in documents]
     recipe_manager = DBRecipeManager(cfg)
     recipe_manager.process_cutouts(documents)
     log.info("Recipe creation completed.")
