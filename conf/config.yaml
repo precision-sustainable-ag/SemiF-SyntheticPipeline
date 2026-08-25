@@ -43,5 +43,5 @@ synthesize:
 
 sqlite3:
   dev_imgs: "semif_developed_images" # Table name
-  cutouts: "semif_cutouts" # Table name
+  cutouts: "semif" # Table name
   db_name: "agir"

@@ -260,11 +260,11 @@ def clear_directory(dir_path: str) -> None:
 def query_for_cutout_metadata(cutout_id: str,cursor: sqlite3.Cursor) -> str:
 
         # Get column names
-        cursor.execute("PRAGMA table_info(semif_cutouts);")
+        cursor.execute("PRAGMA table_info(semif);")
         columns = [col[1] for col in cursor.fetchall()]
 
         # Fetch the single row with the given cutout_id
-        cursor.execute("SELECT * FROM semif_cutouts WHERE cutout_id = ?", (cutout_id,))
+        cursor.execute("SELECT * FROM semif WHERE cutout_id = ?", (cutout_id,))
         row = cursor.fetchone()
 
         if row is None:
@@ -273,15 +273,8 @@ def query_for_cutout_metadata(cutout_id: str,cursor: sqlite3.Cursor) -> str:
         # Turn the row into a dictionary
         row_dict = dict(zip(columns, row))
 
-        # Attempt to parse JSON fields
-        try:
-            row_dict['cutout_props'] = json.loads(row_dict['cutout_props'])
-            row_dict['category'] = json.loads(row_dict['category'])
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse JSON fields for cutout_id {cutout_id}: {e}")
-
-        # Extract species
-        species = row_dict['category']['common_name'].upper()
+        # Extract species (category/cutout_props fields are flat columns, not JSON blobs)
+        species = row_dict['category_common_name'].upper()
 
         return species
 
@@ -292,7 +285,7 @@ def index_cutouts_by_species(json_recipe_path: str) -> dict[str, dict]:
     species_indexed_cutouts = {}
     for synthetic_image in synthetic_images:
         for cutout in synthetic_image["cutouts"]:
-            species = cutout["category"]["common_name"].upper()
+            species = cutout["category_common_name"].upper()
             if species not in species_indexed_cutouts:
                 species_indexed_cutouts[species] = []
             species_indexed_cutouts[species].append(cutout)

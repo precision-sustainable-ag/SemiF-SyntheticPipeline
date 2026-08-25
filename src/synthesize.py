@@ -227,7 +227,7 @@ class ImageProcessor:
         placed_regions = []  # List to store the coordinates of already placed cutouts
 
         for img, (cutout_id, cutout_metadata) in zip(images, cutout_data):            
-            class_id = cutout_metadata['category']['class_id']
+            class_id = cutout_metadata['category_class_id']
             cutout_id = cutout_metadata['cutout_id']
 
             # Apply transformations to the cutout
@@ -642,7 +642,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
                     log.error(f"Failed to load cutout image {cutout_path}. Skipping.")
                     continue
                 # Calculate real-world scaling for the cutout
-                cutout_area = cutout_metadata['cutout_props']['bbox_area_cm2']
+                cutout_area = cutout_metadata['estimated_bbox_area_cm2']
                 cutout_pixel_area = cutout_area * pixel_cm_ratio
                 cutout_scaling_factor = math.sqrt(cutout_pixel_area / (img.shape[1] * img.shape[0]))
 

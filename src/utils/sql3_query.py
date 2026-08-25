@@ -128,12 +128,12 @@ class SQLiteQueryHandler:
                 cn_lower = cn.lower().strip()
                 min_val = range_vals.get('min', default_min)
                 max_val = range_vals.get('max', default_max)
-                conditions.append("(LOWER(trim(json_extract(category, '$.common_name'))) = ? AND json_extract(cutout_props, '$.bbox_area_cm2') >= ? AND json_extract(cutout_props, '$.bbox_area_cm2') <= ?)")
+                conditions.append("(LOWER(trim(category_common_name)) = ? AND estimated_bbox_area_cm2 >= ? AND estimated_bbox_area_cm2 <= ?)")
                 parameters.extend([cn_lower, min_val, max_val])
 
             # For records whose common name is not specified in the overrides, apply the default range.
             placeholders = ", ".join("?" for _ in cn_ranges.keys())
-            default_condition = f"(LOWER(trim(json_extract(category, '$.common_name'))) NOT IN ({placeholders}) AND json_extract(cutout_props, '$.bbox_area_cm2') >= ? AND json_extract(cutout_props, '$.bbox_area_cm2') <= ?)"
+            default_condition = f"(LOWER(trim(category_common_name)) NOT IN ({placeholders}) AND estimated_bbox_area_cm2 >= ? AND estimated_bbox_area_cm2 <= ?)"
             # Add the lower-cased common names to the parameters.
             parameters.extend([cn.lower().strip() for cn in cn_ranges.keys()])
             parameters.extend([default_min, default_max])
@@ -145,8 +145,8 @@ class SQLiteQueryHandler:
             self.params.extend(parameters)
         else:
             # If no specific common name ranges, fall back to default
-            self.add_condition("json_extract(cutout_props, '$.bbox_area_cm2')", ">=", default_min)
-            self.add_condition("json_extract(cutout_props, '$.bbox_area_cm2')", "<=", default_max)
+            self.add_condition("estimated_bbox_area_cm2", ">=", default_min)
+            self.add_condition("estimated_bbox_area_cm2", "<=", default_max)
 
     def add_validated_filter(self) -> None:
         """
@@ -188,17 +188,17 @@ class SQLiteQueryHandler:
         self.add_bbox_area_condition()
         # Handle extends_border filter
         if morph.get('extends_border') is not None:
-            self.add_condition("json_extract(cutout_props, '$.extends_border')", "=", morph.extends_border)
+            self.add_condition("extends_border", "=", morph.extends_border)
 
         # Handle is_primary filter
         if morph.get('is_primary') is not None:
-            self.add_condition("json_extract(cutout_props, '$.is_primary')", "=", morph.is_primary)
+            self.add_condition("is_primary", "=", morph.is_primary)
 
         # Handle blur_effect filter
-        self.add_range_filter(morph, 'blur_effect', 'json_extract(cutout_props, "$.blur_effect")')
+        self.add_range_filter(morph, 'blur_effect', 'blur_effect')
 
         # Handle num_components filter
-        self.add_range_filter(morph, 'num_components', 'json_extract(cutout_props, "$.num_components")')
+        self.add_range_filter(morph, 'num_components', 'num_components')
 
     def add_category_condition(self) -> None:
         """
@@ -218,7 +218,7 @@ class SQLiteQueryHandler:
                         placeholders = ", ".join("?" for _ in names)
                         # Construct the condition:
                         # LOWER(json_extract(category, '$.common_name')) IN (?, ?, ...)
-                        condition = f"LOWER(trim(json_extract(category, '$.common_name'))) IN ({placeholders})"
+                        condition = f"LOWER(trim(category_common_name)) IN ({placeholders})"
                         # condition = "LOWER(trim(json_extract(category, '$.common_name'))) = ?"
                         self.conditions.append(condition)
                         # Append the lower-cased names to the parameters.
@@ -226,12 +226,12 @@ class SQLiteQueryHandler:
                     else:
                         # If value is a single string, use an equality check.
                         # condition = "LOWER(json_extract(category, '$.common_name')) = ?"
-                        condition = "LOWER(trim(json_extract(category, '$.common_name'))) = ?"
+                        condition = "LOWER(trim(category_common_name)) = ?"
                         self.conditions.append(condition)
                         self.params.append(value.lower().strip())
                 else:
                     # For other category keys, apply a simple equality filter.
-                    condition = f"json_extract(category, '$.{key}') = ?"
+                    condition = f"category_{key} = ?"
                     self.conditions.append(condition)
                     self.params.append(value)
     def add_non_target_weed_condition(self) -> None:
@@ -243,14 +243,14 @@ class SQLiteQueryHandler:
 
         # Handle non_target_weed filters either True or False
         if non_target_weed is not None:
-            self.add_condition("json_extract(cutout_props, '$.non_target_weed')", "=", non_target_weed)
+            self.add_condition("non_target_weed", "=", non_target_weed)
 
         # Handle non_target_weed_pred_conf filter which has a min and max value
         if non_target_weed_pred_conf.min or non_target_weed_pred_conf.max:
             min_conf = non_target_weed_pred_conf.get('min', 0.0)
             max_conf = non_target_weed_pred_conf.get('max', 1.0)
-            self.add_condition("json_extract(cutout_props, '$.non_target_weed_pred_conf')", ">=", min_conf)
-            self.add_condition("json_extract(cutout_props, '$.non_target_weed_pred_conf')", "<=", max_conf)
+            self.add_condition("non_target_weed_pred_conf", ">=", min_conf)
+            self.add_condition("non_target_weed_pred_conf", "<=", max_conf)
 
 @hydra.main(version_base="1.2", config_path="../../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -264,4 +264,3 @@ def main(cfg: DictConfig) -> None:
 # Example usage:
 if __name__ == "__main__":
     main()
-    

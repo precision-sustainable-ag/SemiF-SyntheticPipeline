@@ -20,7 +20,7 @@ morphological:
   # Filter settings for morphological properties under "cutout_props"
   is_primary: true
   extends_border: false
-  validated: true
+  validated: null # suggested database has no "Validated" column
   
   bbox_area_cm2:  # Area range in cm2
     default:

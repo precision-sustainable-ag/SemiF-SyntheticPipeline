@@ -27,7 +27,7 @@ class CutoutProcessor():
         # Connect to database (READ ONLY)
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
         self.cursor = conn.cursor()
-        self.cursor.execute("PRAGMA table_info(semif_cutouts);")
+        self.cursor.execute("PRAGMA table_info(semif);")
 
         # Grab cutout ids of the cutouts that were downloaded
         self.cutout_path = cfg.paths.cutoutdir
