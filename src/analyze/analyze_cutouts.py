@@ -8,7 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 # util imports
 from utils.pdf import PDFDrafter 
 from utils.utils import clear_directory, read_recipe, query_for_cutout_metadata, add_grammar_and_capitalization_to_list
-from utils.graphs import horizontal_bar_chart_plot, jitter_plot, vertical_bar_chart_plot, boolean_horizontal_bar_chart_plot, bbox_area_horizontal_box_plot
+from utils.graphs import horizontal_bar_chart_plot, jitter_plot, vertical_bar_chart_plot, boolean_horizontal_bar_chart_plot
 
 log = logging.getLogger(__name__)
 
@@ -152,8 +152,6 @@ class CutoutAnalyzer():
             horizontal_bar_chart_plot(self.batch_num_components[species], species, "Number of Components", file_path, title_info, palette, logrithmic)
         for species in self.bbox:
             jitter_plot(self.bbox[species], species, "BBOX Area (cm^2)", file_path, title_info, palette)
-            if title_info == 'all':
-                bbox_area_horizontal_box_plot(self.bbox[species], species, self.cfg.paths.resultsdir)
         for species in self.blur:
             jitter_plot(self.blur[species], species, "Blur Effect", file_path, title_info, palette)
         for species in self.is_primary:
