@@ -7,7 +7,7 @@ from typing import Dict, List, Any
 from collections import defaultdict
 from omegaconf import DictConfig
 from tqdm import tqdm
-from utils.sql3_query import SQLiteQueryHandler
+from utils.sql3_query import SpeciesFilterQueryEngine
 
 log = logging.getLogger(__name__)
   
@@ -330,13 +330,12 @@ def main(cfg: DictConfig) -> None:
     """
     log.info("Starting recipe creation process.")  # Log the start of the process
 
-    query_handler = SQLiteQueryHandler(cfg)
-    query_handler.add_conditions()
-    rows, columns = query_handler.execute_query()
-    log.info(f"Retrieved {len(rows)} documents from the database.")
-    query_handler.close()
-    # Convert the rows to a list of dictionaries.
-    documents = [dict(zip(columns, row)) for row in rows]
+    query_engine = SpeciesFilterQueryEngine(cfg)
+    try:
+        documents = query_engine.fetch_all()
+    finally:
+        query_engine.close()
+    log.info(f"Retrieved {len(documents)} documents from the database.")
     # Ensure each document has an _id field.
     for doc in documents:
         if "_id" not in doc:

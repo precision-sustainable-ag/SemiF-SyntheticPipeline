@@ -18,7 +18,7 @@ class PDFDrafter():
         self.cfg = cfg
 
         # Extract species and sort them alphabetically, ignore duplicates
-        species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
+        species_list = list(set(name.lower() for name in cfg.cutout_filters.category.species_filters.keys()))
         self.sorted_species = sorted(species_list, key=lambda s: s.lower())
 
         # Set up canvas/pdf

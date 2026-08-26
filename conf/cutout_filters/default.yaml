@@ -1,64 +1,250 @@
 # Settings
 
-total_images: 3
+total_images: 10
 
 background_fov_cm2: 7500 # bbot images, Assumed real-world field of view for backgrounds (in cm²)
 # background_fov_cm2: 3000  # unsplash images Assumed real-world field of view for backgrounds (in cm²)
 resize_factor: 0.25
 
 cuts_n_image: # Number of cutouts per image
-  min: 500
-  max: 1500
+  min: 1
+  max: 2
 
 reuse_cutouts: true  # Whether to allow reusing cutouts in multiple images
 min_visibility: 0.0  # Minimum visibility ratio required for the new cutout
+
 morphological:
+  # These filters are applied uniformly to every species (not per-species).
+  # For per-species filters (season, year, estimated_bbox_area_cm2, num_components,
+  # day_range) see category.species_filters below.
   non_target_weed:  # Querying for non_target_weed == false
   non_target_weed_pred_conf:
     min:
     max:  # Confidence must be between 0.5 and 1.0
-  # Filter settings for morphological properties under "cutout_props"
+
   is_primary: true
   extends_border: false
   validated: null # suggested database has no "Validated" column
-  
-  bbox_area_cm2:  # Area range in cm2
-    default:
-      min: 10
-      max: 1000
-    common_name_ranges: # applies to specific common names, use default if not specified here but in the common_name list
-      Mustards:
-        min: 10
-        max: 1000
-    
-    
-    # very_small: [0, 0.1]
-    # small: [0.1, 1]
-    # medium: [1, 10]
-    # medium_large: [10, 100]
-    # large: [100, 1000]
-    # very_large: [1000, 1000000]
-  
+
   blur_effect:  # Blur effect threshold
-    min: 
-    max: 
-  num_components: # Number of components range
     min:
     max:
 
+# Per-species filters.
+#
+# Each key under `species_filters` is a category_common_name to include. Every
+# field below follows one rule: leave it blank/empty and NO condition is
+# applied for that field for that species (i.e. it goes through unfiltered on
+# that dimension). There is no implicit shared "default" fallback -- blank
+# always means unrestricted, not "use some default range".
+#
+# is_primary / extends_border are the ONE exception to that rule, since they
+# default to the *global* morphological.is_primary / morphological.extends_border
+# value above rather than to "unrestricted":
+#   - blank      -> inherit the global value (same behavior as every other
+#                    species that doesn't override it)
+#   - true/false -> override the global value for this species only
+#   - "any"      -> explicit opt-out: no filter at all for this species,
+#                    even while the global filter stays active for everyone
+#                    else
+#
+# estimated_bbox_area_cm2: pick ONE mode, never both:
+#   - {min, max}   -> literal absolute cm^2 range
+#   - {percentile} -> keep rows above this percentile (e.g. 75 = keep the top
+#                     25% by estimated_bbox_area_cm2), computed independently
+#                     per matching season, AFTER season/year/num_components/
+#                     day_range have already narrowed that season's rows.
+#
+# day_range: pick ONE mode, or leave entirely blank for no date filtering.
+# All offsets are always relative to that SPECIFIC season's own min/max
+# datetime (computed live per season -- never a fixed calendar date), so
+# nothing here ever needs to be precomputed by hand:
+#   - last_days: N            -> [max_dt - N days, max_dt]
+#   - first_days: N           -> [min_dt, min_dt + N days]
+#   - trim_days: {start, end} -> [min_dt + start days, max_dt - end days]
+#     (either side of trim_days may be 0 to only trim the other end)
+#
+# When `season` is left blank (all seasons), day_range and the
+# estimated_bbox_area_cm2 percentile are each computed independently per
+# matching season -- never combined into one cross-season window/threshold.
 category:
-  # Filter settings for category attributes
-  common_name:
-    - oats
-    - cereal rye
-    - Crimson clover
-    - red clover
-    - winter pea
-    - hairy vetch
-    - Black Oats
-    - Winter Wheat
-    - Mustards
-    
+  species_filters:
+    oats:
+      season:
+      year:
+      is_primary:
+      extends_border:
+      estimated_bbox_area_cm2:
+        min: 10
+        max: 1000
+        percentile:
+      num_components:
+        min:
+        max:
+      day_range:
+        last_days:
+        first_days:
+        trim_days:
+          start:
+          end:
+    cereal rye:
+      season:
+      year:
+      is_primary:
+      extends_border:
+      estimated_bbox_area_cm2:
+        min: 10
+        max: 1000
+        percentile:
+      num_components:
+        min:
+        max:
+      day_range:
+        last_days:
+        first_days:
+        trim_days:
+          start:
+          end:
+    crimson clover:
+      season: [cover_crops_2023_2024]
+      year:
+      is_primary: any
+      extends_border: any
+      estimated_bbox_area_cm2:
+        min:
+        max:
+        percentile: 75
+      num_components:
+        min: 1
+        max: 20
+      day_range:
+        last_days: 2
+        first_days:
+        trim_days:
+          start:
+          end:
+    red clover:
+      season:
+      year:
+      is_primary:
+      extends_border:
+      estimated_bbox_area_cm2:
+        min: 10
+        max: 1000
+        percentile:
+      num_components:
+        min:
+        max:
+      day_range:
+        last_days:
+        first_days:
+        trim_days:
+          start:
+          end:
+    winter pea:
+      season:
+      year:
+      is_primary:
+      extends_border:
+      estimated_bbox_area_cm2:
+        min: 10
+        max: 1000
+        percentile:
+      num_components:
+        min:
+        max:
+      day_range:
+        last_days:
+        first_days:
+        trim_days:
+          start:
+          end:
+    hairy vetch:
+      season:
+      year:
+      is_primary:
+      extends_border:
+      estimated_bbox_area_cm2:
+        min: 10
+        max: 1000
+        percentile:
+      num_components:
+        min:
+        max:
+      day_range:
+        last_days:
+        first_days:
+        trim_days:
+          start:
+          end:
+    black oats:
+      season:
+      year:
+      is_primary:
+      extends_border:
+      estimated_bbox_area_cm2:
+        min: 10
+        max: 1000
+        percentile:
+      num_components:
+        min:
+        max:
+      day_range:
+        last_days:
+        first_days:
+        trim_days:
+          start:
+          end:
+    winter wheat:
+      season:
+      year:
+      is_primary:
+      extends_border:
+      estimated_bbox_area_cm2:
+        min: 10
+        max: 1000
+        percentile:
+      num_components:
+        min:
+        max:
+      day_range:
+        last_days:
+        first_days:
+        trim_days:
+          start:
+          end:
+    mustards:
+      season:
+      year:
+      is_primary:
+      extends_border:
+      estimated_bbox_area_cm2:
+        min: 10
+        max: 1000
+        percentile:
+      num_components:
+        min:
+        max:
+      day_range:
+        last_days:
+        first_days:
+        trim_days:
+          start:
+          end:
+
+common_name_weights:
+    crimson clover: 1.0  # clover
+    red clover: 0.0    # clover
+    winter pea: 0.0     # peas
+    hairy vetch: 0.0   # vetch
+    mustards: 0.0        # brassicas
+    black oats: 0.0     # Grass
+    oats: 0.0            # Grass
+    cereal rye: 0.0      # Grass
+    winter wheat: 0.0    # Grass
+
+
+
     # - Barley
     # - Barnyardgrass
     # - Broadleaf Signalgrass
@@ -104,14 +290,3 @@ category:
     # - Winter Pea
     # - Winter Wheat
     # - Yellow Foxtail
-    
-common_name_weights:
-    crimson clover: 0.15  # clover
-    red clover: 0.15      # clover
-    winter pea: 0.15      # peas
-    hairy vetch: 0.15     # vetch
-    mustards: 0.15        # brassicas
-    black oats: 0.075      # Grass
-    oats: 0.075            # Grass
-    cereal rye: 0.075      # Grass
-    winter wheat: 0.075    # Grass

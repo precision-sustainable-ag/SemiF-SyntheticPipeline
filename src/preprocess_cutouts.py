@@ -20,7 +20,7 @@ class CutoutProcessor():
         self.num_workers = cfg.preprocess_cutouts.num_workers
 
         self.common_names = [
-            name.upper() for name in self.cfg.cutout_filters.category.common_name
+            name.upper() for name in self.cfg.cutout_filters.category.species_filters.keys()
         ]
         db_path = str(cfg.paths.sql_database)
 
@@ -223,7 +223,7 @@ def invert_and_check_species_preprocess_dictionary(preprocess_cutouts: dict[str,
 
             else:
                 log.warning(
-                    f"Requested preprocessing for {species_upper} but did not specify in cfg.cutout_filters.category.common_name"
+                    f"Requested preprocessing for {species_upper} but did not specify in cfg.cutout_filters.category.species_filters"
                 )
                 log.warning("Skipping this species")
 

@@ -19,7 +19,7 @@ class CutoutAnalyzer():
         self.db_path = str(cfg.paths.sql_database)
 
         # Extract list of common names
-        species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
+        species_list = list(set(name.lower() for name in cfg.cutout_filters.category.species_filters.keys()))
         sorted_species = sorted(species_list, key=lambda s: s.lower())
 
         # KEEP TRACK OF NUMBER OF CUTOUTS
@@ -220,9 +220,9 @@ def main(cfg: DictConfig, report: PDFDrafter) -> None:
     directory_for_graphs_of_specified_cutouts = "specified"
     directory_for_graphs_of_storages = 'storage_location'
 
-    if not cfg.cutout_filters.category.common_name:
+    if not cfg.cutout_filters.category.species_filters:
         log.error("No species specified for analysis")
-        log.error("Species can be specified in cutout_filters under common_name")
+        log.error("Species can be specified in cutout_filters under category.species_filters")
         return
 
     # Graph all species specified in config
@@ -238,7 +238,7 @@ def main(cfg: DictConfig, report: PDFDrafter) -> None:
     heading = "Analysis of Cutouts"
 
     # Description
-    species_list = list(set(name.lower() for name in cfg.cutout_filters.category.common_name))
+    species_list = list(set(name.lower() for name in cfg.cutout_filters.category.species_filters.keys()))
     species_list = add_grammar_and_capitalization_to_list(species_list)
     description = f"The following section is a report of the {species_list} in the database. The aim is to display the metadata of all cutouts vs cutouts you specified in your configuration"
 
