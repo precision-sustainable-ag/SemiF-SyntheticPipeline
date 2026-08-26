@@ -65,7 +65,7 @@ class PreprocessAnalyzer():
         for species, process_param_pairs in species_processes_dictionary.items():
 
             if species not in self.cutouts_indexed_by_species:
-                log.error(f"Requested analysis for a species: {species} not in recipe (not requested in category.common_name). Skipping")
+                log.error(f"Requested analysis for a species: {species} not in recipe (not requested in category.species_filters). Skipping")
                 continue
 
             # Get list of cutouts to add to report
