@@ -330,6 +330,12 @@ def main(cfg: DictConfig) -> None:
     """
     log.info("Starting recipe creation process.")  # Log the start of the process
 
+    if cfg.get("cutout_source", "legacy") == "seg_to_cut":
+        from seg_to_cut_source import create_recipes_from_runs
+
+        create_recipes_from_runs(cfg)
+        return
+
     query_handler = SQLiteQueryHandler(cfg)
     query_handler.add_conditions()
     rows, columns = query_handler.execute_query()
