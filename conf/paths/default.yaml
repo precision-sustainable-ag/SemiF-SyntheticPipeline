@@ -13,6 +13,7 @@ species_info: /home/psa_images/SemiF-AnnotationPipeline/data/semifield-utils/spe
 primary_longterm_storage: /mnt/research-projects/s/screberg/longterm_images
 secondary_longterm_storage: /mnt/research-projects/s/screberg/GROW_DATA
 tertiary_longterm_storage: /mnt/research-projects/s/screberg/longterm_images2
+cutout_storage_root: ${paths.primary_longterm_storage}
 
 # SQL database
 sql_database: ${paths.datadir}/db/agir.db

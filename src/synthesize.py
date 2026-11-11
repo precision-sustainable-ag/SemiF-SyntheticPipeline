@@ -227,20 +227,27 @@ class ImageProcessor:
         placed_regions = []  # List to store the coordinates of already placed cutouts
 
         for img, (cutout_id, cutout_metadata) in zip(images, cutout_data):            
-            from_seg_to_cut = self.cfg.get("cutout_source", "legacy") == "seg_to_cut"
+            source = self.cfg.get("cutout_source", "legacy")
+            from_seg_to_cut = source == "seg_to_cut"
+            from_agir_db = source == "agir_db"
+            direct_source = from_seg_to_cut or from_agir_db
             class_id = (
                 cutout_metadata['resolved_class_id']
-                if from_seg_to_cut
+                if direct_source
                 else cutout_metadata['category']['class_id']
             )
             cutout_id = cutout_metadata['cutout_id']
 
-            placement = cutout_metadata.get('cutout_props', {}).get('edge_cut', {}).get(
-                'synthetic_placement', 'unrestricted'
-            ) if from_seg_to_cut else 'unrestricted'
+            placement = (
+                cutout_metadata.get('cutout_props', {}).get('edge_cut', {}).get(
+                    'synthetic_placement', 'unrestricted'
+                ) if from_seg_to_cut else
+                cutout_metadata['synthetic_placement'] if from_agir_db else
+                'unrestricted'
+            )
             # Rotating or flipping a truncated plant changes which edge it must touch.
             transformed_img = img if placement != 'unrestricted' else self.apply_random_transform(img)
-            if from_seg_to_cut and (
+            if direct_source and (
                 transformed_img.shape[0] > bg_height or transformed_img.shape[1] > bg_width
             ):
                 log.warning("Skipping cutout %s: scaled cutout exceeds the background", cutout_id)
@@ -249,7 +256,7 @@ class ImageProcessor:
             for _ in range(max_retries):
                 roi_x, roi_y, img_x_start, img_y_start, img_x_end, img_y_end = (
                     self.placement_coordinates(bg_height, bg_width, transformed_img, placement)
-                    if from_seg_to_cut else
+                    if direct_source else
                     self.random_coordinates(bg_height, bg_width, transformed_img)
                 )
                 # Calculate the bounding box for this placement
@@ -433,7 +440,7 @@ class ImageProcessor:
         
         cutout_rgb = rgb_image[img_y_start:img_y_end, img_x_start:img_x_end].astype(np.float32)     
         cutout_alpha = alpha_channel[img_y_start:img_y_end, img_x_start:img_x_end]
-        if self.cfg.get("cutout_source", "legacy") != "seg_to_cut":
+        if self.cfg.get("cutout_source", "legacy") == "legacy":
             kernel = np.ones((3, 3), np.uint8)
             cutout_alpha = cv2.erode(cutout_alpha, kernel, iterations=1)
         cutout_rgb[cutout_alpha == 0] = 0
@@ -523,7 +530,11 @@ class ImageCompositor:
         self.recipe = recipe  # Store the recipe as an attribute for access in other methods
         self.background_path = Path(cfg.paths.backgrounddir, recipe['background_image_id'])
         self.cutout_metadata = recipe['cutouts']
-        self.cutout_paths = [Path(cfg.paths.cutoutdir, cutout['cutout_id'] + ".png") for cutout in self.cutout_metadata]
+        self.cutout_paths = [
+            Path(cutout['cutout_path']) if cfg.get("cutout_source", "legacy") in ("seg_to_cut", "agir_db")
+            else Path(cfg.paths.cutoutdir, cutout['cutout_id'] + ".png")
+            for cutout in self.cutout_metadata
+        ]
         self.processor = ImageProcessor(cfg, num_cutouts=len(self.cutout_paths))
         self.config_save_dirs(cfg)
 
@@ -645,7 +656,10 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         shared_data (Dict): Shared dictionary for pre-loaded cutouts and backgrounds.
     """
     try:
-        from_seg_to_cut = cfg.get("cutout_source", "legacy") == "seg_to_cut"
+        source = cfg.get("cutout_source", "legacy")
+        from_seg_to_cut = source == "seg_to_cut"
+        from_agir_db = source == "agir_db"
+        direct_source = from_seg_to_cut or from_agir_db
         # Extract background path
         background_path = Path(cfg.paths.backgrounddir, recipe['background_image_id'])
         background_fov_cm2 = cfg.cutout_filters.background_fov_cm2  # Real-world FoV for background
@@ -654,7 +668,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         if background_path not in shared_data:
             log.info(f"Loading background image {background_path}")
             background_image = cv2.imread(str(background_path), cv2.IMREAD_COLOR)
-            if from_seg_to_cut and background_image is None:
+            if direct_source and background_image is None:
                 raise ValueError(f"Could not read background: {background_path}")
             
             # Calculate real-world pixel-to-cm ratio for the background
@@ -673,7 +687,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         
         # background = shared_data[background_path]  # Get the pre-loaded background image
         background, pixel_cm_ratio = shared_data[background_path]
-        if from_seg_to_cut:
+        if direct_source:
             background = background.copy()
         
         # Process the cutouts and check if they are in shared_data
@@ -682,20 +696,20 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         for cutout_metadata in recipe['cutouts']:
             cutout_id = cutout_metadata['cutout_id']
             cutout_path = (
-                Path(cutout_metadata['cutout_path']) if from_seg_to_cut
+                Path(cutout_metadata['cutout_path']) if direct_source
                 else Path(cfg.paths.cutoutdir, f"{cutout_id}.png")
             )
             if cutout_path not in shared_data:
                 log.debug(f"Loading cutout image {cutout_path}")
                 img = cv2.imread(str(cutout_path), cv2.IMREAD_UNCHANGED)
                 if img is None:
-                    if from_seg_to_cut:
+                    if direct_source:
                         raise ValueError(f"Could not read cutout: {cutout_path}")
                     log.error(f"Failed to load cutout image {cutout_path}. Skipping.")
                     continue
                 # Calculate real-world scaling for the cutout
                 cutout_area = (
-                    cutout_metadata['synthesis_area_cm2'] if from_seg_to_cut
+                    cutout_metadata['synthesis_area_cm2'] if direct_source
                     else cutout_metadata['cutout_props']['bbox_area_cm2']
                 )
                 cutout_pixel_area = cutout_area * pixel_cm_ratio
@@ -722,6 +736,19 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
                     if not np.any(img[:, :, 3]):
                         log.warning("Skipping cutout %s: foreground disappeared after scaling to %s", cutout_id, size)
                         continue
+                elif from_agir_db:
+                    if img.ndim != 3 or img.shape[2] != 4:
+                        raise ValueError(f"Expected a BGRA cutout: {cutout_path}")
+                    size = (
+                        max(1, round(img.shape[1] * cutout_scaling_factor)),
+                        max(1, round(img.shape[0] * cutout_scaling_factor)),
+                    )
+                    original_alpha = img[:, :, 3]
+                    img = cv2.resize(img, size, interpolation=cv2.INTER_LINEAR)
+                    img[:, :, 3] = cv2.resize(original_alpha, size, interpolation=cv2.INTER_NEAREST)
+                    if not np.any(img[:, :, 3]):
+                        log.warning("Skipping cutout %s: foreground disappeared after scaling", cutout_id)
+                        continue
                 else:
                     img = resize_image(img, cutout_scaling_factor)
                     if img.shape[2] == 4:
@@ -731,7 +758,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
             images.append(shared_data[cutout_path])
             cutout_data.append((cutout_id, cutout_metadata))
 
-        if from_seg_to_cut and not images:
+        if direct_source and not images:
             raise ValueError("All selected cutouts lost their foreground during scaling")
         
         # Initialize the processor with the number of cutouts
@@ -741,7 +768,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
         result, result_semantic_mask, result_instance_mask, coord_results, yolo_bboxes = processor.distribute_images(
            background, images, cutout_data, mode="random", min_visibility=cfg.cutout_filters.min_visibility
            )
-        if from_seg_to_cut and cfg.synthesize.semantic_masks and not np.any(result_semantic_mask):
+        if direct_source and cfg.synthesize.semantic_masks and not np.any(result_semantic_mask):
             raise ValueError("No cutout foreground was placed; synthetic image was not saved")
         
         # Save the results
@@ -751,7 +778,7 @@ def process_recipe(cfg: DictConfig, recipe: Dict, shared_data: Dict) -> None:
     
     except Exception as exc:
         log.exception(f"Failed to process synthetic image {recipe['synthetic_image_id']}: {exc}")
-        if cfg.get("cutout_source", "legacy") == "seg_to_cut":
+        if cfg.get("cutout_source", "legacy") in ("seg_to_cut", "agir_db"):
             raise
 
 def main(cfg: DictConfig) -> None:
@@ -786,7 +813,7 @@ def main(cfg: DictConfig) -> None:
                         log.info("Recipe processed successfully.")
                     except Exception as exc:
                         log.exception(f"Recipe processing failed: {exc}")
-                        if cfg.get("cutout_source", "legacy") == "seg_to_cut":
+                        if cfg.get("cutout_source", "legacy") in ("seg_to_cut", "agir_db"):
                             raise
         else:
             # Sequential processing for debugging
@@ -796,5 +823,5 @@ def main(cfg: DictConfig) -> None:
                     log.info(f"Processed recipe {recipe['synthetic_image_id']}")
                 except Exception as exc:
                     log.exception(f"Failed to process recipe: {exc}")
-                    if cfg.get("cutout_source", "legacy") == "seg_to_cut":
+                    if cfg.get("cutout_source", "legacy") in ("seg_to_cut", "agir_db"):
                         raise

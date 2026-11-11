@@ -13,7 +13,12 @@ project_name: pm3d
 sub_name: mixed
 
 # The original SQLite/storage workflow remains the default.
-cutout_source: legacy  # legacy or seg_to_cut
+cutout_source: legacy  # legacy, seg_to_cut, or agir_db
+agir_db:
+  # Filter names through cutout_filters.category.common_name.
+  min_area_cm2: 0
+  max_area_cm2: null
+  class_weights: {}  # optional common_name: weight mapping
 seg_to_cut:
   runs: []  # Paths to completed seg_to_cut/<run_id> directories
   validated: null  # null accepts both reviewed and unreviewed cutouts

@@ -335,6 +335,11 @@ def main(cfg: DictConfig) -> None:
 
         create_recipes_from_runs(cfg)
         return
+    if cfg.get("cutout_source", "legacy") == "agir_db":
+        from agir_db_source import create_recipes_from_db
+
+        create_recipes_from_db(cfg)
+        return
 
     query_handler = SQLiteQueryHandler(cfg)
     query_handler.add_conditions()

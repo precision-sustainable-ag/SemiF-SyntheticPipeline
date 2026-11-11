@@ -1,0 +1,20 @@
+workdir: ${hydra:runtime.cwd}
+projectdir: ${paths.workdir}/projects/${project_name}/${sub_name}
+datadir: ${paths.workdir}/data
+cutoutdir: ${paths.datadir}/cutouts
+cutoutanalysisdir: ${paths.cutoutdir}/analysis
+backgrounddir: /mnt/thunder_storage/dash_agir/backgrounds
+recipesdir: ${paths.projectdir}/recipes
+resultsdir: ${paths.projectdir}/results
+analysisdir: ${paths.projectdir}/analysis
+species_info: ${paths.datadir}/species_info.json
+
+# AgIR DB paths such as /semifield-cutouts/<batch>/<cutout>.png
+# are resolved beneath this mounted directory.
+cutout_storage_root: /mnt/thunder_storage/dash_agir
+sql_database: /mnt/thunder_storage/dash_agir/semifield-database/AgIR_DB_v2_0_202609.db
+
+# Compatibility paths for the legacy workflow; agir_db does not use them.
+primary_longterm_storage: /mnt/thunder_storage/dash_agir
+secondary_longterm_storage: /mnt/thunder_storage/dash_agir
+tertiary_longterm_storage: /mnt/thunder_storage/dash_agir
