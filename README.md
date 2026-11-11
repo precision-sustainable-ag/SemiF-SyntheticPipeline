@@ -46,6 +46,36 @@ SemiF-SyntheticPipeline is a Python-based pipeline for generating synthetic imag
    Ensure the database is placed in the correct directory as specified in the configuration files.
 
 ## Configuration
+
+### AgIR DB v2 cutouts on Lightning
+
+Use `cutout_source=agir_db` to read cutout records from the flat `semif` table.
+The `paths=lightning` preset points to the mounted AgIR DB, cutouts, and
+background JPEGs. Run from the repository root, for example:
+
+```bash
+python main.py paths=lightning cutout_source=agir_db \
+  'cutout_filters.category.common_name=["white clover"]' \
+  cutout_filters.total_images=2 \
+  cutout_filters.cuts_n_image.min=10 \
+  cutout_filters.cuts_n_image.max=20
+```
+
+The new source uses `category.common_name` to select DB rows. It maps DB
+`cutout_path` and `cutout_json_path` values beneath
+`paths.cutout_storage_root`, verifies the PNG exists, and reads JSON only for
+cutouts considered for recipes. It uses `cutout_props.edge_cut.synthetic_placement`
+when present. If that field is absent, only `extends_border = false` cutouts
+are accepted as unrestricted; true or unknown flags and `unsuitable`
+placements are skipped. A positive `bbox_area_cm2`, or otherwise a positive
+`estimated_bbox_area_cm2`, is required for image scaling. Optional
+`agir_db.min_area_cm2`, `agir_db.max_area_cm2`, and `agir_db.class_weights`
+settings are separate from the legacy cutout filters. The usual recipe count,
+cutouts per image, reuse, background field of view, and resize settings still
+apply. The analysis, move, and preprocessing tasks are skipped for this source.
+
+The existing `seg_to_cut` and `legacy` sources retain their own input paths.
+
 The pipeline is configured using **Hydra-based YAML files**.
 
 ### Main Configuration: `config.yaml`

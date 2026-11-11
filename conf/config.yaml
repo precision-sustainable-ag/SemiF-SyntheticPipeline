@@ -12,6 +12,23 @@ hydra:
 project_name: pm3d
 sub_name: mixed
 
+# The original SQLite/storage workflow remains the default.
+cutout_source: legacy  # legacy, seg_to_cut, or agir_db
+agir_db:
+  # Filter names through cutout_filters.category.common_name.
+  min_area_cm2: 0
+  max_area_cm2: null
+  class_weights: {}  # optional common_name: weight mapping
+seg_to_cut:
+  runs: []  # Paths to completed seg_to_cut/<run_id> directories
+  validated: null  # null accepts both reviewed and unreviewed cutouts
+  is_primary: null
+  common_names: []  # empty accepts all classes
+  placements: [unrestricted]  # add edge/corner placements when suitable cutouts are scarce
+  min_area_cm2: 0  # Minimum cutout area in cm²; 0 imposes no extra lower limit
+  max_area_cm2: null  # Maximum cutout area in cm²; null imposes no upper limit
+  class_weights: {}  # optional common_name: weight mapping
+
 tasks:
   # - json_to_mongo # Deprecated
   create_recipes:
